@@ -1,0 +1,22 @@
+{
+	"name": "client-end",
+	"main": "client-public/index-client.js",
+	"scripts": {
+		"start": "expo start",
+		"android": "expo run:android",
+		"ios": "expo run:ios",
+		"web": "expo start --web"
+	},
+	"dependencies": {
+		"@react-native-async-storage/async-storage": "^2.2.0",
+		"@stripe/stripe-react-native": "^0.54.1",
+		"expo": "^54.0.6",
+		"react": "19.1.0",
+		"react-native": "0.81.4",
+		"react-native-modal": "^14.0.0-rc.1",
+		"react-native-safe-area-context": "^5.6.1",
+		"react-native-toast-message": "^2.3.3",
+		"shared-store": "file:../shared-store",
+		"zustand": "^5.0.8"
+	}
+}
