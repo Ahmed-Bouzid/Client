@@ -9,8 +9,7 @@ import {
 	Pressable,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useProductStore } from "../../client-public/stores/useProductStore";
-
+import useProductStore from "../stores/useProductStore.js";
 export default function Menu({
 	userName,
 	orders,
