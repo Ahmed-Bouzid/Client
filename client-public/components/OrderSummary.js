@@ -92,7 +92,7 @@ const OrderSummary = ({
 				>
 					<Text style={styles.actionButtonText}>
 						{safeCurrentOrder.length > 0
-							? "Ajouter cette commande"
+							? "Envoyer la commande"
 							: "Commande envoyée"}
 					</Text>
 				</TouchableOpacity>

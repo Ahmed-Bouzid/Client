@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import JoinOrCreateTable from "./components/JoinOrCreateTable";
 import Menu from "./components/Menu";
@@ -14,14 +14,31 @@ export default function App() {
 	const [tableId] = useState("686af692bb4cba684ff3b757");
 	const [userName, setUserName] = useState(null);
 	const [hasActiveOrder, setHasActiveOrder] = useState(false);
-	const [allOrders, setAllOrders] = useState([]); // ← AJOUTÉ - toutes les commandes cumulées
-	const [orders, setOrders] = useState([]); // commandes déjà envoyées
-	const [currentOrder, setCurrentOrder] = useState([]); // commande en cours
+	const [allOrders, setAllOrders] = useState([]);
+	const [orders, setOrders] = useState([]);
+	const [currentOrder, setCurrentOrder] = useState([]);
 	const [cart, setCart] = useState({});
+	const [activeOrderId, setActiveOrderId] = useState(null); // ⭐ NOUVEAU: Stocke l'ID de commande active
 	const restaurantId = "686af511bb4cba684ff3b72e";
 
-	// Utilisation du hook d'alerte personnalisée
 	const { showAlert, AlertComponent } = useCustomAlert();
+
+	// Récupérer l'ID de commande active au démarrage
+	useEffect(() => {
+		const loadActiveOrderId = async () => {
+			try {
+				const savedId = await AsyncStorage.getItem("activeOrderId");
+				if (savedId) {
+					setActiveOrderId(savedId);
+					setHasActiveOrder(true);
+					console.log("📦 OrderId restauré:", savedId);
+				}
+			} catch (error) {
+				console.error("Erreur chargement orderId:", error);
+			}
+		};
+		loadActiveOrderId();
+	}, []);
 
 	const getClientToken = async () => {
 		const token = await AsyncStorage.getItem("clientToken");
@@ -34,7 +51,6 @@ export default function App() {
 		setStep("menu");
 	};
 
-	// Ajouter un produit à la commande en cours
 	const handleAddOrder = (item) => {
 		setCurrentOrder((prev) => {
 			const existing = prev.find((o) => o._id === item._id);
@@ -45,14 +61,12 @@ export default function App() {
 			}
 			return [...prev, { ...item, quantity: 1, user: userName }];
 		});
-		// Mettre à jour le panier visuel
 		setCart((prev) => ({
 			...prev,
 			[item._id]: (prev[item._id] || 0) + 1,
 		}));
 	};
 
-	// Modifier quantité / suppression dans la commande en cours
 	const handleUpdateQuantity = (item, quantity) => {
 		if (quantity <= 0) {
 			setCurrentOrder((prev) => prev.filter((o) => o._id !== item._id));
@@ -72,20 +86,16 @@ export default function App() {
 	const submitOrder = async () => {
 		console.log("📦 Début de submitOrder");
 
-		const items =
-			currentOrder.length > 0
-				? currentOrder.map((i) => ({
-						productId: i._id,
-						name: i.name,
-						quantity: i.quantity,
-						price: i.price,
-				  }))
-				: [];
+		const items = currentOrder.map((i) => ({
+			productId: i._id,
+			name: i.name,
+			quantity: i.quantity,
+			price: i.price,
+		}));
 
 		console.log("🛒 Items à commander:", items);
 
 		if (items.length === 0) {
-			console.log("❌ Panier vide");
 			showAlert(
 				"Panier vide",
 				"Veuillez ajouter des articles avant de commander.",
@@ -95,12 +105,10 @@ export default function App() {
 		}
 
 		try {
-			console.log("🔑 Récupération du token...");
 			const token = await getClientToken();
-			console.log("✅ Token récupéré:", token ? "OUI" : "NON");
+			console.log("🔑 Token récupéré: OUI");
 
-			console.log("🚀 Envoi de la commande...");
-			const res = await fetch("http://192.168.1.165:3000/orders/", {
+			const res = await fetch("http://192.168.1.185:3000/orders/", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -131,20 +139,26 @@ export default function App() {
 				return;
 			}
 
-			// AJOUT : Cumuler les commandes dans allOrders
+			// ⭐⭐⭐ SAUVEGARDEZ L'ID DE LA COMMANDE ⭐⭐⭐
+			const newOrderId = data._id;
+			setActiveOrderId(newOrderId);
+			await AsyncStorage.setItem("activeOrderId", newOrderId);
+			setHasActiveOrder(true);
+			console.log("🎯 Nouvelle commande ID:", newOrderId);
+
+			// Cumuler les commandes
 			setAllOrders((prev) => [
 				...prev,
 				...currentOrder.map((item) => ({
 					...item,
 					sent: true,
-					orderId: data.orderId,
+					orderId: newOrderId,
 				})),
 			]);
 
-			// Reset panier MAIS PAS hasActiveOrder
+			// Reset panier
 			setCurrentOrder([]);
 			setCart({});
-			setHasActiveOrder(true); // ← GARDEZ ÇA POUR LE BOUTON PAYER
 
 			showAlert(
 				"✅ Commande envoyée",
@@ -168,7 +182,6 @@ export default function App() {
 		}
 	};
 
-	// Valider la commande actuelle et passer à add-ons
 	const handleValidateOrder = () => {
 		if (currentOrder.length === 0) {
 			showAlert("Aucun article", "Veuillez ajouter au moins un produit.", [
@@ -179,7 +192,6 @@ export default function App() {
 		setStep("orders");
 	};
 
-	// Ajouter des add-ons et continuer
 	const handleAddOnComplete = (addOns) => {
 		const updatedOrder = [...currentOrder];
 		addOns.forEach((item) => {
@@ -191,13 +203,30 @@ export default function App() {
 			}
 		});
 		setCurrentOrder(updatedOrder);
-		setStep("orders"); // page de récap
+		setStep("orders");
 	};
 
-	// Envoyer la commande finale
-	const handlePay = () => {
-		// Logique de paiement...
-		setHasActiveOrder(false); // ← COMMANDE TERMINÉE
+	// ⭐⭐⭐ FONCTION POUR NAVIGUER VERS PAYMENT ⭐⭐⭐
+	const navigateToPayment = () => {
+		if (!activeOrderId) {
+			showAlert("Erreur", "Aucune commande active à payer", [{ text: "OK" }]);
+			return;
+		}
+		console.log("🚀 Navigation vers Payment avec ID:", activeOrderId);
+		setStep("payment");
+	};
+
+	// ⭐⭐⭐ FONCTION APRÈS PAIEMENT RÉUSSI ⭐⭐⭐
+	const handlePaymentSuccess = async () => {
+		// Marquer la commande comme payée dans le state
+		setHasActiveOrder(false);
+		setAllOrders([]);
+
+		// Supprimer l'ID sauvegardé
+		setActiveOrderId(null);
+		await AsyncStorage.removeItem("activeOrderId");
+
+		console.log("✅ Paiement réussi, retour au menu");
 		setStep("menu");
 	};
 
@@ -218,13 +247,13 @@ export default function App() {
 						setOrders={setCurrentOrder}
 						onAdd={handleAddOrder}
 						onValidate={handleValidateOrder}
-						onPay={handlePay}
-						cart={cart}
-						setCart={setCart}
+						onPay={handlePaymentSuccess} // Appelé après paiement réussi
 						onUpdateQuantity={handleUpdateQuantity}
 						hasActiveOrder={hasActiveOrder}
-						onNavigateToPayment={() => setStep("payment")}
+						onNavigateToPayment={navigateToPayment} // ⬅️ FONCTION CORRECTE
 						onNavigateToOrders={() => setStep("addOn")}
+						cart={cart}
+						setCart={setCart}
 					/>
 				)}
 
@@ -238,7 +267,7 @@ export default function App() {
 
 				{step === "orders" && (
 					<OrderSummary
-						allOrders={allOrders} // ← AJOUTÉ
+						allOrders={allOrders}
 						currentOrder={currentOrder}
 						onUpdateQuantity={handleUpdateQuantity}
 						onSubmitOrder={submitOrder}
@@ -248,17 +277,13 @@ export default function App() {
 
 				{step === "payment" && (
 					<Payment
-						allOrders={allOrders} // ← AJOUTÉ
-						onSuccess={() => {
-							setHasActiveOrder(false); // ← Reset ici
-							setAllOrders([]); // ← VIDER après paiement
-							setStep("menu");
-						}}
+						allOrders={allOrders}
+						orderId={activeOrderId} // ⬅️ ID PASSÉ DIRECTEMENT
+						onSuccess={handlePaymentSuccess}
 						onBack={() => setStep("menu")}
 					/>
 				)}
 
-				{/* Composant d'alerte personnalisée - DOIT ÊTRE À LA FIN */}
 				<AlertComponent />
 			</SafeAreaView>
 		</StripeProvider>
