@@ -13,8 +13,14 @@ export const productService = {
 			const response = await fetch(url, { headers });
 
 			if (!response.ok) {
-				const errorText = await response.text();
-				throw new Error(`HTTP ${response.status}: ${errorText}`);
+				let errorText = `HTTP ${response.status}`;
+				try {
+					const errorData = await response.json();
+					errorText = errorData.message || errorText;
+				} catch (e) {
+					// Si ce n'est pas du JSON, utiliser le status
+				}
+				throw new Error(errorText);
 			}
 
 			const data = await response.json();

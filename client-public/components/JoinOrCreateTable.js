@@ -1,6 +1,4 @@
 import React, { useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import {
 	View,
 	Text,
@@ -10,18 +8,20 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	FlatList,
-	ScrollView,
 	ImageBackground,
 } from "react-native";
+import { useTableStore } from "../stores/useTableStore.js";
 
 export default function JoinOrCreateTable({
-	tableId = "686af692bb4cba684ff3b757",
+	tableId = null,
 	onJoin,
 }) {
-	console.log("🔹 JoinOrCreateTable mounted"); // <--- ajouté
 	const [name, setName] = useState("");
 	const [error, setError] = useState("");
 	const [participants, setParticipants] = useState(["Alice", "Bob", "Charlie"]);
+
+	const { joinTable, tableId: storeTableId, restaurantId } = useTableStore();
+	const finalTableId = tableId || storeTableId;
 
 	const handleJoin = async () => {
 		if (!name.trim()) {
@@ -29,29 +29,20 @@ export default function JoinOrCreateTable({
 			return;
 		}
 
+		if (!finalTableId) {
+			setError("TableId manquant. Veuillez scanner le QR code de la table ou contacter le serveur.");
+			return;
+		}
+
 		try {
-			const res = await fetch("http://192.168.1.185:3000/client/token", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					pseudo: name,
-					tableId: tableId,
-					restaurantId: "686af511bb4cba684ff3b72e",
-				}),
-			});
-
-			const data = await res.json();
-			if (!res.ok) throw new Error(data.message || "Erreur serveur");
-
-			// ✅ Stocker le token côté client
-			await AsyncStorage.setItem("clientToken", data.token);
-
+			// Passer restaurantId depuis le store
+			await joinTable(name, finalTableId, restaurantId);
 			setError("");
 			setParticipants((prev) => [...prev, name]);
 			onJoin(name);
 			setName("");
 		} catch (err) {
-			setError(err.message);
+			setError(err.message || "Erreur lors de la connexion");
 		}
 	};
 
@@ -67,7 +58,7 @@ export default function JoinOrCreateTable({
 				keyboardVerticalOffset={Platform.OS === "ios" ? -300 : 0}
 			>
 				<Text style={styles.title}>
-					Bienvenue à vous. Vous êtes à la table {tableId.number || tableId}
+					Bienvenue à vous. Vous êtes à la table {finalTableId?.number || finalTableId || "?"}
 				</Text>
 
 				{participants.length > 0 && (

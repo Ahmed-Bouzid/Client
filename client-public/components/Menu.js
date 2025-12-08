@@ -11,8 +11,10 @@ import {
 	Alert,
 } from "react-native";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import useProductStore from "../stores/useProductStore.js";
+import { useCartStore } from "../stores/useCartStore.js";
+import { useOrderStore } from "../stores/useOrderStore.js";
+import { orderService } from "../../shared-api/services/orderService.js";
 
 export default function Menu({
 	userName,
@@ -29,11 +31,12 @@ export default function Menu({
 }) {
 	const products = useProductStore((state) => state.products);
 	const fetchProducts = useProductStore((state) => state.fetchProducts);
+	const { cart } = useCartStore();
+	const { currentOrder, fetchActiveOrder } = useOrderStore();
 
 	const [selectedCategory, setSelectedCategory] = useState(null);
 	const [modalVisible, setModalVisible] = useState(false);
 	const [selectedItem, setSelectedItem] = useState(null);
-	const [cart, setCart] = useState({});
 
 	// ⚡ Catégories principales
 	const categories = [
@@ -48,78 +51,33 @@ export default function Menu({
 		{ id: "dessert", title: "🍰 Desserts", color: "#BA68C8", icon: "cake" },
 	];
 
-	// ============ PERSISTANCE AVEC ASYNCSTORAGE ============
-	useEffect(() => {
-		const loadCart = async () => {
-			try {
-				const saved = await AsyncStorage.getItem(`cart_${userName}`);
-				if (saved) setCart(JSON.parse(saved));
-			} catch (error) {
-				console.error("Erreur chargement panier:", error);
-			}
-		};
-		loadCart();
-	}, [userName]);
-
-	useEffect(() => {
-		const saveCart = async () => {
-			try {
-				await AsyncStorage.setItem(`cart_${userName}`, JSON.stringify(cart));
-			} catch (error) {
-				console.error("Erreur sauvegarde panier:", error);
-			}
-		};
-		saveCart();
-	}, [cart, userName]);
-
 	// ============ FONCTIONS ============
-	const handleIncrease = (item) => {
-		setCart({ ...cart, [item._id]: (cart[item._id] || 0) + 1 });
+	const handleIncrease = async (item) => {
+		// onAdd gère déjà l'ajout au panier ET à la commande
 		onAdd(item);
 	};
 
-	const handleDecrease = (item) => {
-		if (cart[item._id] > 0) {
-			setCart({ ...cart, [item._id]: cart[item._id] - 1 });
+	const handleDecrease = async (item) => {
+		const currentQty = cart[item._id] || 0;
+		if (currentQty > 0) {
+			const newQty = currentQty - 1;
+			// onUpdateQuantity gère déjà la mise à jour du panier ET de la commande
+			onUpdateQuantity(item, newQty);
 		}
 	};
 
 	const cartItems = products
-		.filter((item) => cart[item._id] > 0)
+		.filter((item) => (cart[item._id] || 0) > 0)
 		.map((item) => ({
 			...item,
 			sent:
-				orders.find((o) => o.name === item.name && o.user === userName)?.sent ||
+				currentOrder.find((o) => o.name === item.name && o.user === userName)?.sent ||
 				false,
 		}));
 
 	const getActiveOrderId = async () => {
-		try {
-			const token = await AsyncStorage.getItem("clientToken");
-			if (!token) {
-				console.log("❌ Pas de token");
-				return null;
-			}
-
-			const API_URL = "http://192.168.1.185:3000";
-			const response = await fetch(`${API_URL}/orders/active`, {
-				headers: { Authorization: `Bearer ${token}` },
-			});
-
-			if (response.ok) {
-				const orders = await response.json();
-				if (orders.length === 0) return null;
-
-				const activeOrder = orders.find(
-					(order) => !order.paid && order.status !== "completed"
-				);
-				return activeOrder?._id;
-			}
-			return null;
-		} catch (error) {
-			console.error("Erreur récupération commande:", error);
-			return null;
-		}
+		const activeOrder = await fetchActiveOrder();
+		return activeOrder?._id || null;
 	};
 
 	const openModal = (item) => {
@@ -128,85 +86,24 @@ export default function Menu({
 	};
 
 	const handlePayPress = async () => {
-		console.log("🎯 Début paiement...");
-
-		// ⭐⭐⭐ SOLUTION TEMPORAIRE ⭐⭐⭐
-		// Si navigation n'existe pas, utilisez onNavigateToPayment s'il existe
 		if (onNavigateToPayment) {
-			console.log("🔄 Utilisation de onNavigateToPayment (prop)");
-
 			const orderId = await getActiveOrderId();
 			if (!orderId) {
 				Alert.alert("Erreur", "Aucune commande active trouvée");
 				return;
 			}
-
-			// Appelez la fonction passée en prop
-			onNavigateToPayment(orderId, cartItems);
+			onNavigateToPayment();
 			return;
 		}
 
-		// Sinon, essayez navigation
-		if (!navigation) {
-			console.log("❌ Navigation non disponible, ouverture modal de paiement");
-
-			const orderId = await getActiveOrderId();
-			if (!orderId) {
-				Alert.alert("Erreur", "Aucune commande active trouvée");
-				return;
-			}
-
-			// ⭐⭐⭐ OUVREZ UNE MODAL DIRECTEMENT ⭐⭐⭐
-			Alert.alert(
-				"💳 Paiement",
-				`Commande: ${orderId}\nTotal: ${cartItems.reduce(
-					(sum, item) => sum + item.price * cart[item._id],
-					0
-				)}€\n\nVoulez-vous marquer comme payée?`,
-				[
-					{ text: "Annuler", style: "cancel" },
-					{
-						text: "Marquer comme payée",
-						onPress: async () => {
-							try {
-								const API_URL = "http://192.168.1.185:3000";
-								const response = await fetch(
-									`${API_URL}/orders/${orderId}/mark-as-paid`,
-									{
-										method: "POST",
-									}
-								);
-
-								if (response.ok) {
-									Alert.alert("✅ Succès", "Commande marquée comme payée");
-									// Optionnel: vider le panier
-									setCart({});
-								} else {
-									Alert.alert("❌ Erreur", "Impossible de marquer comme payée");
-								}
-							} catch (error) {
-								console.error("Erreur paiement:", error);
-								Alert.alert("❌ Erreur", "Problème de connexion");
-							}
-						},
-					},
-				]
-			);
-			return;
-		}
-
-		// Code original si navigation existe
+		// Fallback si pas de navigation
 		const orderId = await getActiveOrderId();
 		if (!orderId) {
 			Alert.alert("Erreur", "Aucune commande active trouvée");
 			return;
 		}
 
-		console.log("🚀 Navigation vers Payment avec ID:", orderId);
-		navigation.navigate("Payment", {
-			orderId: orderId,
-			allOrders: cartItems,
-		});
+		Alert.alert("Erreur", "Navigation non disponible");
 	};
 
 	useEffect(() => {
@@ -298,7 +195,7 @@ export default function Menu({
 								{cartItems.map((item) => (
 									<View key={item._id} style={styles.cartItem}>
 										<Text style={styles.cartItemName}>{item.name}</Text>
-										<Text style={styles.cartItemQty}>x{cart[item._id]}</Text>
+										<Text style={styles.cartItemQty}>x{cart[item._id] || 0}</Text>
 									</View>
 								))}
 							</View>
@@ -315,15 +212,6 @@ export default function Menu({
 								<Text style={styles.actionButtonText}>
 									✅ Valider ({Object.keys(cart).length} articles)
 								</Text>
-							</TouchableOpacity>
-						)}
-
-						{hasActiveOrder && (
-							<TouchableOpacity
-								style={[styles.actionButton, styles.payButton]}
-								onPress={handlePayPress}
-							>
-								<Text style={styles.actionButtonText}>💳 Payer</Text>
 							</TouchableOpacity>
 						)}
 					</View>
@@ -382,17 +270,6 @@ export default function Menu({
 
 			{/* 🎯 BOUTONS PRINCIPAUX */}
 			<View style={styles.mainButtonsContainer}>
-				{cartItems.length > 0 && (
-					<TouchableOpacity
-						style={[styles.mainActionButton, styles.mainValidateButton]}
-						onPress={onNavigateToOrders}
-					>
-						<Text style={styles.mainActionButtonText}>
-							✅ Valider la commande ({Object.keys(cart).length} articles)
-						</Text>
-					</TouchableOpacity>
-				)}
-
 				{hasActiveOrder && (
 					<TouchableOpacity
 						style={[styles.mainActionButton, styles.mainPayButton]}
@@ -740,6 +617,9 @@ const styles = StyleSheet.create({
 	},
 	mainValidateButton: {
 		backgroundColor: "#4CAF50",
+	},
+	mainViewOrderButton: {
+		backgroundColor: "#2196F3",
 	},
 	mainPayButton: {
 		backgroundColor: "#FF9800",

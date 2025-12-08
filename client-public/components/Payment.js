@@ -1,5 +1,5 @@
 // Payment.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
 	View,
 	Text,
@@ -7,8 +7,10 @@ import {
 	StyleSheet,
 	Alert,
 	ActivityIndicator,
+	ScrollView,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // ⬅️ AJOUTEZ CE IMPORT
+import { MaterialIcons } from "@expo/vector-icons";
+import { useOrderStore } from "../stores/useOrderStore.js";
 
 export default function Payment({
 	allOrders = [],
@@ -17,94 +19,87 @@ export default function Payment({
 	onBack,
 }) {
 	const [loading, setLoading] = useState(false);
-	const API_URL = "http://192.168.1.185:3000";
+	const [selectedItems, setSelectedItems] = useState(new Set());
+	const { markAsPaid, isLoading } = useOrderStore();
 
-	console.log("🎫 Payment reçu:", {
-		orderId,
-		allOrdersCount: allOrders.length,
-	});
+	// Créer un identifiant unique pour chaque article (même si c'est le même produit)
+	const getItemId = (index) => {
+		return `item-${index}`;
+	};
 
-	const getClientToken = async () => {
-		try {
-			const token = await AsyncStorage.getItem("clientToken");
-			if (!token) {
-				console.log("❌ Pas de token dans AsyncStorage");
-				return null;
-			}
-			console.log("✅ Token récupéré:", token.substring(0, 20) + "...");
-			return token;
-		} catch (error) {
-			console.error("Erreur récupération token:", error);
-			return null;
+	// Initialiser avec tous les articles sélectionnés par défaut
+	useEffect(() => {
+		if (allOrders && allOrders.length > 0) {
+			const allIds = new Set(allOrders.map((_, index) => getItemId(index)));
+			setSelectedItems(allIds);
+		}
+	}, [allOrders]);
+
+	const toggleItem = (index) => {
+		if (!allOrders || !allOrders[index]) return;
+		const itemId = getItemId(index);
+		const newSelected = new Set(selectedItems);
+		if (newSelected.has(itemId)) {
+			newSelected.delete(itemId);
+		} else {
+			newSelected.add(itemId);
+		}
+		setSelectedItems(newSelected);
+	};
+
+	const toggleAll = () => {
+		if (!allOrders || allOrders.length === 0) return;
+		
+		if (selectedItems.size === allOrders.length) {
+			// Tout désélectionner
+			setSelectedItems(new Set());
+		} else {
+			// Tout sélectionner
+			const allIds = new Set(allOrders.map((_, index) => getItemId(index)));
+			setSelectedItems(allIds);
 		}
 	};
 
-	const handlePay = async () => {
-		console.log("💰 Paiement pour orderId:", orderId);
+	const safeAllOrders = allOrders || [];
+	const selectedOrders = safeAllOrders.filter((_, index) => 
+		selectedItems.has(getItemId(index))
+	);
+	const total = selectedOrders.reduce(
+		(sum, item) => sum + (item?.price || 0) * (item?.quantity || 1),
+		0
+	);
 
+	const handlePay = async () => {
 		if (!orderId) {
 			Alert.alert("Erreur", "Aucune commande à payer");
+			return;
+		}
+
+		if (selectedItems.size === 0) {
+			Alert.alert("Erreur", "Veuillez sélectionner au moins un article à payer");
 			return;
 		}
 
 		setLoading(true);
 
 		try {
-			// 1. Récupérer le token
-			const token = await getClientToken();
-			if (!token) {
-				Alert.alert("Erreur", "Session expirée. Veuillez vous reconnecter.");
-				setLoading(false);
-				return;
-			}
-
-			console.log("📡 Envoi requête avec token...");
-
-			// 2. Envoyer la requête avec token
-			const response = await fetch(
-				`${API_URL}/orders/${orderId}/mark-as-paid`,
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${token}`, // ⬅️ AJOUTEZ LE TOKEN
-					},
-				}
-			);
-
-			console.log("📡 Status paiement:", response.status);
-
-			if (response.ok) {
-				const data = await response.json();
-				console.log("✅ Paiement réussi:", data);
-
-				Alert.alert(
-					"✅ Paiement réussi",
-					"Votre commande a été marquée comme payée.",
-					[
-						{
-							text: "OK",
-							onPress: onSuccess,
+			// Pour l'instant, on paie toute la commande
+			// TODO: Implémenter le paiement partiel côté backend si nécessaire
+			await markAsPaid(orderId);
+			Alert.alert(
+				"✅ Paiement réussi",
+				`${selectedOrders.length} article(s) sélectionné(s).`,
+				[
+					{
+						text: "OK",
+						onPress: () => {
+							onSuccess();
 						},
-					]
-				);
-			} else {
-				const errorText = await response.text();
-				console.log("❌ Erreur réponse:", errorText);
-
-				if (response.status === 401) {
-					Alert.alert(
-						"❌ Erreur d'authentification",
-						"Votre session a expiré. Veuillez vous reconnecter.",
-						[{ text: "OK" }]
-					);
-				} else {
-					Alert.alert("❌ Erreur", errorText || "Le paiement a échoué");
-				}
-			}
+					},
+				]
+			);
 		} catch (error) {
-			console.error("🔥 Erreur réseau:", error);
-			Alert.alert("❌ Erreur réseau", "Impossible de se connecter au serveur");
+			// L'erreur est déjà gérée par le store
 		} finally {
 			setLoading(false);
 		}
@@ -126,10 +121,8 @@ export default function Payment({
 		);
 	}
 
-	const total = allOrders.reduce(
-		(sum, item) => sum + item.price * (item.quantity || 1),
-		0
-	);
+	const isProcessing = loading || isLoading;
+	const allSelected = selectedItems.size === safeAllOrders.length && safeAllOrders.length > 0;
 
 	return (
 		<View style={styles.container}>
@@ -140,42 +133,92 @@ export default function Payment({
 			</Text>
 
 			<View style={styles.orderDetails}>
-				<Text style={styles.detailTitle}>Articles:</Text>
-				{allOrders.length === 0 ? (
+				<View style={styles.headerRow}>
+					<Text style={styles.detailTitle}>Articles:</Text>
+					<TouchableOpacity onPress={toggleAll} style={styles.selectAllButton}>
+						<Text style={styles.selectAllText}>
+							{allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+						</Text>
+					</TouchableOpacity>
+				</View>
+
+				{safeAllOrders.length === 0 ? (
 					<Text style={styles.emptyText}>Aucun article à afficher</Text>
 				) : (
-					allOrders.map((item, index) => (
-						<View key={index} style={styles.orderItem}>
-							<Text style={styles.itemName}>
-								{item.name} x {item.quantity || 1}
-							</Text>
-							<Text style={styles.itemPrice}>
-								{(item.price * (item.quantity || 1)).toFixed(2)}€
-							</Text>
-						</View>
-					))
+					<ScrollView style={styles.itemsList}>
+						{safeAllOrders.map((item, index) => {
+							const itemId = getItemId(index);
+							const isSelected = selectedItems.has(itemId);
+							return (
+								<TouchableOpacity
+									key={`${item.name}-${index}-${item.price}`}
+									style={[
+										styles.orderItem,
+										isSelected && styles.orderItemSelected,
+									]}
+									onPress={() => toggleItem(index)}
+								>
+									<View style={styles.checkboxContainer}>
+										<View
+											style={[
+												styles.checkbox,
+												isSelected && styles.checkboxChecked,
+											]}
+										>
+											{isSelected && (
+												<MaterialIcons
+													name="check"
+													size={18}
+													color="#fff"
+												/>
+											)}
+										</View>
+									</View>
+									<View style={styles.itemInfo}>
+										<Text style={styles.itemName}>
+											{item.name} x {item.quantity || 1}
+										</Text>
+										<Text style={styles.itemPrice}>
+											{(item.price * (item.quantity || 1)).toFixed(2)}€
+										</Text>
+									</View>
+								</TouchableOpacity>
+							);
+						})}
+					</ScrollView>
 				)}
 			</View>
 
-			<Text style={styles.total}>Total: {total.toFixed(2)}€</Text>
+			<View style={styles.totalContainer}>
+				<Text style={styles.totalLabel}>
+					Total ({selectedOrders.length} article{selectedOrders.length > 1 ? "s" : ""}):
+				</Text>
+				<Text style={styles.total}> {total.toFixed(2)}€</Text>
+			</View>
 
 			<View style={styles.buttonsContainer}>
 				<TouchableOpacity
-					style={[styles.payButton, loading && styles.payButtonDisabled]}
+					style={[
+						styles.payButton,
+						(isProcessing || selectedItems.size === 0) &&
+							styles.payButtonDisabled,
+					]}
 					onPress={handlePay}
-					disabled={loading}
+					disabled={isProcessing || selectedItems.size === 0}
 				>
-					{loading ? (
+					{isProcessing ? (
 						<ActivityIndicator color="#fff" />
 					) : (
-						<Text style={styles.buttonText}>Marquer comme payé</Text>
+						<Text style={styles.buttonText}>
+							Payer {selectedOrders.length} article{selectedOrders.length > 1 ? "s" : ""}
+						</Text>
 					)}
 				</TouchableOpacity>
 
 				<TouchableOpacity
 					style={styles.backButton}
 					onPress={onBack}
-					disabled={loading}
+					disabled={isProcessing}
 				>
 					<Text style={styles.buttonText}>Retour</Text>
 				</TouchableOpacity>
@@ -187,8 +230,6 @@ export default function Payment({
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
 		padding: 20,
 		backgroundColor: "#f8f9fa",
 	},
@@ -197,6 +238,7 @@ const styles = StyleSheet.create({
 		fontWeight: "bold",
 		marginBottom: 10,
 		color: "#333",
+		textAlign: "center",
 	},
 	orderId: {
 		fontSize: 14,
@@ -206,6 +248,7 @@ const styles = StyleSheet.create({
 		backgroundColor: "#f0f0f0",
 		padding: 8,
 		borderRadius: 6,
+		textAlign: "center",
 	},
 	errorText: {
 		color: "red",
@@ -215,16 +258,80 @@ const styles = StyleSheet.create({
 	},
 	orderDetails: {
 		width: "100%",
-		marginBottom: 25,
-		padding: 20,
+		marginBottom: 15,
+		padding: 15,
 		backgroundColor: "#fff",
 		borderRadius: 12,
+		maxHeight: 400,
+	},
+	headerRow: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		marginBottom: 15,
 	},
 	detailTitle: {
 		fontSize: 18,
 		fontWeight: "bold",
-		marginBottom: 15,
 		color: "#333",
+	},
+	selectAllButton: {
+		padding: 5,
+	},
+	selectAllText: {
+		fontSize: 14,
+		color: "#2196F3",
+		fontWeight: "600",
+	},
+	itemsList: {
+		maxHeight: 300,
+	},
+	orderItem: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingVertical: 12,
+		paddingHorizontal: 8,
+		borderBottomWidth: 1,
+		borderBottomColor: "#f0f0f0",
+		borderRadius: 8,
+		marginBottom: 5,
+	},
+	orderItemSelected: {
+		backgroundColor: "#E8F5E9",
+	},
+	checkboxContainer: {
+		marginRight: 12,
+	},
+	checkbox: {
+		width: 24,
+		height: 24,
+		borderWidth: 2,
+		borderColor: "#4CAF50",
+		borderRadius: 4,
+		justifyContent: "center",
+		alignItems: "center",
+		backgroundColor: "#fff",
+	},
+	checkboxChecked: {
+		backgroundColor: "#4CAF50",
+		borderColor: "#4CAF50",
+	},
+	itemInfo: {
+		flex: 1,
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+	},
+	itemName: {
+		fontSize: 16,
+		color: "#555",
+		flex: 1,
+	},
+	itemPrice: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#333",
+		marginLeft: 10,
 	},
 	emptyText: {
 		color: "#999",
@@ -232,26 +339,23 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		padding: 20,
 	},
-	orderItem: {
+	totalContainer: {
 		flexDirection: "row",
-		justifyContent: "space-between",
-		paddingVertical: 10,
-		borderBottomWidth: 1,
-		borderBottomColor: "#f0f0f0",
+		justifyContent: "center",
+		alignItems: "center",
+		marginBottom: 20,
+		paddingVertical: 15,
+		backgroundColor: "#fff",
+		borderRadius: 12,
 	},
-	itemName: {
-		fontSize: 16,
-		color: "#555",
-	},
-	itemPrice: {
-		fontSize: 16,
+	totalLabel: {
+		fontSize: 18,
 		fontWeight: "600",
 		color: "#333",
 	},
 	total: {
 		fontSize: 24,
 		fontWeight: "bold",
-		marginBottom: 30,
 		color: "#4CAF50",
 	},
 	buttonsContainer: {
@@ -266,6 +370,7 @@ const styles = StyleSheet.create({
 	},
 	payButtonDisabled: {
 		backgroundColor: "#81C784",
+		opacity: 0.6,
 	},
 	backButton: {
 		backgroundColor: "#757575",

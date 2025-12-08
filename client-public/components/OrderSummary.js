@@ -86,16 +86,16 @@ const OrderSummary = ({
 			</View>
 
 			<View style={styles.actionsContainer}>
-				<TouchableOpacity
-					style={[styles.actionButton, styles.sendButton]}
-					onPress={onSubmitOrder}
-				>
-					<Text style={styles.actionButtonText}>
-						{safeCurrentOrder.length > 0
-							? "Envoyer la commande"
-							: "Commande envoyée"}
-					</Text>
-				</TouchableOpacity>
+				{safeCurrentOrder.length > 0 && (
+					<TouchableOpacity
+						style={[styles.actionButton, styles.sendButton]}
+						onPress={onSubmitOrder}
+					>
+						<Text style={styles.actionButtonText}>
+							Envoyer la commande
+						</Text>
+					</TouchableOpacity>
+				)}
 
 				<TouchableOpacity
 					style={[styles.actionButton, styles.backButton]}
