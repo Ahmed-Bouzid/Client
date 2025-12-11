@@ -13,6 +13,9 @@ import { useCartStore } from "./stores/useCartStore";
 
 export default function App() {
 	const [step, setStep] = useState("join"); // join, menu, addOn, orders, payment
+	const [reservationId, setReservationId] = useState("");
+	const [clientId, setClientId] = useState("");
+	const [tableNumber, setTableNumber] = useState(null);
 
 	// IDs en dur pour les tests
 	const DEFAULT_TABLE_ID = "686af692bb4cba684ff3b757";
@@ -71,20 +74,32 @@ export default function App() {
 	}, [userName]);
 
 	// Handler pour rejoindre une table
-	const handleJoinTable = async (name) => {
+	const handleJoinTable = async (
+		clientName,
+		reservationId,
+		tableId,
+		tableNumber,
+		clientId
+	) => {
 		try {
+			// ⭐ Stocker toutes les infos
+			setUserName(clientName);
+			setReservationId(reservationId);
+			setTableNumber(tableNumber);
+			setClientId(clientId);
+
+			// Appeler joinTable du store (si nécessaire)
 			await joinTable(
-				name, 
-				tableId || DEFAULT_TABLE_ID, 
+				clientName,
+				tableId || DEFAULT_TABLE_ID,
 				restaurantId || DEFAULT_RESTAURANT_ID
 			);
-			// Réinitialiser les commandes et le panier lors d'une nouvelle connexion
-			// pour s'assurer qu'on part avec un état propre (première connexion)
+
 			resetOrder();
 			await clearCart();
 			setStep("menu");
 		} catch (error) {
-			// L'erreur est déjà gérée par le store
+			console.error("Erreur join table:", error);
 		}
 	};
 
@@ -111,11 +126,43 @@ export default function App() {
 			return;
 		}
 
+		// ⭐ VÉRIFIER qu'on a les infos nécessaires
+		if (!reservationId) {
+			showAlert(
+				"Erreur",
+				"Aucune réservation active. Veuillez rejoindre une table d'abord.",
+				[{ text: "OK" }]
+			);
+			return;
+		}
+
 		try {
-			await submitOrderToServer({ 
-				tableId: tableId || DEFAULT_TABLE_ID, 
-				restaurantId: restaurantId || DEFAULT_RESTAURANT_ID 
-			});
+			// Préparer les données COMPLÈTES
+			const orderData = {
+				tableId: tableId || DEFAULT_TABLE_ID,
+				restaurantId: restaurantId || DEFAULT_RESTAURANT_ID,
+				reservationId: reservationId, // ⭐ DÉJÀ PRÉSENT
+				clientId: clientId, // ⭐ AJOUTER
+				clientName: userName, // ⭐ AJOUTER (userName vient du store)
+				items: currentOrder.map((item) => ({
+					productId: item._id,
+					name: item.name,
+					price: item.price,
+					quantity: item.quantity || 1,
+				})),
+				total: currentOrder.reduce(
+					(sum, item) => sum + item.price * (item.quantity || 1),
+					0
+				),
+				status: "in_progress",
+				origin: "client",
+			};
+
+			console.log("📤 Envoi commande avec données:", orderData);
+
+			// ⭐ ENVOYER TOUTES LES DONNÉES
+			await submitOrderToServer(orderData);
+
 			await clearCart();
 
 			showAlert(
@@ -131,7 +178,11 @@ export default function App() {
 				]
 			);
 		} catch (error) {
-			// L'erreur est déjà gérée par le store
+			console.error("Erreur création commande dans App.js:", error);
+			showAlert(
+				"Erreur",
+				error.message || "Erreur lors de la création de la commande"
+			);
 		}
 	};
 
@@ -165,6 +216,9 @@ export default function App() {
 			showAlert("Erreur", "Aucune commande active à payer", [{ text: "OK" }]);
 			return;
 		}
+
+		// ⭐ Passer toutes les infos nécessaires au Payment
+		// Vous devrez ajuster Payment.js pour accepter ces props
 		setStep("payment");
 	};
 
@@ -172,7 +226,7 @@ export default function App() {
 	const handlePaymentSuccess = () => {
 		// Le paiement a déjà été effectué dans Payment.js
 		// On redirige simplement vers le menu
-		setStep("menu");
+		setStep("join");
 	};
 
 	return (
@@ -182,26 +236,35 @@ export default function App() {
 				edges={["top", "left", "right"]}
 			>
 				{step === "join" && (
-					<JoinOrCreateTable tableId={tableId || DEFAULT_TABLE_ID} onJoin={handleJoinTable} />
+					<JoinOrCreateTable
+						tableId={tableId || DEFAULT_TABLE_ID}
+						onJoin={handleJoinTable}
+					/>
 				)}
 
 				{step === "menu" && (
 					<Menu
 						userName={userName}
+						// ⭐⭐ AJOUTEZ CES PROPS ⭐⭐
+						reservationId={reservationId}
+						tableId={tableId || DEFAULT_TABLE_ID}
+						tableNumber={tableNumber}
+						clientId={clientId}
 						orders={currentOrder}
-						setOrders={(orders) => {
-							// Cette prop peut être supprimée si on utilise uniquement le store
-						}}
 						onAdd={handleAddOrder}
 						onValidate={handleValidateOrder}
 						onPay={handlePaymentSuccess}
 						onUpdateQuantity={handleUpdateQuantity}
 						hasActiveOrder={hasActiveOrder}
 						onNavigateToPayment={navigateToPayment}
-						onNavigateToOrders={() => setStep("orders")}
-						cart={cart}
-						setCart={(newCart) => {
-							// Cette prop peut être supprimée si on utilise uniquement le store
+						onNavigateToOrders={handleValidateOrder}
+						navigation={{
+							navigate: (screen, params) => {
+								// Simuler navigation pour Menu
+								if (screen === "Payment") {
+									setStep("payment");
+								}
+							},
 						}}
 					/>
 				)}
@@ -228,6 +291,12 @@ export default function App() {
 					<Payment
 						allOrders={allOrders}
 						orderId={activeOrderId}
+						// ⭐⭐ AJOUTEZ CES PROPS ⭐⭐
+						reservationId={reservationId}
+						tableId={tableId || DEFAULT_TABLE_ID}
+						tableNumber={tableNumber}
+						clientId={clientId}
+						userName={userName}
 						onSuccess={handlePaymentSuccess}
 						onBack={() => setStep("menu")}
 					/>

@@ -71,9 +71,14 @@ export default function Menu({
 		.map((item) => ({
 			...item,
 			sent:
-				currentOrder.find((o) => o.name === item.name && o.user === userName)?.sent ||
-				false,
+				currentOrder.find((o) => o.name === item.name && o.user === userName)
+					?.sent || false,
 		}));
+
+	const totalArticles = cartItems.reduce(
+		(total, item) => total + (cart[item._id] || 0),
+		0
+	);
 
 	const getActiveOrderId = async () => {
 		const activeOrder = await fetchActiveOrder();
@@ -195,7 +200,9 @@ export default function Menu({
 								{cartItems.map((item) => (
 									<View key={item._id} style={styles.cartItem}>
 										<Text style={styles.cartItemName}>{item.name}</Text>
-										<Text style={styles.cartItemQty}>x{cart[item._id] || 0}</Text>
+										<Text style={styles.cartItemQty}>
+											x{cart[item._id] || 0}
+										</Text>
 									</View>
 								))}
 							</View>
@@ -210,7 +217,13 @@ export default function Menu({
 								onPress={onNavigateToOrders}
 							>
 								<Text style={styles.actionButtonText}>
-									✅ Valider ({Object.keys(cart).length} articles)
+									✅ Valider (
+									{Object.values(cart).reduce((sum, qty) => sum + qty, 0)}{" "}
+									article
+									{Object.values(cart).reduce((sum, qty) => sum + qty, 0) > 1
+										? "s"
+										: ""}
+									)
 								</Text>
 							</TouchableOpacity>
 						)}

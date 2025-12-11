@@ -43,7 +43,10 @@ export const useOrderStore = create((set, get) => ({
 					o._id === item._id ? { ...o, quantity: o.quantity + 1 } : o
 				);
 			} else {
-				newOrder = [...state.currentOrder, { ...item, quantity: 1, user: userName }];
+				newOrder = [
+					...state.currentOrder,
+					{ ...item, quantity: 1, user: userName },
+				];
 			}
 			return { currentOrder: newOrder };
 		});
@@ -69,29 +72,50 @@ export const useOrderStore = create((set, get) => ({
 	/**
 	 * Soumet la commande au serveur
 	 */
-	submitOrder: async ({ tableId, restaurantId }) => {
+	submitOrder: async (orderData) => {
+		// ⭐ CHANGE : accepter orderData complet
+		const { tableId, restaurantId, reservationId, clientId, clientName } =
+			orderData;
+
 		const state = get();
-		if (state.currentOrder.length === 0) {
-			throw new Error("Panier vide");
+
+		// Vérifier qu'on a les données nécessaires
+		if (!reservationId) {
+			throw new Error("reservationId est requis");
 		}
 
-		set({ isLoading: true });
-
-		try {
-			const items = state.currentOrder.map((i) => ({
+		// Utiliser items de orderData si fournis, sinon currentOrder
+		const itemsToSend =
+			orderData.items ||
+			state.currentOrder.map((i) => ({
 				productId: i._id,
 				name: i.name,
 				quantity: i.quantity,
 				price: i.price,
 			}));
 
-			const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+		if (itemsToSend.length === 0) {
+			throw new Error("Panier vide");
+		}
+
+		set({ isLoading: true });
+
+		try {
+			// Calculer le total si non fourni
+			const totalToSend =
+				orderData.total ||
+				itemsToSend.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
 			const data = await orderService.createOrder({
 				tableId,
-				items,
-				total,
+				items: itemsToSend,
+				total: totalToSend,
 				restaurantId,
+				reservationId, // ⭐ ENVOYÉ
+				clientId, // ⭐ ENVOYÉ
+				clientName, // ⭐ ENVOYÉ
+				status: "in_progress",
+				origin: "client",
 			});
 
 			// Sauvegarder l'ID de la commande
@@ -120,7 +144,6 @@ export const useOrderStore = create((set, get) => ({
 			throw error;
 		}
 	},
-
 	/**
 	 * Récupère la commande active depuis le serveur
 	 */
@@ -157,7 +180,7 @@ export const useOrderStore = create((set, get) => ({
 	markAsPaid: async (orderId = null) => {
 		const state = get();
 		const finalOrderId = orderId || state.activeOrderId;
-		
+
 		if (!finalOrderId) {
 			throw new Error("Aucune commande active à payer");
 		}
@@ -194,4 +217,3 @@ export const useOrderStore = create((set, get) => ({
 		});
 	},
 }));
-

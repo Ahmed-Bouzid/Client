@@ -5,7 +5,18 @@ export const orderService = {
 	/**
 	 * Crée une nouvelle commande
 	 */
-	async createOrder({ tableId, items, total, restaurantId, serverId = null }) {
+	async createOrder({
+		tableId,
+		items,
+		total,
+		restaurantId,
+		serverId = null,
+		reservationId, // ⭐ AJOUTER
+		clientId, // ⭐ AJOUTER
+		clientName, // ⭐ AJOUTER
+		status = "in_progress",
+		origin = "client",
+	}) {
 		try {
 			const token = await clientAuthService.getClientToken();
 
@@ -19,10 +30,13 @@ export const orderService = {
 					tableId,
 					items,
 					total,
-					status: "in_progress",
 					restaurantId,
-					serverId,
-					origin: "client",
+					reservationId, // ⭐ UTILISER LE PARAMÈTRE
+					clientId, // ⭐ UTILISER LE PARAMÈTRE
+					clientName, // ⭐ UTILISER LE PARAMÈTRE
+					serverId: null,
+					status: status,
+					origin: origin,
 				}),
 			});
 
@@ -124,4 +138,3 @@ export const orderService = {
 		}
 	},
 };
-
