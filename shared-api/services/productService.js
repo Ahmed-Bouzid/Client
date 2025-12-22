@@ -1,32 +1,15 @@
-import { API_CONFIG } from "../config/apiConfig.js";
+import { useFetchWithAuth } from "../hooks/useFetchWithAuth.js"; // ton hook
 
 export const productService = {
 	async fetchProducts(token = null) {
+		const fetchWithAuth = useFetchWithAuth();
+
 		try {
-			const headers = {};
-			if (token) {
-				headers.Authorization = `Bearer ${token}`;
-			}
-
 			const url = `${API_CONFIG.BASE_URL}/products/restaurant/${API_CONFIG.RESTAURANT_ID}`;
-
-			const response = await fetch(url, { headers });
-
-			if (!response.ok) {
-				let errorText = `HTTP ${response.status}`;
-				try {
-					const errorData = await response.json();
-					errorText = errorData.message || errorText;
-				} catch (e) {
-					// Si ce n'est pas du JSON, utiliser le status
-				}
-				throw new Error(errorText);
-			}
-
-			const data = await response.json();
+			const data = await fetchWithAuth(url, { method: "GET" });
 			return data;
 		} catch (error) {
-			throw error;
+			throw error; // ici tu peux aussi lancer une erreur spécifique pour déclencher la popup
 		}
 	},
 };

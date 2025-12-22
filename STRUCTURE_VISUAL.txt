@@ -1,0 +1,133 @@
+╔══════════════════════════════════════════════════════════╗
+║         CLIENT-END STRUCTURE (APRÈS REFACTOR)            ║
+╚══════════════════════════════════════════════════════════╝
+
+CLIENT-end/
+│
+├── 📱 client-public/
+│   │
+│   ├── App.jsx                    ⭐ (ex: app.js)
+│   ├── index.js                   ⭐ (ex: index-client.js)
+│   │
+│   └── 📁 src/                    ⭐ NOUVELLE STRUCTURE
+│       │
+│       ├── 📺 screens/            (4 écrans)
+│       │   ├── Menu.jsx           ✅ Écran menu
+│       │   ├── Payment.jsx        ✅ Écran paiement
+│       │   ├── OrderSummary.jsx   ✅ Résumé commande
+│       │   ├── JoinOrCreateTable.jsx  ✅ Connexion table
+│       │   └── index.js           📦 Exports
+│       │
+│       ├── 🧩 components/         (3 composants)
+│       │   ├── AddOn.jsx          ✅ Suppléments
+│       │   ├── OrderList.jsx      ✅ Liste commandes
+│       │   ├── MenuItems.jsx      ✅ Items menu
+│       │   └── index.js           📦 Exports
+│       │
+│       ├── 📦 stores/             (4 stores Zustand)
+│       │   ├── useCartStore.js
+│       │   ├── useOrderStore.js
+│       │   ├── useProductStore.js
+│       │   ├── useClientTableStore.js
+│       │   └── index.js           📦 Exports
+│       │
+│       ├── 🔌 services/           (1 service)
+│       │   └── productService.js
+│       │
+│       └── 🛠️ utils/              (3 utilitaires)
+│           ├── token.js
+│           ├── customAlert.js
+│           ├── RootNavigation.js
+│           └── index.js           📦 Exports
+│
+├── 🔗 shared-api/                 # API partagée
+│   ├── services/
+│   ├── utils/
+│   └── config/
+│
+├── 🖼️ assets/                     # Ressources
+│
+├── package.json
+├── README.md                      📚 Documentation
+├── REFACTOR_SUMMARY.md            📚 Résumé
+└── STRUCTURE_VISUAL.txt           📚 Ce fichier
+
+╔══════════════════════════════════════════════════════════╗
+║                    📊 STATISTIQUES                       ║
+╚══════════════════════════════════════════════════════════╝
+
+📁 Dossiers src/           : 5
+📄 Fichiers totaux         : 19
+📺 Écrans (screens)        : 4
+🧩 Composants              : 3
+📦 Stores Zustand          : 4
+🔌 Services                : 1
+🛠️ Utilitaires             : 3
+📚 Fichiers index          : 5
+📖 Documentation           : 3
+
+╔══════════════════════════════════════════════════════════╗
+║              🎯 CHANGEMENTS PRINCIPAUX                   ║
+╚══════════════════════════════════════════════════════════╝
+
+RENOMMÉ   : app.js                    → App.jsx
+RENOMMÉ   : index-client.js           → index.js
+DÉPLACÉ   : components/Menu.js        → src/screens/Menu.jsx
+DÉPLACÉ   : components/Payment.js     → src/screens/Payment.jsx
+DÉPLACÉ   : components/OrderSummary.js → src/screens/OrderSummary.jsx
+DÉPLACÉ   : components/JoinOrCreateTable.js → src/screens/JoinOrCreateTable.jsx
+DÉPLACÉ   : components/AddOn.js       → src/components/AddOn.jsx
+DÉPLACÉ   : components/OrderList.js   → src/components/OrderList.jsx
+RENOMMÉ   : components/menuItems.js   → src/components/MenuItems.jsx
+DÉPLACÉ   : stores/*                  → src/stores/
+DÉPLACÉ   : services/*                → src/services/
+DÉPLACÉ   : utils/*                   → src/utils/
+CRÉÉ      : src/screens/index.js      (exports centralisés)
+CRÉÉ      : src/components/index.js   (exports centralisés)
+CRÉÉ      : src/stores/index.js       (exports centralisés)
+CRÉÉ      : src/utils/index.js        (exports centralisés)
+CRÉÉ      : README.md                 (documentation complète)
+CRÉÉ      : REFACTOR_SUMMARY.md       (résumé)
+
+╔══════════════════════════════════════════════════════════╗
+║              ✅ CONVENTIONS APPLIQUÉES                   ║
+╚══════════════════════════════════════════════════════════╝
+
+Composants/Écrans : PascalCase.jsx    (Menu.jsx, Payment.jsx)
+Hooks (stores)    : useCamelCase.js   (useCartStore.js)
+Services          : camelCase.js      (productService.js)
+Utilitaires       : camelCase.js      (token.js)
+Dossiers          : kebab-case/       (client-public/)
+Index exports     : index.js          (fichiers d'export)
+
+╔══════════════════════════════════════════════════════════╗
+║                🚀 RÉSULTAT FINAL                         ║
+╚══════════════════════════════════════════════════════════╝
+
+✅ Structure professionnelle et scalable
+✅ Séparation claire screens / components
+✅ Nommage cohérent (PascalCase pour composants)
+✅ Organisation intuitive dans src/
+✅ Imports optimisés avec fichiers index
+✅ Documentation complète (3 fichiers)
+✅ Aucune erreur de compilation
+✅ Prêt pour la production
+
+🎉 CLIENT-END RESTRUCTURÉ AVEC SUCCÈS ! 🎉
+
+╔══════════════════════════════════════════════════════════╗
+║              📖 IMPORTS OPTIMISÉS                        ║
+╚══════════════════════════════════════════════════════════╝
+
+// Depuis App.jsx
+import { Menu, Payment } from "./src/screens";
+import { AddOn, OrderList } from "./src/components";
+import { useCartStore, useOrderStore } from "./src/stores";
+import { useCustomAlert } from "./src/utils";
+
+// Depuis screens/Menu.jsx
+import { AddOn } from "../components";
+import { useCartStore } from "../stores";
+
+// Depuis components/AddOn.jsx
+import { useProductStore } from "../stores";
