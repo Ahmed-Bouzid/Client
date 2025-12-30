@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../config/api";
 import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
@@ -16,6 +17,9 @@ import { BlurView } from "expo-blur";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useOrderStore } from "../stores/useOrderStore.js";
+import { orderService } from "../../../shared-api/services/orderService.js";
+import * as RootNavigation from "../utils/RootNavigation";
+import { ReceiptModal } from "../components/receipt/ReceiptModal";
 
 const { width, height } = Dimensions.get("window");
 
@@ -92,8 +96,8 @@ const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle }) => {
 						isPaid
 							? ["rgba(56, 239, 125, 0.2)", "rgba(17, 153, 142, 0.1)"]
 							: isSelected
-							? ["rgba(102, 126, 234, 0.3)", "rgba(118, 75, 162, 0.2)"]
-							: ["rgba(255,255,255,0.95)", "rgba(248,249,250,0.95)"]
+								? ["rgba(102, 126, 234, 0.3)", "rgba(118, 75, 162, 0.2)"]
+								: ["rgba(255,255,255,0.95)", "rgba(248,249,250,0.95)"]
 					}
 					style={[styles.paymentItem, isPaid && styles.paymentItemPaid]}
 					start={{ x: 0, y: 0 }}
@@ -117,7 +121,16 @@ const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle }) => {
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
 							>
-								<MaterialIcons name="check" size={18} color="#fff" />
+								<Text style={{ color: "#fff" }}>
+									<MaterialIcons name="check" size={18} color="#fff" />{" "}
+									{item.name}
+									{item.clientName ? (
+										<Text style={{ color: "#4facfe", fontWeight: "bold" }}>
+											{" "}
+											[{item.clientName}]
+										</Text>
+									) : null}
+								</Text>
 							</LinearGradient>
 						) : (
 							<View style={styles.checkboxEmpty}>
@@ -182,13 +195,23 @@ const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle }) => {
 };
 
 export default function Payment({
-	allOrders = [],
 	orderId = null,
 	reservationId = null,
 	tableId = null,
-	onSuccess = () => {},
+	onSuccess,
 	onBack = () => {},
 }) {
+	// Redirection par défaut : retour au menu si onSuccess non fourni
+	const handleSuccess =
+		typeof onSuccess === "function"
+			? onSuccess
+			: () => {
+					RootNavigation.navigate("Menu");
+				};
+	// Utilise le store Zustand pour l'historique persistant
+	const { init } = useOrderStore();
+	const [allOrders, setAllOrders] = useState([]); // Liste brute des commandes (Order)
+	const [flatItems, setFlatItems] = useState([]); // Liste aplatie des items (chaque item = 1 produit d'une commande)
 	const [loading, setLoading] = useState(false);
 	const [selectedItems, setSelectedItems] = useState(new Set());
 	const [paidItems, setPaidItems] = useState(new Set());
@@ -199,6 +222,13 @@ export default function Payment({
 		totalDue: 0,
 		totalPaid: 0,
 	});
+
+	// 🎫 État pour le reçu
+	const [showReceipt, setShowReceipt] = useState(false);
+	const [receiptData, setReceiptData] = useState(null);
+	const [currentReservation, setCurrentReservation] = useState(null);
+	const [shouldRedirectAfterReceipt, setShouldRedirectAfterReceipt] =
+		useState(false);
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -219,7 +249,45 @@ export default function Payment({
 				useNativeDriver: true,
 			}),
 		]).start();
-	}, []);
+		// Charger toutes les commandes de la réservation au montage
+		const fetchOrders = async () => {
+			if (reservationId) {
+				const orders = await orderService.getOrdersByReservation(reservationId);
+				setAllOrders(orders || []);
+				// Aplatir les items : chaque item hérite de clientName et orderId
+				const items = [];
+				(orders || []).forEach((order) => {
+					(order.items || []).forEach((item) => {
+						items.push({
+							...item,
+							orderId: order._id,
+							clientName: order.clientName || "",
+						});
+					});
+				});
+				setFlatItems(items);
+
+				// Charger les infos de réservation pour le reçu
+				try {
+					const res = await fetch(
+						`${API_BASE_URL}/reservations/${reservationId}`,
+						{
+							headers: {
+								"Content-Type": "application/json",
+							},
+						}
+					);
+					if (res.ok) {
+						const data = await res.json();
+						setCurrentReservation(data);
+					}
+				} catch (err) {
+					console.error("Erreur chargement réservation:", err);
+				}
+			}
+		};
+		fetchOrders();
+	}, [reservationId]);
 
 	const { markAsPaid, isLoading } = useOrderStore();
 
@@ -252,12 +320,7 @@ export default function Payment({
 				const saved = await AsyncStorage.getItem(storageKey);
 				if (saved) {
 					const parsed = JSON.parse(saved);
-					console.log(
-						"📂 Chargement paidItems:",
-						storageKey,
-						parsed.length,
-						"articles"
-					);
+
 					setPaidItems(new Set(parsed));
 				}
 			} catch (error) {
@@ -287,18 +350,18 @@ export default function Payment({
 
 	// ✅ Initialiser la sélection avec les articles non payés
 	useEffect(() => {
-		if (allOrders && allOrders.length > 0) {
-			const nonPaidItems = allOrders.filter(
+		if (flatItems && flatItems.length > 0) {
+			const nonPaidItems = flatItems.filter(
 				(item) => !paidItems.has(getItemId(item))
 			);
 			const nonPaidIds = new Set(nonPaidItems.map((item) => getItemId(item)));
 			setSelectedItems(nonPaidIds);
 		}
-	}, [allOrders, paidItems]);
+	}, [flatItems, paidItems]);
 
 	// 🔍 Vérifier si la réservation peut être fermée
 	const checkReservationClosure = async () => {
-		if (!allOrders || allOrders.length === 0) {
+		if (!flatItems || flatItems.length === 0) {
 			setReservationStatus({
 				canClose: false,
 				reason: "❌ Aucune commande à analyser",
@@ -309,40 +372,40 @@ export default function Payment({
 			return;
 		}
 
-		const unpaidOrders = allOrders.filter(
+		const unpaidItems = flatItems.filter(
 			(item) => !paidItems.has(getItemId(item))
 		);
 
-		const totalDue = unpaidOrders.reduce(
+		const totalDue = unpaidItems.reduce(
 			(sum, item) => sum + (item?.price || 0) * (item?.quantity || 1),
 			0
 		);
 
-		const paidOrdersList = allOrders.filter((item) =>
+		const paidItemsList = flatItems.filter((item) =>
 			paidItems.has(getItemId(item))
 		);
 
-		const totalPaid = paidOrdersList.reduce(
+		const totalPaid = paidItemsList.reduce(
 			(sum, item) => sum + (item?.price || 0) * (item?.quantity || 1),
 			0
 		);
 
-		const canClose = unpaidOrders.length === 0;
+		const canClose = unpaidItems.length === 0;
 		const reason = canClose
 			? "✅ Toutes les commandes sont payées"
-			: `❌ ${unpaidOrders.length} article(s) à payer (${totalDue.toFixed(
+			: `❌ ${unpaidItems.length} article(s) à payer (${totalDue.toFixed(
 					2
-			  )}€ dû)`;
+				)}€ dû)`;
 
 		setReservationStatus({
 			canClose,
 			reason,
-			unpaidOrders,
+			unpaidOrders: unpaidItems,
 			totalDue,
 			totalPaid,
 		});
 
-		return { canClose, totalDue, totalPaid, unpaidOrders };
+		return { canClose, totalDue, totalPaid, unpaidOrders: unpaidItems };
 	};
 
 	// 🔄 Mettre à jour le statut de la réservation
@@ -387,11 +450,10 @@ export default function Payment({
 
 		try {
 			// ⭐ ENLEVEZ LE TOKEN - la nouvelle route n'en a pas besoin
-			console.log("🔍 Tentative fermeture réservation:", reservationId);
 
 			// ⭐ CORRECTION : Body vide ou objet vide
 			const response = await fetch(
-				`http://192.168.1.185:3000/reservations/client/${reservationId}/close`,
+				`${API_BASE_URL}/reservations/client/${reservationId}/close`,
 				{
 					method: "PUT",
 					headers: {
@@ -411,7 +473,6 @@ export default function Payment({
 			}
 
 			const data = await response.json();
-			console.log("✅ Réservation fermée:", data);
 
 			// ⭐ LA TABLE SERA LIBÉRÉE AUTOMATIQUEMENT PAR LA ROUTE BACKEND
 			// Pas besoin d'appeler releaseTable séparément
@@ -424,6 +485,18 @@ export default function Payment({
 		} catch (error) {
 			console.error("🚨 Erreur réseau:", error);
 			return { success: false, message: `Erreur réseau: ${error.message}` };
+		}
+	};
+
+	// 🎫 Gestion de la fermeture du reçu
+	const handleCloseReceipt = async () => {
+		setShowReceipt(false);
+
+		// Si paiement complet, rediriger après fermeture du reçu
+		if (shouldRedirectAfterReceipt) {
+			await markAsPaid(orderId);
+			setShouldRedirectAfterReceipt(false);
+			handleSuccess();
 		}
 	};
 
@@ -446,7 +519,7 @@ export default function Payment({
 
 		try {
 			// 1. Filtrer les articles sélectionnés
-			const selectedOrders = allOrders.filter((item) =>
+			const selectedOrders = flatItems.filter((item) =>
 				selectedItems.has(getItemId(item))
 			);
 
@@ -464,7 +537,7 @@ export default function Payment({
 			setPaidItems(newPaidItems);
 
 			// 4. Vérifier si paiement complet
-			const remainingItems = allOrders.filter(
+			const remainingItems = flatItems.filter(
 				(item) => !newPaidItems.has(getItemId(item))
 			);
 			const isFullPayment = remainingItems.length === 0;
@@ -475,7 +548,6 @@ export default function Payment({
 				if (reservationId) {
 					const closureResult = await closeReservationOnServer();
 					if (!closureResult.success) {
-						console.log("⚠️ Réservation non fermée:", closureResult.message);
 					}
 				}
 
@@ -495,36 +567,40 @@ export default function Payment({
 				0
 			);
 
-			// 8. Afficher l'alerte de confirmation
-			const message =
-				`${selectedOrders.length} article(s) payé(s).\n\n` +
-				`💳 Montant payé: ${amountPaid.toFixed(2)}€\n` +
-				`💰 Total payé: ${updatedStatus?.totalPaid?.toFixed(2) || 0}€\n` +
-				(remainingAmount > 0
-					? `📋 Reste à payer: ${remainingAmount.toFixed(2)}€ (${
-							remainingItems.length
-					  } article${remainingItems.length > 1 ? "s" : ""})`
-					: "✅ Tous les articles sont payés !");
+			// 8. Afficher le reçu pour paiement complet
+			if (isFullPayment) {
+				// Préparer les données du reçu
+				setReceiptData({
+					items: selectedOrders.map((item) => ({
+						name: item.name,
+						quantity: item.quantity || 1,
+						price: item.price || 0,
+					})),
+					amount: amountPaid,
+					paymentMethod: "Card",
+					last4Digits: null,
+				});
+				setShowReceipt(true);
+				setShouldRedirectAfterReceipt(true); // Marquer pour redirection après fermeture
+			} else {
+				// 8. Afficher l'alerte de confirmation pour paiement partiel
+				const message =
+					`${selectedOrders.length} article(s) payé(s).\n\n` +
+					`💳 Montant payé: ${amountPaid.toFixed(2)}€\n` +
+					`💰 Total payé: ${updatedStatus?.totalPaid?.toFixed(2) || 0}€\n` +
+					`📋 Reste à payer: ${remainingAmount.toFixed(2)}€ (${
+						remainingItems.length
+					} article${remainingItems.length > 1 ? "s" : ""})`;
 
-			Alert.alert(
-				isFullPayment ? "✅ Paiement complet" : "⚠️ Paiement partiel",
-				message,
-				[
+				Alert.alert("⚠️ Paiement partiel", message, [
 					{
 						text: "OK",
-						onPress: async () => {
-							// Désélectionner tout
+						onPress: () => {
 							setSelectedItems(new Set());
-
-							// Si paiement complet, retour au menu
-							if (isFullPayment) {
-								await markAsPaid(orderId);
-								onSuccess?.();
-							}
 						},
 					},
-				]
-			);
+				]);
+			}
 		} catch (error) {
 			console.error("❌ Erreur paiement:", error);
 			Alert.alert("Erreur", "Échec du paiement. Veuillez réessayer.");
@@ -570,9 +646,9 @@ export default function Payment({
 	// 📊 Calculs pour l'affichage
 	const isProcessing = loading || isLoading;
 	const availableItems =
-		allOrders?.filter((item) => !paidItems.has(getItemId(item))) || [];
+		flatItems?.filter((item) => !paidItems.has(getItemId(item))) || [];
 	const paidItemsList =
-		allOrders?.filter((item) => paidItems.has(getItemId(item))) || [];
+		flatItems?.filter((item) => paidItems.has(getItemId(item))) || [];
 	const allSelected =
 		selectedItems.size === availableItems.length && availableItems.length > 0;
 	const selectedOrders = availableItems.filter((item) =>
@@ -799,7 +875,7 @@ export default function Payment({
 									if (storageKey) {
 										AsyncStorage.removeItem(storageKey);
 									}
-									onSuccess();
+									handleSuccess();
 								}}
 								activeOpacity={0.8}
 							>
@@ -975,6 +1051,17 @@ export default function Payment({
 					</TouchableOpacity>
 				</Animated.View>
 			</ScrollView>
+
+			{/* Receipt Modal */}
+			<ReceiptModal
+				visible={showReceipt}
+				onClose={handleCloseReceipt}
+				reservation={currentReservation}
+				items={receiptData?.items || []}
+				amount={receiptData?.amount || 0}
+				paymentMethod={receiptData?.paymentMethod}
+				last4Digits={receiptData?.last4Digits}
+			/>
 		</LinearGradient>
 	);
 }
