@@ -3,6 +3,26 @@ import { clientAuthService } from "./clientAuthService.js";
 
 export const orderService = {
 	/**
+	 * Récupère toutes les commandes d'une réservation
+	 */
+	async getOrdersByReservation(reservationId) {
+		try {
+			const token = await clientAuthService.getClientToken();
+			if (!token) return [];
+			const response = await fetch(
+				`${API_CONFIG.BASE_URL}/orders/reservation/${reservationId}`,
+				{
+					headers: { Authorization: `Bearer ${token}` },
+				}
+			);
+			if (!response.ok) return [];
+			return await response.json();
+		} catch (error) {
+			console.error("❌ Erreur récupération commandes réservation:", error);
+			return [];
+		}
+	},
+	/**
 	 * Crée une nouvelle commande
 	 */
 	async createOrder({

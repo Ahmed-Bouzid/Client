@@ -11,23 +11,33 @@ export const useOrderStore = create((set, get) => ({
 	isLoading: false,
 
 	/**
-	 * Initialise le store depuis AsyncStorage
-	 * Ne fait PAS d'appel API pour éviter trop de requêtes
+	 * Initialise le store depuis AsyncStorage (activeOrderId + allOrders)
 	 */
 	init: async () => {
 		try {
 			const savedId = await AsyncStorage.getItem("activeOrderId");
+			const savedOrders = await AsyncStorage.getItem("allOrders");
+			let orders = [];
+			if (savedOrders) {
+				try {
+					orders = JSON.parse(savedOrders);
+				} catch (e) {
+					orders = [];
+				}
+			}
 			if (savedId) {
-				// Restaurer l'ID sans vérifier avec le serveur (évite trop de requêtes)
-				set({ activeOrderId: savedId, hasActiveOrder: true });
+				set({
+					activeOrderId: savedId,
+					hasActiveOrder: true,
+					allOrders: orders,
+				});
 				console.log("📦 OrderId restauré:", savedId);
 			} else {
-				// Pas de commande sauvegardée
-				set({ activeOrderId: null, hasActiveOrder: false });
+				set({ activeOrderId: null, hasActiveOrder: false, allOrders: orders });
 			}
 		} catch (error) {
-			console.error("❌ Erreur chargement orderId:", error);
-			set({ activeOrderId: null, hasActiveOrder: false });
+			console.error("❌ Erreur chargement orderId/allOrders:", error);
+			set({ activeOrderId: null, hasActiveOrder: false, allOrders: [] });
 		}
 	},
 
@@ -50,6 +60,7 @@ export const useOrderStore = create((set, get) => ({
 			}
 			return { currentOrder: newOrder };
 		});
+		// Pas besoin de persister ici, allOrders n'est pas modifié
 	},
 
 	/**
@@ -129,13 +140,16 @@ export const useOrderStore = create((set, get) => ({
 				orderId: newOrderId,
 			}));
 
+			const updatedOrders = [...state.allOrders, ...sentItems];
 			set({
 				activeOrderId: newOrderId,
 				hasActiveOrder: true,
-				allOrders: [...state.allOrders, ...sentItems],
+				allOrders: updatedOrders,
 				currentOrder: [],
 				isLoading: false,
 			});
+			// Persister allOrders
+			await AsyncStorage.setItem("allOrders", JSON.stringify(updatedOrders));
 
 			return data;
 		} catch (error) {
@@ -189,8 +203,9 @@ export const useOrderStore = create((set, get) => ({
 		try {
 			await orderService.markAsPaid(finalOrderId);
 
-			// Nettoyer le state
+			// Nettoyer le state et effacer l'historique local
 			await AsyncStorage.removeItem("activeOrderId");
+			await AsyncStorage.removeItem("allOrders");
 			set({
 				activeOrderId: null,
 				hasActiveOrder: false,
@@ -215,5 +230,6 @@ export const useOrderStore = create((set, get) => ({
 			activeOrderId: null,
 			hasActiveOrder: false,
 		});
+		AsyncStorage.removeItem("allOrders");
 	},
 }));
