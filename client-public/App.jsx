@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, ActivityIndicator, Animated } from "react-native";
+import { API_CONFIG } from "../shared-api/config/apiConfig.js";
 import { SafeAreaView } from "react-native-safe-area-context";
 import JoinOrCreateTable from "./src/screens/JoinOrCreateTable";
 import Menu from "./src/screens/Menu";
@@ -10,12 +12,117 @@ import { useCustomAlert } from "./src/utils/customAlert";
 import { useClientTableStore } from "./src/stores/useClientTableStore";
 import { useOrderStore } from "./src/stores/useOrderStore";
 import { useCartStore } from "./src/stores/useCartStore";
+import { useAllergyStore } from "./src/stores/useAllergyStore";
+
+// Toast animé style Sonner
+const SuccessToast = ({ message, visible, onHide }) => {
+	const slideAnim = useRef(new Animated.Value(100)).current;
+	const opacityAnim = useRef(new Animated.Value(0)).current;
+
+	useEffect(() => {
+		if (visible) {
+			// Slide up + fade in
+			Animated.parallel([
+				Animated.spring(slideAnim, {
+					toValue: 0,
+					friction: 8,
+					tension: 40,
+					useNativeDriver: true,
+				}),
+				Animated.timing(opacityAnim, {
+					toValue: 1,
+					duration: 200,
+					useNativeDriver: true,
+				}),
+			]).start();
+
+			// Auto-hide après 3s
+			const timer = setTimeout(() => {
+				Animated.parallel([
+					Animated.timing(slideAnim, {
+						toValue: 100,
+						duration: 300,
+						useNativeDriver: true,
+					}),
+					Animated.timing(opacityAnim, {
+						toValue: 0,
+						duration: 300,
+						useNativeDriver: true,
+					}),
+				]).start(() => onHide?.());
+			}, 3000);
+
+			return () => clearTimeout(timer);
+		}
+	}, [visible]);
+
+	if (!visible) return null;
+
+	return (
+		<Animated.View
+			style={{
+				position: "absolute",
+				bottom: 40,
+				left: 20,
+				right: 20,
+				transform: [{ translateY: slideAnim }],
+				opacity: opacityAnim,
+				zIndex: 9999,
+			}}
+		>
+			<View
+				style={{
+					backgroundColor: "#1a1a1a",
+					paddingVertical: 16,
+					paddingHorizontal: 20,
+					borderRadius: 12,
+					flexDirection: "row",
+					alignItems: "center",
+					shadowColor: "#000",
+					shadowOffset: { width: 0, height: -4 },
+					shadowOpacity: 0.25,
+					shadowRadius: 12,
+					elevation: 10,
+					borderWidth: 1,
+					borderColor: "rgba(255,255,255,0.1)",
+				}}
+			>
+				<View
+					style={{
+						width: 28,
+						height: 28,
+						borderRadius: 14,
+						backgroundColor: "#22c55e",
+						alignItems: "center",
+						justifyContent: "center",
+						marginRight: 12,
+					}}
+				>
+					<Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}>
+						✓
+					</Text>
+				</View>
+				<Text
+					style={{
+						color: "#fff",
+						fontSize: 16,
+						fontWeight: "500",
+						flex: 1,
+					}}
+				>
+					{message}
+				</Text>
+			</View>
+		</Animated.View>
+	);
+};
 
 export default function App() {
-	const [step, setStep] = useState("join"); // join, menu, addOn, orders, payment
+	const [step, setStep] = useState("loading"); // loading, join, menu, addOn, orders, payment
 	const [reservationId, setReservationId] = useState("");
 	const [clientId, setClientId] = useState("");
 	const [tableNumber, setTableNumber] = useState(null);
+	const [welcomeBackMessage, setWelcomeBackMessage] = useState(null);
 
 	// IDs en dur pour les tests
 	const DEFAULT_TABLE_ID = "686af692bb4cba684ff3b757";
@@ -53,27 +160,34 @@ export default function App() {
 	} = useCartStore();
 
 	const { showAlert, AlertComponent } = useCustomAlert();
+	const { init: initAllergies } = useAllergyStore();
 
 	// Initialisation au démarrage
 	useEffect(() => {
 		const initialize = async () => {
 			// Initialiser avec les IDs en dur pour les tests
-			await initTable(DEFAULT_TABLE_ID, DEFAULT_RESTAURANT_ID);
+			// init() retourne true si une session existante (userName sauvegardé)
+			const hasExistingSession = await initTable(
+				DEFAULT_TABLE_ID,
+				DEFAULT_RESTAURANT_ID
+			);
 			await initOrder();
+			await initAllergies();
 
-			// ⭐ Récupérer le numéro de table depuis l'API
-			try {
-				const response = await fetch(
-					`http://192.168.1.185:3000/tables/${DEFAULT_TABLE_ID}`
-				);
-				if (response.ok) {
-					const tableData = await response.json();
-					setTableNumber(tableData.number || tableData.tableNumber || "?");
-					console.log("✅ Table info chargée:", tableData);
+			// Si session existante, aller directement au menu avec message de bienvenue
+			if (hasExistingSession) {
+				// On récupère le userName depuis le store après init
+				const savedUserName = useClientTableStore.getState().userName;
+				if (savedUserName) {
+					setWelcomeBackMessage(`Bon retour ${savedUserName} ! 👋`);
+					setStep("menu");
+					// Le toast gère son propre auto-hide via le composant SuccessToast
+					return;
 				}
-			} catch (error) {
-				console.error("Erreur récupération table:", error);
 			}
+
+			// Sinon, afficher la page de connexion
+			setStep("join");
 		};
 		initialize();
 	}, []);
@@ -250,6 +364,18 @@ export default function App() {
 				style={{ flex: 1, backgroundColor: "whitesmoke" }}
 				edges={["top", "left", "right"]}
 			>
+				{/* État de chargement */}
+				{step === "loading" && (
+					<View
+						style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+					>
+						<ActivityIndicator size="large" color="#4CAF50" />
+						<Text style={{ marginTop: 16, color: "#666", fontSize: 16 }}>
+							Chargement...
+						</Text>
+					</View>
+				)}
+
 				{step === "join" && (
 					<JoinOrCreateTable
 						tableId={tableId || DEFAULT_TABLE_ID}
@@ -259,30 +385,32 @@ export default function App() {
 				)}
 
 				{step === "menu" && (
-					<Menu
-						userName={userName}
-						// ⭐⭐ AJOUTEZ CES PROPS ⭐⭐
-						reservationId={reservationId}
-						tableId={tableId || DEFAULT_TABLE_ID}
-						tableNumber={tableNumber}
-						clientId={clientId}
-						orders={currentOrder}
-						onAdd={handleAddOrder}
-						onValidate={handleValidateOrder}
-						onPay={handlePaymentSuccess}
-						onUpdateQuantity={handleUpdateQuantity}
-						hasActiveOrder={hasActiveOrder}
-						onNavigateToPayment={navigateToPayment}
-						onNavigateToOrders={handleValidateOrder}
-						navigation={{
-							navigate: (screen, params) => {
-								// Simuler navigation pour Menu
-								if (screen === "Payment") {
-									setStep("payment");
-								}
-							},
-						}}
-					/>
+					<>
+						<Menu
+							userName={userName}
+							// ⭐⭐ AJOUTEZ CES PROPS ⭐⭐
+							reservationId={reservationId}
+							tableId={tableId || DEFAULT_TABLE_ID}
+							tableNumber={tableNumber}
+							clientId={clientId}
+							orders={currentOrder}
+							onAdd={handleAddOrder}
+							onValidate={handleValidateOrder}
+							onPay={handlePaymentSuccess}
+							onUpdateQuantity={handleUpdateQuantity}
+							hasActiveOrder={hasActiveOrder}
+							onNavigateToPayment={navigateToPayment}
+							onNavigateToOrders={handleValidateOrder}
+							navigation={{
+								navigate: (screen, params) => {
+									// Simuler navigation pour Menu
+									if (screen === "Payment") {
+										setStep("payment");
+									}
+								},
+							}}
+						/>
+					</>
 				)}
 
 				{step === "addOn" && (
@@ -319,6 +447,13 @@ export default function App() {
 				)}
 
 				<AlertComponent />
+
+				{/* Toast Success "Bon retour" */}
+				<SuccessToast
+					message={welcomeBackMessage}
+					visible={!!welcomeBackMessage}
+					onHide={() => setWelcomeBackMessage(null)}
+				/>
 			</SafeAreaView>
 		</StripeProvider>
 	);
