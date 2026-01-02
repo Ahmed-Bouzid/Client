@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+// --- RESET ASYNCSTORAGE AU DEMARRAGE (à retirer après reset) ---
+
 import { View, Text, ActivityIndicator, Animated } from "react-native";
 import { API_CONFIG } from "../shared-api/config/apiConfig.js";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -6,6 +9,7 @@ import JoinOrCreateTable from "./src/screens/JoinOrCreateTable";
 import Menu from "./src/screens/Menu";
 import AddOn from "./src/components/AddOn";
 import Payment from "./src/screens/Payment";
+import PaymentScreen from "./src/screens/PaymentScreen";
 import OrderSummary from "./src/screens/OrderSummary";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { useCustomAlert } from "./src/utils/customAlert";
@@ -18,6 +22,17 @@ import { useAllergyStore } from "./src/stores/useAllergyStore";
 const SuccessToast = ({ message, visible, onHide }) => {
 	const slideAnim = useRef(new Animated.Value(100)).current;
 	const opacityAnim = useRef(new Animated.Value(0)).current;
+
+	useEffect(() => {
+		AsyncStorage.multiRemove([
+			"tableId",
+			"reservationId",
+			"clientId",
+			"clientToken",
+		]).then(() => {
+			console.log("✅ Clés de session/table supprimées !");
+		});
+	}, []);
 
 	useEffect(() => {
 		if (visible) {
@@ -265,6 +280,23 @@ export default function App() {
 		}
 
 		try {
+			// Fonction helper pour normaliser catégorie
+			const normalizeCategory = (category) => {
+				if (!category) return "autre";
+				const normalized = category
+					.toLowerCase()
+					.normalize("NFD")
+					.replace(/[\u0300-\u036f]/g, "");
+				const validCategories = [
+					"boisson",
+					"entree",
+					"plat",
+					"dessert",
+					"autre",
+				];
+				return validCategories.includes(normalized) ? normalized : "autre";
+			};
+
 			// Préparer les données COMPLÈTES
 			const orderData = {
 				tableId: tableId || DEFAULT_TABLE_ID,
@@ -277,6 +309,7 @@ export default function App() {
 					name: item.name,
 					price: item.price,
 					quantity: item.quantity || 1,
+					category: normalizeCategory(item.category), // ⭐ Normaliser
 				})),
 				total: currentOrder.reduce(
 					(sum, item) => sum + item.price * (item.quantity || 1),
@@ -295,12 +328,19 @@ export default function App() {
 
 			showAlert(
 				"✅ Commande envoyée",
-				"Votre commande a été envoyée avec succès !",
+				"Souhaitez-vous payer maintenant ou continuer à commander ?",
 				[
 					{
-						text: "OK",
+						text: "Nouvelle commande",
+						style: "cancel",
 						onPress: () => {
 							setStep("menu");
+						},
+					},
+					{
+						text: "💳 Payer",
+						onPress: () => {
+							navigateToPayment();
 						},
 					},
 				]
@@ -351,15 +391,28 @@ export default function App() {
 	};
 
 	// Handler après paiement réussi
-	const handlePaymentSuccess = () => {
-		// Le paiement a déjà été effectué dans Payment.js
+	const handlePaymentSuccess = async () => {
+		try {
+			// Marquer la commande comme payée dans le store local
+			await markAsPaid(activeOrderId);
 
-		// On redirige simplement vers le menu
-		setStep("join");
+			console.log("✅ Commande marquée comme payée localement");
+
+			// Rediriger vers l'écran de connexion (nouvelle session)
+			setStep("join");
+		} catch (error) {
+			console.error("❌ Erreur lors du marquage de paiement:", error);
+			// Même en cas d'erreur, on redirige (le webhook aura marqué côté serveur)
+			setStep("join");
+		}
 	};
 
+	const STRIPE_PUBLISHABLE_KEY =
+		process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
+		"pk_test_51Ski7zH5JuPQb6uBqEKKQzUq5njDrBZFXvvlR5j9Gz5xnrmXCJO5hEP7tBxcWLrTCO0iYzfFV7OZlxfGaW3FMy5E00VJ0pUHsj";
+
 	return (
-		<StripeProvider publishableKey="pk_test_xxx">
+		<StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
 			<SafeAreaView
 				style={{ flex: 1, backgroundColor: "whitesmoke" }}
 				edges={["top", "left", "right"]}
@@ -432,23 +485,13 @@ export default function App() {
 				)}
 
 				{step === "payment" && (
-					<Payment
-						allOrders={allOrders}
+					<PaymentScreen
 						orderId={activeOrderId}
-						// ⭐⭐ AJOUTEZ CES PROPS ⭐⭐
-						reservationId={reservationId}
-						tableId={tableId || DEFAULT_TABLE_ID}
-						tableNumber={tableNumber}
-						clientId={clientId}
-						userName={userName}
 						onSuccess={handlePaymentSuccess}
-						onBack={() => setStep("menu")}
 					/>
 				)}
-
-				<AlertComponent />
-
 				{/* Toast Success "Bon retour" */}
+				<AlertComponent />
 				<SuccessToast
 					message={welcomeBackMessage}
 					visible={!!welcomeBackMessage}

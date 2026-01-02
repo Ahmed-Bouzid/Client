@@ -148,7 +148,7 @@ export default function AllergyManagement({ onClose }) {
 	};
 
 	return (
-		<View style={{ flex: 1, backgroundColor: "#f8f9fa" }}>
+		<View style={{ flex: 1, backgroundColor: "#f8f9fa", height: "100%" }}>
 			{/* Header */}
 			<LinearGradient
 				colors={PREMIUM_COLORS.primary}

@@ -122,7 +122,7 @@ const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle }) => {
 								end={{ x: 1, y: 1 }}
 							>
 								<Text style={{ color: "#fff" }}>
-									<MaterialIcons name="check" size={18} color="#fff" />{" "}
+									<MaterialIcons name="check" size={18} color="#fff" />
 									{item.name}
 									{item.clientName ? (
 										<Text style={{ color: "#4facfe", fontWeight: "bold" }}>

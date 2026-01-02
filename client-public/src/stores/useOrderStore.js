@@ -3,6 +3,23 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { orderService } from "../../../shared-api/services/orderService.js";
 import { errorHandler } from "../../../shared-api/utils/errorHandler.js";
 
+/**
+ * Normalise la catégorie pour le backend (sans accents)
+ * entrée → entree, boisson → boisson, etc.
+ */
+const normalizeCategory = (category) => {
+	if (!category) return "autre";
+
+	const normalized = category
+		.toLowerCase()
+		.normalize("NFD")
+		.replace(/[\u0300-\u036f]/g, ""); // Retire les accents
+
+	// Vérifier que c'est une valeur valide
+	const validCategories = ["boisson", "entree", "plat", "dessert", "autre"];
+	return validCategories.includes(normalized) ? normalized : "autre";
+};
+
 export const useOrderStore = create((set, get) => ({
 	currentOrder: [], // Commande en cours de construction
 	allOrders: [], // Toutes les commandes (y compris envoyées)
@@ -96,14 +113,18 @@ export const useOrderStore = create((set, get) => ({
 		}
 
 		// Utiliser items de orderData si fournis, sinon currentOrder
-		const itemsToSend =
-			orderData.items ||
-			state.currentOrder.map((i) => ({
-				productId: i._id,
-				name: i.name,
-				quantity: i.quantity,
-				price: i.price,
-			}));
+		const itemsToSend = orderData.items
+			? orderData.items.map((i) => ({
+					...i,
+					category: normalizeCategory(i.category), // ⭐ Normaliser
+				}))
+			: state.currentOrder.map((i) => ({
+					productId: i._id,
+					name: i.name,
+					quantity: i.quantity,
+					price: i.price,
+					category: normalizeCategory(i.category), // ⭐ Normaliser la catégorie
+				}));
 
 		if (itemsToSend.length === 0) {
 			throw new Error("Panier vide");

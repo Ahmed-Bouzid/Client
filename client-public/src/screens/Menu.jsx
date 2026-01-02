@@ -24,6 +24,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useOrderStore } from "../stores/useOrderStore.js";
 import AllergenBadge from "../components/AllergenBadge.jsx";
 import AllergyManagement from "./AllergyManagement.jsx";
+import MessagingBubble from "../components/MessagingBubble.jsx";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -496,6 +497,10 @@ export default function Menu({
 	const [searchQuery, setSearchQuery] = useState("");
 	const [allergyModalVisible, setAllergyModalVisible] = useState(false);
 
+	// 💬 État pour la messagerie client → serveur
+	const [reservationId, setReservationId] = useState(null);
+	const [clientId, setClientId] = useState(null);
+
 	// ⭐ État pour les modales
 	const [infoModalVisible, setInfoModalVisible] = useState(false); // Modal d'information
 	const [optionsModalVisible, setOptionsModalVisible] = useState(false); // Modal de sélection d'options
@@ -503,6 +508,23 @@ export default function Menu({
 	const [infoProductOptions, setInfoProductOptions] = useState([]); // Options pour la modal info
 	const [selectedOptions, setSelectedOptions] = useState([]);
 	const [loadingOptions, setLoadingOptions] = useState(false);
+
+	// 💬 Récupérer reservationId et clientId pour la messagerie
+	useEffect(() => {
+		const loadMessageIds = async () => {
+			try {
+				const storedReservationId = await AsyncStorage.getItem(
+					"currentReservationId"
+				);
+				const storedClientId = await AsyncStorage.getItem("clientId");
+				if (storedReservationId) setReservationId(storedReservationId);
+				if (storedClientId) setClientId(storedClientId);
+			} catch (error) {
+				console.error("Erreur chargement IDs messagerie:", error);
+			}
+		};
+		loadMessageIds();
+	}, []);
 
 	// ⚡ Catégories avec gradients (style moderne)
 	const categories = [
@@ -909,8 +931,8 @@ export default function Menu({
 				onPress={() => onNavigateToOrders?.()}
 			/>
 
-			{/* Bouton Payer si commande active */}
-			{hasActiveOrder && !cartItems.length && (
+			{/* Bouton Payer si commande active (affiché même si le panier est vide) */}
+			{hasActiveOrder && (
 				<TouchableOpacity
 					style={styles.payButtonFloat}
 					onPress={handlePayPress}
@@ -1075,6 +1097,15 @@ export default function Menu({
 			>
 				<AllergyManagement onClose={() => setAllergyModalVisible(false)} />
 			</Modal>
+
+			{/* 💬 Bulle de messagerie client → serveur */}
+			{reservationId && (
+				<MessagingBubble
+					reservationId={reservationId}
+					clientId={clientId || userName}
+					clientName={userName}
+				/>
+			)}
 		</LinearGradient>
 	);
 }
