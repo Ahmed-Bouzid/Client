@@ -3,23 +3,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { orderService } from "../../../shared-api/services/orderService.js";
 import { errorHandler } from "../../../shared-api/utils/errorHandler.js";
 
-/**
- * Normalise la catégorie pour le backend (sans accents)
- * entrée → entree, boisson → boisson, etc.
- */
-const normalizeCategory = (category) => {
-	if (!category) return "autre";
-
-	const normalized = category
-		.toLowerCase()
-		.normalize("NFD")
-		.replace(/[\u0300-\u036f]/g, ""); // Retire les accents
-
-	// Vérifier que c'est une valeur valide
-	const validCategories = ["boisson", "entree", "plat", "dessert", "autre"];
-	return validCategories.includes(normalized) ? normalized : "autre";
-};
-
 export const useOrderStore = create((set, get) => ({
 	currentOrder: [], // Commande en cours de construction
 	allOrders: [], // Toutes les commandes (y compris envoyées)
@@ -28,33 +11,23 @@ export const useOrderStore = create((set, get) => ({
 	isLoading: false,
 
 	/**
-	 * Initialise le store depuis AsyncStorage (activeOrderId + allOrders)
+	 * Initialise le store depuis AsyncStorage
+	 * Ne fait PAS d'appel API pour éviter trop de requêtes
 	 */
 	init: async () => {
 		try {
 			const savedId = await AsyncStorage.getItem("activeOrderId");
-			const savedOrders = await AsyncStorage.getItem("allOrders");
-			let orders = [];
-			if (savedOrders) {
-				try {
-					orders = JSON.parse(savedOrders);
-				} catch (e) {
-					orders = [];
-				}
-			}
 			if (savedId) {
-				set({
-					activeOrderId: savedId,
-					hasActiveOrder: true,
-					allOrders: orders,
-				});
+				// Restaurer l'ID sans vérifier avec le serveur (évite trop de requêtes)
+				set({ activeOrderId: savedId, hasActiveOrder: true });
 				console.log("📦 OrderId restauré:", savedId);
 			} else {
-				set({ activeOrderId: null, hasActiveOrder: false, allOrders: orders });
+				// Pas de commande sauvegardée
+				set({ activeOrderId: null, hasActiveOrder: false });
 			}
 		} catch (error) {
-			console.error("❌ Erreur chargement orderId/allOrders:", error);
-			set({ activeOrderId: null, hasActiveOrder: false, allOrders: [] });
+			console.error("❌ Erreur chargement orderId:", error);
+			set({ activeOrderId: null, hasActiveOrder: false });
 		}
 	},
 
@@ -67,7 +40,7 @@ export const useOrderStore = create((set, get) => ({
 			let newOrder;
 			if (existing) {
 				newOrder = state.currentOrder.map((o) =>
-					o._id === item._id ? { ...o, quantity: o.quantity + 1 } : o
+					o._id === item._id ? { ...o, quantity: o.quantity + 1 } : o,
 				);
 			} else {
 				newOrder = [
@@ -77,7 +50,6 @@ export const useOrderStore = create((set, get) => ({
 			}
 			return { currentOrder: newOrder };
 		});
-		// Pas besoin de persister ici, allOrders n'est pas modifié
 	},
 
 	/**
@@ -91,7 +63,7 @@ export const useOrderStore = create((set, get) => ({
 		} else {
 			set((state) => ({
 				currentOrder: state.currentOrder.map((o) =>
-					o._id === item._id ? { ...o, quantity } : o
+					o._id === item._id ? { ...o, quantity } : o,
 				),
 			}));
 		}
@@ -113,18 +85,14 @@ export const useOrderStore = create((set, get) => ({
 		}
 
 		// Utiliser items de orderData si fournis, sinon currentOrder
-		const itemsToSend = orderData.items
-			? orderData.items.map((i) => ({
-					...i,
-					category: normalizeCategory(i.category), // ⭐ Normaliser
-				}))
-			: state.currentOrder.map((i) => ({
-					productId: i._id,
-					name: i.name,
-					quantity: i.quantity,
-					price: i.price,
-					category: normalizeCategory(i.category), // ⭐ Normaliser la catégorie
-				}));
+		const itemsToSend =
+			orderData.items ||
+			state.currentOrder.map((i) => ({
+				productId: i._id,
+				name: i.name,
+				quantity: i.quantity,
+				price: i.price,
+			}));
 
 		if (itemsToSend.length === 0) {
 			throw new Error("Panier vide");
@@ -161,16 +129,13 @@ export const useOrderStore = create((set, get) => ({
 				orderId: newOrderId,
 			}));
 
-			const updatedOrders = [...state.allOrders, ...sentItems];
 			set({
 				activeOrderId: newOrderId,
 				hasActiveOrder: true,
-				allOrders: updatedOrders,
+				allOrders: [...state.allOrders, ...sentItems],
 				currentOrder: [],
 				isLoading: false,
 			});
-			// Persister allOrders
-			await AsyncStorage.setItem("allOrders", JSON.stringify(updatedOrders));
 
 			return data;
 		} catch (error) {
@@ -210,6 +175,87 @@ export const useOrderStore = create((set, get) => ({
 	},
 
 	/**
+	 * Récupère toutes les commandes d'une réservation depuis l'API
+	 */
+	fetchOrdersByReservation: async (reservationId) => {
+		if (!reservationId) {
+			console.warn("⚠️ fetchOrdersByReservation: reservationId manquant");
+			return [];
+		}
+
+		set({ isLoading: true });
+		try {
+			console.log(`🔍 Appel API /client-orders/${reservationId}...`);
+			const data = await orderService.getOrdersByReservation(reservationId);
+			const orders = data.orders || [];
+
+			console.log(
+				`✅ Commandes chargées pour reservation ${reservationId}:`,
+				orders.length,
+				"commandes",
+			);
+			console.log("📊 Détail des commandes:", JSON.stringify(orders, null, 2));
+
+			// ⭐ APLATIR les items de toutes les commandes en un seul tableau
+			// Payment.jsx s'attend à un tableau d'items, pas un tableau d'orders
+			const allItems = [];
+			orders.forEach((order, orderIndex) => {
+				console.log(`📦 Commande ${orderIndex + 1}:`, {
+					_id: order._id,
+					items: order.items?.length || 0,
+					paid: order.paid,
+					totalAmount: order.totalAmount,
+				});
+
+				if (order.items && Array.isArray(order.items)) {
+					order.items.forEach((item, itemIndex) => {
+						const enrichedItem = {
+							...item,
+							orderId: order._id, // Garder l'ID de la commande parente
+							orderStatus: order.orderStatus || order.status,
+							orderPaid: order.paid,
+							totalAmount: order.totalAmount,
+						};
+						console.log(`   Item ${itemIndex + 1}:`, {
+							name: item.name,
+							quantity: item.quantity,
+							price: item.price,
+							productId: item.productId,
+						});
+						allItems.push(enrichedItem);
+					});
+				} else {
+					console.warn(`⚠️ Commande ${orderIndex + 1} n'a pas d'items`);
+				}
+			});
+
+			console.log(`✅ Items extraits:`, allItems.length, "items au total");
+			console.log(
+				"📋 Liste des items:",
+				allItems.map((i) => ({
+					name: i.name,
+					quantity: i.quantity,
+					price: i.price,
+					_id: i._id || i.productId,
+				})),
+			);
+
+			// Mettre à jour allOrders avec les items aplatis
+			set({
+				allOrders: allItems,
+				isLoading: false,
+			});
+
+			return allItems;
+		} catch (error) {
+			console.error("❌ Erreur fetchOrdersByReservation:", error);
+			set({ allOrders: [], isLoading: false });
+			errorHandler.handleError(error);
+			return [];
+		}
+	},
+
+	/**
 	 * Marque la commande comme payée
 	 */
 	markAsPaid: async (orderId = null) => {
@@ -224,9 +270,8 @@ export const useOrderStore = create((set, get) => ({
 		try {
 			await orderService.markAsPaid(finalOrderId);
 
-			// Nettoyer le state et effacer l'historique local
+			// Nettoyer le state
 			await AsyncStorage.removeItem("activeOrderId");
-			await AsyncStorage.removeItem("allOrders");
 			set({
 				activeOrderId: null,
 				hasActiveOrder: false,
@@ -251,6 +296,5 @@ export const useOrderStore = create((set, get) => ({
 			activeOrderId: null,
 			hasActiveOrder: false,
 		});
-		AsyncStorage.removeItem("allOrders");
 	},
 }));

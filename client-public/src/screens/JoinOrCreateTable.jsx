@@ -26,39 +26,23 @@ import RNUUID from "react-native-uuid";
 
 const { width, height } = Dimensions.get("window");
 
-// 🎨 Premium Design System
-const PREMIUM_COLORS = {
-	primary: ["#667eea", "#764ba2"],
-	secondary: ["#f093fb", "#f5576c"],
-	accent: ["#4facfe", "#00f2fe"],
-	success: ["#11998e", "#38ef7d"],
-	dark: ["#0f0c29", "#302b63", "#24243e"],
-	glass: "rgba(255, 255, 255, 0.15)",
-	glassBorder: "rgba(255, 255, 255, 0.25)",
-	text: "#ffffff",
-	textMuted: "rgba(255, 255, 255, 0.7)",
-	inputBg: "rgba(255, 255, 255, 0.95)",
-};
+// 🎨 Thème BBQ
+import { PREMIUM_COLORS } from "../theme/colors";
 
 export default function JoinOrCreateTable({
 	tableId = null,
 	tableNumber = null,
 	onJoin = () => {},
 }) {
-	// ...hooks et états...
-
-	// Log la liste des guests (participants) et le statut de la table à chaque changement
-	useEffect(() => {
-		// ...
-	}, [participants, tableAvailable]);
 	const [name, setName] = useState("");
-	const [allergies, setAllergies] = useState("");
-	const [restrictions, setRestrictions] = useState("");
 	const [error, setError] = useState("");
 	const [participants, setParticipants] = useState([]);
 	const [showGuestsDropdown, setShowGuestsDropdown] = useState(false);
-	const [showRestrictionsOptions, setShowRestrictionsOptions] = useState(false);
 	const [loading, setLoading] = useState(false);
+	const [creatorName, setCreatorName] = useState(null);
+	const [tableAvailable, setTableAvailable] = useState(null);
+	const [orders, setOrders] = useState([]);
+	const [reservationIdState, setReservationIdState] = useState(null);
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -104,7 +88,7 @@ export default function JoinOrCreateTable({
 					duration: 1500,
 					useNativeDriver: true,
 				}),
-			])
+			]),
 		).start();
 
 		// Staggered input animations
@@ -183,14 +167,6 @@ export default function JoinOrCreateTable({
 		fetchTableInfo();
 	}, [tableId, tableNumber]);
 
-	// 🆕 Stocke le nom du créateur et la disponibilité de la table
-	const [creatorName, setCreatorName] = useState(null);
-	const [tableAvailable, setTableAvailable] = useState(null);
-
-	// 🆕 Commandes publiques de la réservation (accessibles à tous les guests)
-	const [orders, setOrders] = useState([]);
-	const [reservationIdState, setReservationIdState] = useState(null);
-
 	// Récupère la reservationId depuis AsyncStorage (persistant après join)
 	useEffect(() => {
 		async function fetchReservationIdAndOrders() {
@@ -202,7 +178,7 @@ export default function JoinOrCreateTable({
 			if (reservationId) {
 				try {
 					const res = await fetch(
-						`${API_BASE_URL}/client-orders/${reservationId}`
+						`${API_BASE_URL}/client-orders/${reservationId}`,
 					);
 					if (res.ok) {
 						const data = await res.json();
@@ -234,6 +210,17 @@ export default function JoinOrCreateTable({
 		return clientId;
 	};
 
+	const handleClearStorage = async () => {
+		try {
+			await AsyncStorage.clear();
+			Alert.alert("✅ Succès", "AsyncStorage vidé ! Redémarrez l'app.", [
+				{ text: "OK" },
+			]);
+		} catch (e) {
+			Alert.alert("❌ Erreur", "Impossible de vider le storage");
+		}
+	};
+
 	const handleJoin = async () => {
 		if (!name.trim()) return setError("Veuillez entrer un nom.");
 		if (!tableId) return setError("Table non identifiée.");
@@ -242,26 +229,28 @@ export default function JoinOrCreateTable({
 		setError("");
 
 		try {
-			// ⭐ Stocker tableId et pseudo AVANT de générer le token
+			// ⭐ Stocker tableId et pseudo
 			await AsyncStorage.setItem("pseudo", name.trim());
 			await AsyncStorage.setItem("tableId", tableId);
 
-			// Toujours passer le pseudo à getClientToken (stockage géré dans le service)
-			const token = await clientAuthService.getClientToken(name.trim());
+			// Générer un token client simple pour les commandes
+			const token = await clientAuthService.getClientToken(
+				name.trim(),
+				tableId,
+				restaurantId,
+			);
 			const clientId = await getOrCreateClientId();
 
 			const body = {
 				clientName: name.trim(),
 				clientId: clientId,
-				allergies,
-				restrictions,
 				tableId: tableId,
 				restaurantId:
 					restaurantId || (await AsyncStorage.getItem("restaurantId")),
 				reservationDate: new Date().toISOString(),
 				reservationTime: `${String(new Date().getHours()).padStart(
 					2,
-					"0"
+					"0",
 				)}:${String(new Date().getMinutes()).padStart(2, "0")}`,
 			};
 
@@ -273,7 +262,7 @@ export default function JoinOrCreateTable({
 						"Content-Type": "application/json",
 					},
 					body: JSON.stringify(body),
-				}
+				},
 			);
 
 			const text = await response.text();
@@ -289,7 +278,7 @@ export default function JoinOrCreateTable({
 			if (!response.ok) {
 				Alert.alert(
 					"Erreur",
-					data.message || "Erreur lors de la création de la réservation."
+					data.message || "Erreur lors de la création de la réservation.",
 				);
 				setLoading(false);
 				return;
@@ -336,7 +325,7 @@ export default function JoinOrCreateTable({
 			if (tableNumber) {
 				await AsyncStorage.setItem(
 					"currentTableNumber",
-					tableNumber.toString()
+					tableNumber.toString(),
 				);
 			}
 			await AsyncStorage.setItem("currentClientName", name.trim());
@@ -355,7 +344,7 @@ export default function JoinOrCreateTable({
 			setError(err.message || "Erreur réseau");
 			Alert.alert(
 				"Erreur",
-				"Impossible de rejoindre la table. Veuillez réessayer."
+				"Impossible de rejoindre la table. Veuillez réessayer.",
 			);
 		} finally {
 			setLoading(false);
@@ -371,6 +360,15 @@ export default function JoinOrCreateTable({
 				end={{ x: 1, y: 1 }}
 			>
 				<StatusBar barStyle="light-content" />
+
+				{/* 🔧 Debug Button */}
+				<TouchableOpacity
+					style={styles.debugButton}
+					onPress={handleClearStorage}
+					activeOpacity={0.7}
+				>
+					<MaterialIcons name="delete-sweep" size={24} color="#fff" />
+				</TouchableOpacity>
 
 				{/* 🌟 Animated Background Circles */}
 				<View style={styles.bgCircles}>
@@ -532,65 +530,6 @@ export default function JoinOrCreateTable({
 										/>
 									</View>
 								</Animated.View>
-
-								{/* Allergies Input */}
-
-								{/* Restrictions Dropdown Button */}
-								<Animated.View
-									style={[
-										styles.inputWrapper,
-										{
-											opacity: inputAnimations[2].interpolate({
-												inputRange: [0, 1],
-												outputRange: [1, 1],
-											}),
-											transform: [
-												{
-													translateX: inputAnimations[2].interpolate({
-														inputRange: [0, 1],
-														outputRange: [-30, 0],
-													}),
-												},
-											],
-										},
-									]}
-								>
-									<View style={styles.dropdownWrapper}>
-										<TouchableOpacity
-											style={styles.inputContainer}
-											onPress={() =>
-												!loading && setShowRestrictionsOptions(true)
-											}
-											disabled={loading}
-										>
-											<LinearGradient
-												colors={PREMIUM_COLORS.accent}
-												style={styles.inputIcon}
-												start={{ x: 0, y: 0 }}
-												end={{ x: 1, y: 1 }}
-											>
-												<MaterialIcons
-													name="restaurant-menu"
-													size={20}
-													color="#fff"
-												/>
-											</LinearGradient>
-											<Text
-												style={[
-													styles.dropdownText,
-													!restrictions && styles.dropdownPlaceholder,
-												]}
-											>
-												{restrictions || "Restrictions alimentaires"}
-											</Text>
-											<MaterialIcons
-												name="expand-more"
-												size={24}
-												color="#667eea"
-											/>
-										</TouchableOpacity>
-									</View>
-								</Animated.View>
 							</BlurView>
 						</View>
 
@@ -609,7 +548,42 @@ export default function JoinOrCreateTable({
 							</View>
 						) : null}
 
-						{/* 🚀 Premium Join Button */}
+						{/* � Payment Button (si commandes existent) */}
+						{orders.length > 0 && reservationIdState && (
+							<Animated.View
+								style={{
+									transform: [{ scale: buttonScale }],
+									marginBottom: 16,
+								}}
+							>
+								<TouchableOpacity
+									onPress={() =>
+										onJoin?.(
+											name.trim() || "Client",
+											reservationIdState,
+											tableId,
+											displayTableNumber,
+											null,
+										)
+									}
+									activeOpacity={0.9}
+								>
+									<LinearGradient
+										colors={["#667eea", "#764ba2"]}
+										style={styles.joinButton}
+										start={{ x: 0, y: 0 }}
+										end={{ x: 1, y: 0 }}
+									>
+										<MaterialIcons name="payment" size={24} color="#fff" />
+										<Text style={styles.joinButtonText}>
+											Payer mes commandes ({orders.length})
+										</Text>
+									</LinearGradient>
+								</TouchableOpacity>
+							</Animated.View>
+						)}
+
+						{/* �🚀 Premium Join Button */}
 						<Animated.View style={{ transform: [{ scale: buttonScale }] }}>
 							<TouchableOpacity
 								onPress={handleJoin}
@@ -653,64 +627,6 @@ export default function JoinOrCreateTable({
 					</Animated.View>
 				</KeyboardAvoidingView>
 			</LinearGradient>
-
-			{/* MODAL DROPDOWN RESTRICTIONS */}
-			<Modal
-				transparent
-				visible={showRestrictionsOptions}
-				animationType="fade"
-				onRequestClose={() => setShowRestrictionsOptions(false)}
-			>
-				<TouchableWithoutFeedback
-					onPress={() => setShowRestrictionsOptions(false)}
-				>
-					<View style={styles.modalOverlay}>
-						<TouchableWithoutFeedback>
-							<View style={styles.modalDropdown}>
-								{["Aucune", "Halal", "Casher", "Vegan", "Gluten Free"].map(
-									(option, index) => (
-										<TouchableOpacity
-											key={option}
-											style={[
-												styles.modalDropdownItem,
-												restrictions === option &&
-													styles.modalDropdownItemSelected,
-												index === 0 && styles.modalDropdownItemFirst,
-												index === 4 && styles.modalDropdownItemLast,
-											]}
-											onPress={() => {
-												setRestrictions(option);
-												setShowRestrictionsOptions(false);
-											}}
-										>
-											{restrictions === option && (
-												<LinearGradient
-													colors={PREMIUM_COLORS.success}
-													style={StyleSheet.absoluteFill}
-													start={{ x: 0, y: 0 }}
-													end={{ x: 1, y: 0 }}
-												/>
-											)}
-											<Text
-												style={[
-													styles.modalDropdownItemText,
-													restrictions === option &&
-														styles.modalDropdownItemTextSelected,
-												]}
-											>
-												{option}
-											</Text>
-											{restrictions === option && (
-												<MaterialIcons name="check" size={20} color="#fff" />
-											)}
-										</TouchableOpacity>
-									)
-								)}
-							</View>
-						</TouchableWithoutFeedback>
-					</View>
-				</TouchableWithoutFeedback>
-			</Modal>
 
 			{/* MODAL DROPDOWN GUESTS */}
 			<Modal
@@ -1057,5 +973,22 @@ const styles = StyleSheet.create({
 		fontWeight: "bold",
 		fontSize: 14,
 		marginLeft: 10,
+	},
+	debugButton: {
+		position: "absolute",
+		top: 50,
+		right: 20,
+		width: 50,
+		height: 50,
+		borderRadius: 25,
+		backgroundColor: "rgba(255, 59, 48, 0.9)",
+		justifyContent: "center",
+		alignItems: "center",
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		elevation: 8,
+		zIndex: 1000,
 	},
 });

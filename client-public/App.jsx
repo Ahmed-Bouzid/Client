@@ -1,15 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-// --- RESET ASYNCSTORAGE AU DEMARRAGE (à retirer après reset) ---
-
-import { View, Text, ActivityIndicator, Animated } from "react-native";
-import { API_CONFIG } from "../shared-api/config/apiConfig.js";
+import React, { useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { API_BASE_URL } from "./src/config/api";
 import JoinOrCreateTable from "./src/screens/JoinOrCreateTable";
 import Menu from "./src/screens/Menu";
 import AddOn from "./src/components/AddOn";
 import Payment from "./src/screens/Payment";
-import PaymentScreen from "./src/screens/PaymentScreen";
 import OrderSummary from "./src/screens/OrderSummary";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { useCustomAlert } from "./src/utils/customAlert";
@@ -17,127 +12,13 @@ import { useClientTableStore } from "./src/stores/useClientTableStore";
 import { useOrderStore } from "./src/stores/useOrderStore";
 import { useCartStore } from "./src/stores/useCartStore";
 import { useAllergyStore } from "./src/stores/useAllergyStore";
-
-// Toast animé style Sonner
-const SuccessToast = ({ message, visible, onHide }) => {
-	const slideAnim = useRef(new Animated.Value(100)).current;
-	const opacityAnim = useRef(new Animated.Value(0)).current;
-
-	useEffect(() => {
-		AsyncStorage.multiRemove([
-			"tableId",
-			"reservationId",
-			"clientId",
-			"clientToken",
-		]).then(() => {
-			console.log("✅ Clés de session/table supprimées !");
-		});
-	}, []);
-
-	useEffect(() => {
-		if (visible) {
-			// Slide up + fade in
-			Animated.parallel([
-				Animated.spring(slideAnim, {
-					toValue: 0,
-					friction: 8,
-					tension: 40,
-					useNativeDriver: true,
-				}),
-				Animated.timing(opacityAnim, {
-					toValue: 1,
-					duration: 200,
-					useNativeDriver: true,
-				}),
-			]).start();
-
-			// Auto-hide après 3s
-			const timer = setTimeout(() => {
-				Animated.parallel([
-					Animated.timing(slideAnim, {
-						toValue: 100,
-						duration: 300,
-						useNativeDriver: true,
-					}),
-					Animated.timing(opacityAnim, {
-						toValue: 0,
-						duration: 300,
-						useNativeDriver: true,
-					}),
-				]).start(() => onHide?.());
-			}, 3000);
-
-			return () => clearTimeout(timer);
-		}
-	}, [visible]);
-
-	if (!visible) return null;
-
-	return (
-		<Animated.View
-			style={{
-				position: "absolute",
-				bottom: 40,
-				left: 20,
-				right: 20,
-				transform: [{ translateY: slideAnim }],
-				opacity: opacityAnim,
-				zIndex: 9999,
-			}}
-		>
-			<View
-				style={{
-					backgroundColor: "#1a1a1a",
-					paddingVertical: 16,
-					paddingHorizontal: 20,
-					borderRadius: 12,
-					flexDirection: "row",
-					alignItems: "center",
-					shadowColor: "#000",
-					shadowOffset: { width: 0, height: -4 },
-					shadowOpacity: 0.25,
-					shadowRadius: 12,
-					elevation: 10,
-					borderWidth: 1,
-					borderColor: "rgba(255,255,255,0.1)",
-				}}
-			>
-				<View
-					style={{
-						width: 28,
-						height: 28,
-						borderRadius: 14,
-						backgroundColor: "#22c55e",
-						alignItems: "center",
-						justifyContent: "center",
-						marginRight: 12,
-					}}
-				>
-					<Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}>
-						✓
-					</Text>
-				</View>
-				<Text
-					style={{
-						color: "#fff",
-						fontSize: 16,
-						fontWeight: "500",
-						flex: 1,
-					}}
-				>
-					{message}
-				</Text>
-			</View>
-		</Animated.View>
-	);
-};
+import { useRestrictionStore } from "./src/stores/useRestrictionStore";
 
 export default function App() {
-	const [step, setStep] = useState("loading"); // loading, join, menu, addOn, orders, payment
+	const [step, setStep] = useState("join"); // join, menu, addOn, orders, payment
 	const [reservationId, setReservationId] = useState("");
 	const [clientId, setClientId] = useState("");
 	const [tableNumber, setTableNumber] = useState(null);
-	const [welcomeBackMessage, setWelcomeBackMessage] = useState(null);
 
 	// IDs en dur pour les tests
 	const DEFAULT_TABLE_ID = "686af692bb4cba684ff3b757";
@@ -175,34 +56,31 @@ export default function App() {
 	} = useCartStore();
 
 	const { showAlert, AlertComponent } = useCustomAlert();
-	const { init: initAllergies } = useAllergyStore();
 
 	// Initialisation au démarrage
 	useEffect(() => {
 		const initialize = async () => {
 			// Initialiser avec les IDs en dur pour les tests
-			// init() retourne true si une session existante (userName sauvegardé)
-			const hasExistingSession = await initTable(
-				DEFAULT_TABLE_ID,
-				DEFAULT_RESTAURANT_ID
-			);
+			await initTable(DEFAULT_TABLE_ID, DEFAULT_RESTAURANT_ID);
 			await initOrder();
-			await initAllergies();
 
-			// Si session existante, aller directement au menu avec message de bienvenue
-			if (hasExistingSession) {
-				// On récupère le userName depuis le store après init
-				const savedUserName = useClientTableStore.getState().userName;
-				if (savedUserName) {
-					setWelcomeBackMessage(`Bon retour ${savedUserName} ! 👋`);
-					setStep("menu");
-					// Le toast gère son propre auto-hide via le composant SuccessToast
-					return;
+			// ⭐ Initialiser les stores d'allergies et restrictions
+			await useAllergyStore.getState().init();
+			await useRestrictionStore.getState().init();
+
+			// ⭐ Récupérer le numéro de table depuis l'API
+			try {
+				const response = await fetch(
+					`${API_BASE_URL}/tables/${DEFAULT_TABLE_ID}`,
+				);
+				if (response.ok) {
+					const tableData = await response.json();
+					setTableNumber(tableData.number || tableData.tableNumber || "?");
+					console.log("✅ Table info chargée:", tableData);
 				}
+			} catch (error) {
+				console.error("Erreur récupération table:", error);
 			}
-
-			// Sinon, afficher la page de connexion
-			setStep("join");
 		};
 		initialize();
 	}, []);
@@ -222,7 +100,7 @@ export default function App() {
 		reservationId,
 		tableId,
 		tableNumber,
-		clientId
+		clientId,
 	) => {
 		try {
 			// ⭐ Stocker toutes les infos
@@ -235,7 +113,7 @@ export default function App() {
 			await joinTable(
 				clientName,
 				tableId || DEFAULT_TABLE_ID,
-				restaurantId || DEFAULT_RESTAURANT_ID
+				restaurantId || DEFAULT_RESTAURANT_ID,
 			);
 
 			resetOrder();
@@ -264,7 +142,7 @@ export default function App() {
 			showAlert(
 				"Panier vide",
 				"Veuillez ajouter des articles avant de commander.",
-				[{ text: "OK" }]
+				[{ text: "OK" }],
 			);
 			return;
 		}
@@ -274,29 +152,12 @@ export default function App() {
 			showAlert(
 				"Erreur",
 				"Aucune réservation active. Veuillez rejoindre une table d'abord.",
-				[{ text: "OK" }]
+				[{ text: "OK" }],
 			);
 			return;
 		}
 
 		try {
-			// Fonction helper pour normaliser catégorie
-			const normalizeCategory = (category) => {
-				if (!category) return "autre";
-				const normalized = category
-					.toLowerCase()
-					.normalize("NFD")
-					.replace(/[\u0300-\u036f]/g, "");
-				const validCategories = [
-					"boisson",
-					"entree",
-					"plat",
-					"dessert",
-					"autre",
-				];
-				return validCategories.includes(normalized) ? normalized : "autre";
-			};
-
 			// Préparer les données COMPLÈTES
 			const orderData = {
 				tableId: tableId || DEFAULT_TABLE_ID,
@@ -309,11 +170,10 @@ export default function App() {
 					name: item.name,
 					price: item.price,
 					quantity: item.quantity || 1,
-					category: normalizeCategory(item.category), // ⭐ Normaliser
 				})),
 				total: currentOrder.reduce(
 					(sum, item) => sum + item.price * (item.quantity || 1),
-					0
+					0,
 				),
 				status: "in_progress",
 				origin: "client",
@@ -328,28 +188,21 @@ export default function App() {
 
 			showAlert(
 				"✅ Commande envoyée",
-				"Souhaitez-vous payer maintenant ou continuer à commander ?",
+				"Votre commande a été envoyée avec succès !",
 				[
 					{
-						text: "Nouvelle commande",
-						style: "cancel",
+						text: "OK",
 						onPress: () => {
 							setStep("menu");
 						},
 					},
-					{
-						text: "💳 Payer",
-						onPress: () => {
-							navigateToPayment();
-						},
-					},
-				]
+				],
 			);
 		} catch (error) {
 			console.error("Erreur création commande dans App.js:", error);
 			showAlert(
 				"Erreur",
-				error.message || "Erreur lors de la création de la commande"
+				error.message || "Erreur lors de la création de la commande",
 			);
 		}
 	};
@@ -379,56 +232,47 @@ export default function App() {
 	};
 
 	// Navigation vers le paiement
-	const navigateToPayment = () => {
-		if (!activeOrderId) {
-			showAlert("Erreur", "Aucune commande active à payer", [{ text: "OK" }]);
+	const navigateToPayment = async () => {
+		if (!reservationId) {
+			showAlert("Erreur", "Aucune réservation active", [{ text: "OK" }]);
 			return;
 		}
 
-		// ⭐ Passer toutes les infos nécessaires au Payment
-		// Vous devrez ajuster Payment.js pour accepter ces props
-		setStep("payment");
-	};
-
-	// Handler après paiement réussi
-	const handlePaymentSuccess = async () => {
 		try {
-			// Marquer la commande comme payée dans le store local
-			await markAsPaid(activeOrderId);
+			// ⭐ CHARGER LES COMMANDES DEPUIS L'API AVANT DE NAVIGUER
+			console.log(
+				"🔍 Chargement des commandes pour reservation:",
+				reservationId,
+			);
+			await useOrderStore.getState().fetchOrdersByReservation(reservationId);
 
-			console.log("✅ Commande marquée comme payée localement");
-
-			// Rediriger vers l'écran de connexion (nouvelle session)
-			setStep("join");
+			// Passer à l'écran de paiement
+			setStep("payment");
 		} catch (error) {
-			console.error("❌ Erreur lors du marquage de paiement:", error);
-			// Même en cas d'erreur, on redirige (le webhook aura marqué côté serveur)
-			setStep("join");
+			console.error("❌ Erreur chargement commandes:", error);
+			showAlert("Erreur", "Impossible de charger les commandes", [
+				{ text: "OK" },
+			]);
 		}
 	};
 
-	const STRIPE_PUBLISHABLE_KEY =
-		process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
-		"pk_test_51Ski7zH5JuPQb6uBqEKKQzUq5njDrBZFXvvlR5j9Gz5xnrmXCJO5hEP7tBxcWLrTCO0iYzfFV7OZlxfGaW3FMy5E00VJ0pUHsj";
+	// Handler après paiement réussi
+	const handlePaymentSuccess = () => {
+		// Le paiement a déjà été effectué dans Payment.js
+
+		// On redirige simplement vers le menu
+		setStep("join");
+	};
 
 	return (
-		<StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+		<StripeProvider
+			publishableKey="pk_test_51Ski7zH5JuPQb6uBbPv7B8vwFCwhCL0nINHqUX1oxpNm0Qz3fUn5ZoGWf9jwd2dXVizHD0pTalhdEejZMQy9evAi00m3oQWIw0"
+			merchantIdentifier="merchant.com.orderit.app"
+		>
 			<SafeAreaView
 				style={{ flex: 1, backgroundColor: "whitesmoke" }}
 				edges={["top", "left", "right"]}
 			>
-				{/* État de chargement */}
-				{step === "loading" && (
-					<View
-						style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-					>
-						<ActivityIndicator size="large" color="#4CAF50" />
-						<Text style={{ marginTop: 16, color: "#666", fontSize: 16 }}>
-							Chargement...
-						</Text>
-					</View>
-				)}
-
 				{step === "join" && (
 					<JoinOrCreateTable
 						tableId={tableId || DEFAULT_TABLE_ID}
@@ -438,32 +282,30 @@ export default function App() {
 				)}
 
 				{step === "menu" && (
-					<>
-						<Menu
-							userName={userName}
-							// ⭐⭐ AJOUTEZ CES PROPS ⭐⭐
-							reservationId={reservationId}
-							tableId={tableId || DEFAULT_TABLE_ID}
-							tableNumber={tableNumber}
-							clientId={clientId}
-							orders={currentOrder}
-							onAdd={handleAddOrder}
-							onValidate={handleValidateOrder}
-							onPay={handlePaymentSuccess}
-							onUpdateQuantity={handleUpdateQuantity}
-							hasActiveOrder={hasActiveOrder}
-							onNavigateToPayment={navigateToPayment}
-							onNavigateToOrders={handleValidateOrder}
-							navigation={{
-								navigate: (screen, params) => {
-									// Simuler navigation pour Menu
-									if (screen === "Payment") {
-										setStep("payment");
-									}
-								},
-							}}
-						/>
-					</>
+					<Menu
+						userName={userName}
+						// ⭐⭐ AJOUTEZ CES PROPS ⭐⭐
+						reservationId={reservationId}
+						tableId={tableId || DEFAULT_TABLE_ID}
+						tableNumber={tableNumber}
+						clientId={clientId}
+						orders={currentOrder}
+						onAdd={handleAddOrder}
+						onValidate={handleValidateOrder}
+						onPay={handlePaymentSuccess}
+						onUpdateQuantity={handleUpdateQuantity}
+						hasActiveOrder={hasActiveOrder}
+						onNavigateToPayment={navigateToPayment}
+						onNavigateToOrders={handleValidateOrder}
+						navigation={{
+							navigate: (screen, params) => {
+								// Simuler navigation pour Menu
+								if (screen === "Payment") {
+									setStep("payment");
+								}
+							},
+						}}
+					/>
 				)}
 
 				{step === "addOn" && (
@@ -485,18 +327,21 @@ export default function App() {
 				)}
 
 				{step === "payment" && (
-					<PaymentScreen
+					<Payment
+						allOrders={allOrders}
 						orderId={activeOrderId}
+						// ⭐⭐ AJOUTEZ CES PROPS ⭐⭐
+						reservationId={reservationId}
+						tableId={tableId || DEFAULT_TABLE_ID}
+						tableNumber={tableNumber}
+						clientId={clientId}
+						userName={userName}
 						onSuccess={handlePaymentSuccess}
+						onBack={() => setStep("menu")}
 					/>
 				)}
-				{/* Toast Success "Bon retour" */}
+
 				<AlertComponent />
-				<SuccessToast
-					message={welcomeBackMessage}
-					visible={!!welcomeBackMessage}
-					onHide={() => setWelcomeBackMessage(null)}
-				/>
 			</SafeAreaView>
 		</StripeProvider>
 	);

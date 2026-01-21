@@ -30,7 +30,7 @@ import {
 	Vibration,
 	Platform,
 } from "react-native";
-import { BlurView } from "expo-blur";
+// import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { messageService } from "../services/messageService";
@@ -295,7 +295,7 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 							},
 						]}
 					>
-						<BlurView intensity={80} tint="dark" style={styles.menuBlur}>
+						<View style={styles.menuBlur}>
 							{/* Header */}
 							<View style={styles.menuHeader}>
 								<View style={styles.menuHeaderLeft}>
@@ -476,7 +476,7 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 									</Text>
 								</View>
 							)}
-						</BlurView>
+						</View>
 					</Animated.View>
 				</Animated.View>
 			</Modal>
@@ -514,23 +514,35 @@ const styles = StyleSheet.create({
 	overlay: {
 		flex: 1,
 		backgroundColor: "rgba(0, 0, 0, 0.6)",
-		justifyContent: "flex-end",
+		justifyContent: "center",
+		alignItems: "center",
 	},
 	overlayTouchable: {
-		flex: 1,
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
 	},
 
 	// Menu
 	menuContainer: {
 		maxHeight: SCREEN_HEIGHT * 0.75,
-		marginHorizontal: 12,
-		marginBottom: 12,
-		borderRadius: 24,
-		overflow: "hidden",
+		width: SCREEN_WIDTH - 32,
+		borderRadius: 16,
+		backgroundColor: "#fff",
+		alignSelf: "center",
+		paddingVertical: 18,
+		paddingHorizontal: 0,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.12,
+		shadowRadius: 18,
+		elevation: 8,
 	},
 	menuBlur: {
 		flex: 1,
-		backgroundColor: COLORS.darkCard,
+		backgroundColor: "transparent",
 	},
 	menuHeader: {
 		flexDirection: "row",
@@ -550,7 +562,7 @@ const styles = StyleSheet.create({
 	menuTitle: {
 		fontSize: 18,
 		fontWeight: "700",
-		color: COLORS.text,
+		color: "#222",
 	},
 	closeButton: {
 		padding: 8,
@@ -597,7 +609,7 @@ const styles = StyleSheet.create({
 	categoryTitle: {
 		fontSize: 13,
 		fontWeight: "600",
-		color: COLORS.textMuted,
+		color: "#444",
 		textTransform: "uppercase",
 		letterSpacing: 0.5,
 	},
@@ -623,11 +635,11 @@ const styles = StyleSheet.create({
 	messageText: {
 		flex: 1,
 		fontSize: 15,
-		color: COLORS.textSecondary,
+		color: "#222",
 		lineHeight: 22,
 	},
 	messageTextSelected: {
-		color: COLORS.text,
+		color: "#222",
 		fontWeight: "500",
 	},
 
@@ -663,7 +675,7 @@ const styles = StyleSheet.create({
 		gap: 12,
 	},
 	loadingText: {
-		color: COLORS.textMuted,
+		color: "#444",
 		fontSize: 14,
 	},
 	successContainer: {
@@ -682,7 +694,7 @@ const styles = StyleSheet.create({
 		gap: 12,
 	},
 	emptyText: {
-		color: COLORS.textMuted,
+		color: "#444",
 		fontSize: 15,
 	},
 
@@ -697,7 +709,7 @@ const styles = StyleSheet.create({
 		borderTopColor: "rgba(255, 255, 255, 0.1)",
 	},
 	footerText: {
-		color: COLORS.textMuted,
+		color: "#444",
 		fontSize: 12,
 	},
 });

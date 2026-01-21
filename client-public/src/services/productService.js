@@ -1,5 +1,4 @@
 import { API_CONFIG } from "../../../shared-api/config/apiConfig.js";
-import { getRestaurantId } from "../../../shared-api/utils/getRestaurantId.js";
 
 export const productService = {
 	async fetchProducts(token = null) {
@@ -15,10 +14,13 @@ export const productService = {
 
 		if (token) {
 			headers.Authorization = `Bearer ${token}`;
+			console.log(
+				"📨 Headers Authorization:",
+				headers.Authorization.substring(0, 30) + "..."
+			);
 		}
 
-		const restaurantId = await getRestaurantId();
-		const url = `${API_CONFIG.BASE_URL}/products/restaurant/${restaurantId}`;
+		const url = `${API_CONFIG.BASE_URL}/products/restaurant/${API_CONFIG.RESTAURANT_ID}`;
 		// console.log("🌐 URL complète:", url);
 		// console.log("🍽️ Restaurant ID:", API_CONFIG.RESTAURANT_ID);
 

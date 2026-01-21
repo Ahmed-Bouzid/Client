@@ -13,18 +13,19 @@ import {
 	Dimensions,
 	TextInput,
 	Platform,
-	Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import {
+	MaterialCommunityIcons,
+	MaterialIcons,
+	Ionicons,
+} from "@expo/vector-icons";
 import { useCartStore } from "../stores/useCartStore.js";
 import useProductStore from "../stores/useProductStore.js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useOrderStore } from "../stores/useOrderStore.js";
-import AllergenBadge from "../components/AllergenBadge.jsx";
-import AllergyManagement from "./AllergyManagement.jsx";
-import MessagingBubble from "../components/MessagingBubble.jsx";
+import DietaryPreferences from "./DietaryPreferences.jsx";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -96,9 +97,6 @@ const PremiumProductCard = ({
 				},
 			]}
 		>
-			{/* Allergen Badge */}
-			<AllergenBadge product={item} />
-
 			{/* Gradient accent line */}
 			<LinearGradient
 				colors={categoryGradient || ["#667eea", "#764ba2"]}
@@ -135,6 +133,18 @@ const PremiumProductCard = ({
 							>
 								<Text style={[styles.premiumTagText, { color: "#FF9800" }]}>
 									🌾 Sans gluten
+								</Text>
+							</View>
+						)}
+						{item.allergens && (
+							<View
+								style={[
+									styles.premiumTag,
+									{ backgroundColor: "rgba(244,67,54,0.1)" },
+								]}
+							>
+								<Text style={[styles.premiumTagText, { color: "#F44336" }]}>
+									⚠️
 								</Text>
 							</View>
 						)}
@@ -275,7 +285,7 @@ const PremiumFloatingCart = ({ itemCount, total, onPress }) => {
 							duration: 1500,
 							useNativeDriver: true,
 						}),
-					])
+					]),
 				),
 			]).start();
 		} else {
@@ -495,36 +505,7 @@ export default function Menu({
 	const [modalVisible, setModalVisible] = useState(false);
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [searchQuery, setSearchQuery] = useState("");
-	const [allergyModalVisible, setAllergyModalVisible] = useState(false);
-
-	// 💬 État pour la messagerie client → serveur
-	const [reservationId, setReservationId] = useState(null);
-	const [clientId, setClientId] = useState(null);
-
-	// ⭐ État pour les modales
-	const [infoModalVisible, setInfoModalVisible] = useState(false); // Modal d'information
-	const [optionsModalVisible, setOptionsModalVisible] = useState(false); // Modal de sélection d'options
-	const [productOptions, setProductOptions] = useState([]);
-	const [infoProductOptions, setInfoProductOptions] = useState([]); // Options pour la modal info
-	const [selectedOptions, setSelectedOptions] = useState([]);
-	const [loadingOptions, setLoadingOptions] = useState(false);
-
-	// 💬 Récupérer reservationId et clientId pour la messagerie
-	useEffect(() => {
-		const loadMessageIds = async () => {
-			try {
-				const storedReservationId = await AsyncStorage.getItem(
-					"currentReservationId"
-				);
-				const storedClientId = await AsyncStorage.getItem("clientId");
-				if (storedReservationId) setReservationId(storedReservationId);
-				if (storedClientId) setClientId(storedClientId);
-			} catch (error) {
-				console.error("Erreur chargement IDs messagerie:", error);
-			}
-		};
-		loadMessageIds();
-	}, []);
+	const [showDietaryModal, setShowDietaryModal] = useState(false);
 
 	// ⚡ Catégories avec gradients (style moderne)
 	const categories = [
@@ -559,58 +540,9 @@ export default function Menu({
 	];
 
 	// ============ FONCTIONS ============
-	// Ouvrir la modal d'information (clic sur produit)
-	const handleOpenInfoModal = async (item) => {
-		console.log("🖼️ handleOpenInfoModal - item:", item);
-		console.log("🖼️ item.image:", item.image);
-		console.log("🖼️ item.imageUrl:", item.imageUrl);
-		setSelectedItem(item);
-		setInfoModalVisible(true);
-		// Charger les options pour affichage informatif
-		const options = await checkProductOptions(item._id);
-		setInfoProductOptions(options);
-	};
-
-	// Ouvrir la modal de sélection d'options (clic sur "+")
 	const handleIncrease = async (item) => {
-		// Charger les options pour vérifier si le produit en a
-		const options = await checkProductOptions(item._id);
-		if (options && options.length > 0) {
-			// Le produit a des options, ouvrir la modal de sélection
-			setSelectedItem(item);
-			setSelectedOptions([]);
-			setProductOptions(options);
-			setOptionsModalVisible(true);
-		} else {
-			// Pas d'options, ajout direct au panier
-			onAdd?.(item);
-		}
-	};
-
-	// Vérifie si un produit a des options (retourne les options ou [])
-	const checkProductOptions = async (productId) => {
-		try {
-			const clientToken = await AsyncStorage.getItem("clientToken");
-			if (!clientToken) return [];
-
-			const url = `${process.env.EXPO_PUBLIC_API_URL || "https://orderit-backend-6y1m.onrender.com"}/products/${productId}/options`;
-			const response = await fetch(url, {
-				method: "GET",
-				headers: {
-					Authorization: `Bearer ${clientToken}`,
-					"Content-Type": "application/json",
-				},
-			});
-
-			if (response.ok) {
-				const options = await response.json();
-				return Array.isArray(options) ? options : [];
-			}
-			return [];
-		} catch (error) {
-			console.error("Erreur vérification options:", error);
-			return [];
-		}
+		// onAdd gère déjà l'ajout au panier ET à la commande
+		onAdd?.(item);
 	};
 
 	const handleDecrease = async (item) => {
@@ -633,7 +565,7 @@ export default function Menu({
 
 	const totalArticles = cartItems.reduce(
 		(total, item) => total + (cart[item._id] || 0),
-		0
+		0,
 	);
 
 	const getActiveOrderId = async () => {
@@ -641,88 +573,20 @@ export default function Menu({
 		return activeOrder?._id || null;
 	};
 
-	const fetchProductOptions = async (productId) => {
-		setLoadingOptions(true);
-		try {
-			const clientToken = await AsyncStorage.getItem("clientToken");
-			if (!clientToken) {
-				setProductOptions([]);
-				return;
-			}
-
-			const url = `${process.env.EXPO_PUBLIC_API_URL || "https://orderit-backend-6y1m.onrender.com"}/products/${productId}/options`;
-
-			const response = await fetch(url, {
-				method: "GET",
-				headers: {
-					Authorization: `Bearer ${clientToken}`,
-					"Content-Type": "application/json",
-				},
-			});
-
-			if (response.ok) {
-				const options = await response.json();
-				setProductOptions(Array.isArray(options) ? options : []);
-			} else {
-				setProductOptions([]);
-			}
-		} catch (error) {
-			console.error("Erreur chargement options:", error);
-			setProductOptions([]);
-		} finally {
-			setLoadingOptions(false);
-		}
-	};
-
-	const toggleOption = (option) => {
-		setSelectedOptions((prev) => {
-			const exists = prev.find((opt) => opt._id === option._id);
-			if (exists) {
-				// Décocher l'option
-				return [];
-			} else {
-				// Cocher l'option (max 1)
-				return [option];
-			}
-		});
-	};
-
-	const handleAddToCartWithOptions = () => {
-		if (selectedOptions.length > 0) {
-			// Créer un nom avec l'option entre parenthèses
-			const optionName = selectedOptions[0].name;
-			const itemWithOptions = {
-				...selectedItem,
-				name: `${selectedItem.name} (${optionName})`,
-				originalName: selectedItem.name,
-				options: selectedOptions,
-			};
-			onAdd?.(itemWithOptions);
-		} else {
-			onAdd?.(selectedItem);
-		}
-		setOptionsModalVisible(false);
-		setSelectedOptions([]);
+	const openModal = (item) => {
+		setSelectedItem(item);
+		setModalVisible(true);
 	};
 
 	const handlePayPress = async () => {
 		if (onNavigateToPayment) {
-			const orderId = await getActiveOrderId();
-			if (!orderId) {
-				Alert.alert("Erreur", "Aucune commande active trouvée");
-				return;
-			}
+			// ✅ Navigation directe vers Payment
+			// fetchOrdersByReservation sera appelé dans navigateToPayment (App.jsx)
 			onNavigateToPayment?.();
 			return;
 		}
 
 		// Fallback si pas de navigation
-		const orderId = await getActiveOrderId();
-		if (!orderId) {
-			Alert.alert("Erreur", "Aucune commande active trouvée");
-			return;
-		}
-
 		Alert.alert("Erreur", "Navigation non disponible");
 	};
 
@@ -747,7 +611,7 @@ export default function Menu({
 		? products.filter(
 				(p) =>
 					p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-					p.description?.toLowerCase().includes(searchQuery.toLowerCase())
+					p.description?.toLowerCase().includes(searchQuery.toLowerCase()),
 			)
 		: [];
 
@@ -759,7 +623,7 @@ export default function Menu({
 	// 💰 Total du panier
 	const cartTotal = cartItems.reduce(
 		(sum, item) => sum + item.price * (cart[item._id] || 0),
-		0
+		0,
 	);
 
 	// 🎯 ÉCRAN UNIFIÉ : Catégories + Produits
@@ -784,34 +648,42 @@ export default function Menu({
 
 			{/* Header Premium */}
 			<View style={styles.premiumHeader}>
-				<View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-					{/* Icône avec pastille allergènes */}
-					<View style={styles.headerIconContainer}>
-						<TouchableOpacity
-							onPress={() => setAllergyModalVisible(true)}
-							activeOpacity={0.7}
-						>
-							<LinearGradient
-								colors={PREMIUM_COLORS.accent}
-								style={styles.headerIcon}
-								start={{ x: 0, y: 0 }}
-								end={{ x: 1, y: 1 }}
-							>
-								<MaterialIcons name="restaurant-menu" size={32} color="#fff" />
-							</LinearGradient>
-						</TouchableOpacity>
-						{/* Pastille rouge avec + (déplacée en dehors du LinearGradient) */}
-						<View style={styles.allergyBadgeAbsolute}>
-							<Text style={styles.allergyBadgeText}>+</Text>
-						</View>
+				<TouchableOpacity
+					onPress={() => setShowDietaryModal(true)}
+					style={{ position: "relative" }}
+					activeOpacity={0.7}
+				>
+					<LinearGradient
+						colors={PREMIUM_COLORS.accent}
+						style={styles.headerIcon}
+						start={{ x: 0, y: 0 }}
+						end={{ x: 1, y: 1 }}
+					>
+						<MaterialIcons name="restaurant-menu" size={32} color="#fff" />
+					</LinearGradient>
+					{/* Badge "+" */}
+					<View
+						style={{
+							position: "absolute",
+							top: -4,
+							right: -4,
+							backgroundColor: "#ff512f",
+							width: 20,
+							height: 20,
+							borderRadius: 10,
+							alignItems: "center",
+							justifyContent: "center",
+							borderWidth: 2,
+							borderColor: "#fff",
+						}}
+					>
+						<Ionicons name="add" size={14} color="#fff" />
 					</View>
-					<View style={{ flex: 1 }}>
-						<Text style={styles.welcomeTitle}>
-							{userName ? `Bonjour ${userName}` : "Bienvenue"} ✨
-						</Text>
-						<Text style={styles.subtitle}>Découvrez notre carte</Text>
-					</View>
-				</View>
+				</TouchableOpacity>
+				<Text style={styles.welcomeTitle}>
+					{userName ? `Bonjour ${userName}` : "Bienvenue"} ✨
+				</Text>
+				<Text style={styles.subtitle}>Découvrez notre carte</Text>
 			</View>
 
 			{/* 🔍 Barre de recherche Premium */}
@@ -849,7 +721,7 @@ export default function Menu({
 					keyExtractor={(item) => item._id.toString()}
 					renderItem={({ item, index }) => {
 						const productCategory = categories.find(
-							(c) => c.id === item.category?.toLowerCase()
+							(c) => c.id === item.category?.toLowerCase(),
 						);
 						return (
 							<PremiumProductCard
@@ -857,7 +729,7 @@ export default function Menu({
 								cart={cart}
 								onIncrease={handleIncrease}
 								onDecrease={handleDecrease}
-								onPress={() => handleOpenInfoModal(item)}
+								onPress={() => openModal(item)}
 								index={index}
 								categoryGradient={productCategory?.gradient}
 							/>
@@ -894,7 +766,7 @@ export default function Menu({
 							cart={cart}
 							onIncrease={handleIncrease}
 							onDecrease={handleDecrease}
-							onPress={() => handleOpenInfoModal(item)}
+							onPress={() => openModal(item)}
 							index={index}
 							categoryGradient={selectedCategory?.gradient}
 						/>
@@ -931,8 +803,8 @@ export default function Menu({
 				onPress={() => onNavigateToOrders?.()}
 			/>
 
-			{/* Bouton Payer si commande active (affiché même si le panier est vide) */}
-			{hasActiveOrder && (
+			{/* Bouton Payer si commande active */}
+			{hasActiveOrder && !cartItems.length && (
 				<TouchableOpacity
 					style={styles.payButtonFloat}
 					onPress={handlePayPress}
@@ -949,163 +821,53 @@ export default function Menu({
 				</TouchableOpacity>
 			)}
 
-			{/* 🔹 MODAL 1 : Info produit (lecture seule) - Clic sur produit */}
+			{/* 🔹 Modal produit Premium */}
 			{selectedItem && (
 				<Modal
 					transparent
-					visible={infoModalVisible}
+					visible={modalVisible}
 					animationType="fade"
-					onRequestClose={() => setInfoModalVisible(false)}
+					onRequestClose={() => setModalVisible(false)}
 				>
-					<TouchableOpacity
-						style={styles.modalOverlayDark}
-						activeOpacity={1}
-						onPress={() => setInfoModalVisible(false)}
-					>
-						<TouchableOpacity
-							style={styles.modalContent}
-							activeOpacity={1}
-							onPress={(e) => e.stopPropagation()}
-						>
-							<Text style={styles.modalTitle}>{selectedItem.name}</Text>
-
-							{/* Image du produit */}
-							{(selectedItem.image || selectedItem.imageUrl) && (
-								<Image
-									source={{ uri: selectedItem.image || selectedItem.imageUrl }}
-									style={styles.modalImage}
-									resizeMode="cover"
-									onLoad={() =>
-										console.log(
-											"✅ Image chargée:",
-											selectedItem.image || selectedItem.imageUrl
-										)
-									}
-									onError={(e) =>
-										console.log("❌ Erreur image:", e.nativeEvent.error)
-									}
-								/>
-							)}
-
-							{/* Options (sur une ligne) */}
-							{infoProductOptions.length > 0 && (
-								<Text style={styles.infoOptionsOneLine}>
-									{infoProductOptions.map((opt) => opt.name).join(" - ")}
-								</Text>
-							)}
-
-							{/* Allergènes */}
-							{selectedItem.allergens && selectedItem.allergens.length > 0 && (
-								<View style={styles.infoAllergensContainer}>
-									<Text style={styles.modalAllergens}>
-										⚠️ Allergènes :{" "}
-										{selectedItem.allergens
-											.map((a) =>
-												typeof a === "object" ? `${a.icon || ""} ${a.name}` : a
-											)
-											.join(", ")}
-									</Text>
-								</View>
-							)}
-						</TouchableOpacity>
-					</TouchableOpacity>
-				</Modal>
-			)}
-
-			{/* 🔹 MODAL 2 : Sélection d'options (0 ou 1 option) - Clic sur "+" */}
-			{selectedItem && (
-				<Modal
-					transparent
-					visible={optionsModalVisible}
-					animationType="fade"
-					onRequestClose={() => setOptionsModalVisible(false)}
-				>
-					<View style={styles.modalOverlayDark}>
+					<View style={styles.modalOverlay}>
 						<View style={styles.modalContent}>
 							<Text style={styles.modalTitle}>{selectedItem.name}</Text>
-
-							{/* Section Options avec boutons radio */}
-							{loadingOptions ? (
-								<View style={styles.optionsLoading}>
-									<Text style={styles.optionsLoadingText}>
-										Chargement des options...
+							<Text style={styles.modalDescription}>
+								{selectedItem.description || "Sans description"}
+							</Text>
+							<View style={styles.modalTags}>
+								{selectedItem.vegan && (
+									<Text style={[styles.modalTag, styles.modalVeganTag]}>
+										🌱 Vegan
 									</Text>
-								</View>
-							) : productOptions.length > 0 ? (
-								<View style={styles.optionsContainer}>
-									<Text style={styles.optionsTitle}>
-										Choisissez une option :
+								)}
+								{selectedItem.glutenFree && (
+									<Text style={[styles.modalTag, styles.modalGlutenTag]}>
+										🌾 Sans gluten
 									</Text>
-									{productOptions.map((option) => {
-										const isSelected = selectedOptions.find(
-											(opt) => opt._id === option._id
-										);
-										return (
-											<TouchableOpacity
-												key={option._id}
-												style={[
-													styles.optionItem,
-													isSelected && styles.optionItemSelected,
-												]}
-												onPress={() => toggleOption(option)}
-											>
-												<View style={styles.optionLeft}>
-													<Text style={styles.optionRadio}>
-														{isSelected ? "🔘" : "⚪"}
-													</Text>
-													<Text style={styles.optionName}>{option.name}</Text>
-												</View>
-												{option.price > 0 && (
-													<Text style={styles.optionPrice}>
-														+{option.price.toFixed(2)}€
-													</Text>
-												)}
-											</TouchableOpacity>
-										);
-									})}
-								</View>
-							) : null}
-
-							{/* Boutons Annuler / Ajouter */}
-							<View style={styles.modalButtons}>
-								<Pressable
-									style={[styles.modalButton, styles.modalCancelButton]}
-									onPress={() => {
-										setOptionsModalVisible(false);
-										setSelectedOptions([]);
-									}}
-								>
-									<Text style={styles.modalCancelText}>Annuler</Text>
-								</Pressable>
-								<Pressable
-									style={[styles.modalButton, styles.modalAddButton]}
-									onPress={handleAddToCartWithOptions}
-								>
-									<Text style={styles.modalAddText}>Ajouter</Text>
-								</Pressable>
+								)}
 							</View>
+							{selectedItem.allergens && (
+								<Text style={styles.modalAllergens}>
+									⚠️ Allergènes : {selectedItem.allergens}
+								</Text>
+							)}
+							<Pressable
+								style={styles.modalCloseButton}
+								onPress={() => setModalVisible(false)}
+							>
+								<Text style={styles.modalCloseText}>Fermer</Text>
+							</Pressable>
 						</View>
 					</View>
 				</Modal>
 			)}
 
-			{/* 🚨 Modal Gestion des Allergies */}
-			<Modal
-				visible={allergyModalVisible}
-				animationType="slide"
-				onRequestClose={() => setAllergyModalVisible(false)}
-			>
-				<AllergyManagement onClose={() => setAllergyModalVisible(false)} />
-			</Modal>
-
-			{/* 💬 Bulle de messagerie client → serveur */}
-			{reservationId && (
-				<MessagingBubble
-					reservationId={reservationId}
-					clientId={clientId || userName}
-					clientName={userName}
-				/>
-			)}
+			{/* Modal Préférences Alimentaires */}
+			<DietaryPreferences
+				visible={showDietaryModal}
+				onClose={() => setShowDietaryModal(false)}
+			/>
 		</LinearGradient>
 	);
 }
@@ -1120,28 +882,6 @@ const styles = StyleSheet.create({
 	bgDecor: {
 		...StyleSheet.absoluteFillObject,
 		overflow: "hidden",
-	},
-	headerIconContainer: {
-		position: "relative", // Essentiel pour positionner la pastille
-	},
-	allergyBadgeAbsolute: {
-		position: "absolute",
-		top: -2,
-		right: -2,
-		width: 20,
-		height: 20,
-		borderRadius: 10,
-		backgroundColor: "#eb3349",
-		justifyContent: "center",
-		alignItems: "center",
-		borderWidth: 2,
-		borderColor: "#fff",
-		shadowColor: "#eb3349",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.5,
-		shadowRadius: 4,
-		elevation: 5,
-		zIndex: 10,
 	},
 	bgCircle: {
 		position: "absolute",
@@ -1163,35 +903,8 @@ const styles = StyleSheet.create({
 	// 🎨 Header Premium
 	premiumHeader: {
 		marginBottom: 20,
+		alignItems: "center",
 		paddingTop: 10,
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-	},
-	allergyBadge: {
-		position: "absolute",
-		top: -2,
-		right: -2,
-		width: 20,
-		height: 20,
-		borderRadius: 10,
-		backgroundColor: "#eb3349",
-		justifyContent: "center",
-		alignItems: "center",
-		borderWidth: 2,
-		borderColor: "#fff",
-		shadowColor: "#eb3349",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.5,
-		shadowRadius: 4,
-		elevation: 5,
-		overflow: "visible",
-	},
-	allergyBadgeText: {
-		color: "#fff",
-		fontSize: 14,
-		fontWeight: "bold",
-		lineHeight: 16,
 	},
 	headerIcon: {
 		width: 70,
@@ -1199,6 +912,7 @@ const styles = StyleSheet.create({
 		borderRadius: 35,
 		justifyContent: "center",
 		alignItems: "center",
+		marginBottom: 16,
 		shadowColor: "#4facfe",
 		shadowOffset: { width: 0, height: 8 },
 		shadowOpacity: 0.4,
@@ -1477,7 +1191,7 @@ const styles = StyleSheet.create({
 		bottom: 20,
 		left: 20,
 		right: 20,
-		backgroundColor: "#2196F3",
+		// backgroundColor supprimé - le LinearGradient gère le fond
 		padding: 15,
 		borderRadius: 12,
 		alignItems: "center",
@@ -1775,12 +1489,6 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		alignItems: "center",
 	},
-	modalOverlayDark: {
-		flex: 1,
-		backgroundColor: "rgba(0,0,0,0.8)",
-		justifyContent: "center",
-		alignItems: "center",
-	},
 	modalContent: {
 		width: "85%",
 		backgroundColor: "#fff",
@@ -1794,13 +1502,6 @@ const styles = StyleSheet.create({
 		marginBottom: 10,
 		color: "#333",
 		textAlign: "center",
-	},
-	modalImage: {
-		width: "100%",
-		height: 200,
-		borderRadius: 12,
-		marginVertical: 15,
-		backgroundColor: "#f0f0f0",
 	},
 	modalDescription: {
 		fontSize: 16,
@@ -1830,66 +1531,10 @@ const styles = StyleSheet.create({
 	},
 	modalAllergens: {
 		fontSize: 14,
+		color: "#ff6b6b",
 		fontStyle: "italic",
 		marginBottom: 20,
 		textAlign: "center",
-	},
-	// 🎨 Styles modal info produit
-	infoPriceContainer: {
-		alignSelf: "center",
-		backgroundColor: "#667eea",
-		paddingHorizontal: 20,
-		paddingVertical: 8,
-		borderRadius: 20,
-		marginVertical: 10,
-	},
-	infoPriceText: {
-		color: "#fff",
-		fontSize: 20,
-		fontWeight: "700",
-	},
-	infoOptionsOneLine: {
-		fontSize: 15,
-		color: "#555",
-		textAlign: "center",
-		marginTop: 15,
-		fontStyle: "italic",
-	},
-	infoOptionsContainer: {
-		marginTop: 15,
-		paddingTop: 15,
-		borderTopWidth: 1,
-		borderTopColor: "#e0e0e0",
-	},
-	infoOptionsTitle: {
-		fontSize: 15,
-		fontWeight: "600",
-		color: "#333",
-		marginBottom: 10,
-	},
-	infoOptionItem: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		paddingVertical: 8,
-		paddingHorizontal: 10,
-		backgroundColor: "#f9f9f9",
-		borderRadius: 8,
-		marginBottom: 6,
-	},
-	infoOptionName: {
-		fontSize: 14,
-		color: "#555",
-	},
-	infoOptionPrice: {
-		fontSize: 14,
-		fontWeight: "600",
-		color: "#667eea",
-	},
-	infoAllergensContainer: {
-		marginTop: 15,
-		paddingTop: 15,
-		borderTopWidth: 1,
-		borderTopColor: "#e0e0e0",
 	},
 	modalCloseButton: {
 		backgroundColor: "#4CAF50",
@@ -1898,94 +1543,6 @@ const styles = StyleSheet.create({
 		borderRadius: 10,
 	},
 	modalCloseText: {
-		color: "#fff",
-		fontWeight: "bold",
-		fontSize: 16,
-	},
-	// ⭐ Styles pour les options
-	optionsContainer: {
-		width: "100%",
-		marginTop: 20,
-		marginBottom: 15,
-	},
-	optionsTitle: {
-		fontSize: 16,
-		fontWeight: "700",
-		color: "#333",
-		marginBottom: 12,
-	},
-	optionItem: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingVertical: 12,
-		paddingHorizontal: 15,
-		borderRadius: 10,
-		backgroundColor: "#f5f5f5",
-		marginBottom: 8,
-		borderWidth: 2,
-		borderColor: "transparent",
-	},
-	optionItemSelected: {
-		backgroundColor: "#E8F5E9",
-		borderColor: "#4CAF50",
-	},
-	optionLeft: {
-		flexDirection: "row",
-		alignItems: "center",
-		flex: 1,
-	},
-	optionCheckbox: {
-		fontSize: 20,
-		marginRight: 10,
-	},
-	optionRadio: {
-		fontSize: 20,
-		marginRight: 10,
-	},
-	optionName: {
-		fontSize: 15,
-		fontWeight: "500",
-		color: "#333",
-		flex: 1,
-	},
-	optionPrice: {
-		fontSize: 14,
-		fontWeight: "600",
-		color: "#4CAF50",
-	},
-	optionsLoading: {
-		paddingVertical: 20,
-	},
-	optionsLoadingText: {
-		fontSize: 14,
-		color: "#999",
-		textAlign: "center",
-	},
-	modalButtons: {
-		flexDirection: "row",
-		marginTop: 10,
-		gap: 10,
-		width: "100%",
-	},
-	modalButton: {
-		flex: 1,
-		paddingVertical: 12,
-		borderRadius: 10,
-		alignItems: "center",
-	},
-	modalCancelButton: {
-		backgroundColor: "#9E9E9E",
-	},
-	modalAddButton: {
-		backgroundColor: "#4CAF50",
-	},
-	modalCancelText: {
-		color: "#fff",
-		fontWeight: "bold",
-		fontSize: 16,
-	},
-	modalAddText: {
 		color: "#fff",
 		fontWeight: "bold",
 		fontSize: 16,
@@ -2005,7 +1562,7 @@ const styles = StyleSheet.create({
 	premiumCard: {
 		borderRadius: 20,
 		marginBottom: 16,
-		// overflow: "hidden" retiré pour permettre l'affichage du AllergenBadge
+		overflow: "hidden",
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 4 },
 		shadowOpacity: 0.15,
@@ -2019,7 +1576,6 @@ const styles = StyleSheet.create({
 		width: "100%",
 		borderTopLeftRadius: 20,
 		borderTopRightRadius: 20,
-		overflow: "hidden",
 	},
 	premiumCardContent: {
 		flexDirection: "row",

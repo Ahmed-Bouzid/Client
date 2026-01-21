@@ -13,11 +13,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useAllergyStore } from "../stores/useAllergyStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const PREMIUM_COLORS = {
-	primary: ["#667eea", "#764ba2"],
-	success: ["#56ab2f", "#a8e063"],
-	danger: ["#eb3349", "#f45c43"],
-};
+import { PREMIUM_COLORS } from "../theme/colors";
 
 export default function AllergyManagement({ onClose }) {
 	const { userAllergenIds, toggleAllergen, allergensCache, setAllergensCache } =

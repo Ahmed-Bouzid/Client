@@ -10,14 +10,12 @@ export const useClientTableStore = create((set, get) => ({
 
 	/**
 	 * Initialise la table depuis AsyncStorage ou params
-	 * Retourne true si un userName était sauvegardé (session existante)
 	 */
 	init: async (tableId = null, restaurantId = null) => {
 		try {
 			// Essayer de récupérer depuis AsyncStorage
 			const savedTableId = await AsyncStorage.getItem("tableId");
 			const savedRestaurantId = await AsyncStorage.getItem("restaurantId");
-			const savedUserName = await AsyncStorage.getItem("userName");
 
 			// Utiliser l'ordre de priorité : param > AsyncStorage > DEFAULT_TABLE_ID > null
 			const finalTableId =
@@ -28,14 +26,9 @@ export const useClientTableStore = create((set, get) => ({
 			set({
 				tableId: finalTableId,
 				restaurantId: finalRestaurantId,
-				userName: savedUserName || null,
 			});
-
-			// Retourne true si session existante (userName sauvegardé)
-			return !!savedUserName;
 		} catch (error) {
 			console.error("❌ Erreur chargement table:", error);
-			return false;
 		}
 	},
 
@@ -58,20 +51,10 @@ export const useClientTableStore = create((set, get) => ({
 	},
 
 	/**
-	 * Définit le nom d'utilisateur et le sauvegarde
+	 * Définit le nom d'utilisateur
 	 */
-	setUserName: async (userName) => {
-		try {
-			if (userName) {
-				await AsyncStorage.setItem("userName", userName);
-			} else {
-				await AsyncStorage.removeItem("userName");
-			}
-			set({ userName });
-		} catch (error) {
-			console.error("❌ Erreur sauvegarde userName:", error);
-			set({ userName });
-		}
+	setUserName: (userName) => {
+		set({ userName });
 	},
 
 	/**
@@ -133,13 +116,12 @@ export const useClientTableStore = create((set, get) => ({
 	},
 
 	/**
-	 * Réinitialise la table et le userName
+	 * Réinitialise la table
 	 */
 	reset: async () => {
 		try {
 			await AsyncStorage.removeItem("tableId");
 			await AsyncStorage.removeItem("restaurantId");
-			await AsyncStorage.removeItem("userName");
 			set({
 				tableId: null,
 				userName: null,

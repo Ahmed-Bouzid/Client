@@ -2,11 +2,7 @@ import { API_CONFIG } from "../config/apiConfig.js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const clientAuthService = {
-	/**
-	 * Génère ou récupère le token client.
-	 * @param {string} [pseudoParam] - Pseudo à utiliser (prioritaire sur AsyncStorage)
-	 */
-	async getClientToken(pseudoParam) {
+	async getClientToken(pseudo, tableId = null, restaurantId = null) {
 		try {
 			// 1. Vérifier si on a déjà un token
 			let token = await AsyncStorage.getItem("clientToken");
@@ -15,30 +11,9 @@ export const clientAuthService = {
 			if (!token) {
 				console.log("🔹 Génération nouveau token client...");
 
-				// Utiliser le pseudo passé en paramètre si dispo, sinon AsyncStorage
-				let pseudo = pseudoParam;
-				if (pseudoParam) {
-					await AsyncStorage.setItem("pseudo", pseudoParam);
-					console.log("[DEBUG] Pseudo fourni et stocké:", pseudoParam);
-				} else {
-					pseudo = await AsyncStorage.getItem("pseudo");
-					console.log("[DEBUG] Pseudo récupéré AsyncStorage:", pseudo);
-				}
-				const tableId = await AsyncStorage.getItem("tableId");
-				const restaurantId = API_CONFIG.RESTAURANT_ID;
-
-				if (!pseudo || !tableId || !restaurantId) {
-					console.log(
-						"[DEBUG getClientToken] pseudo:",
-						pseudo,
-						", tableId:",
-						tableId,
-						", restaurantId:",
-						restaurantId
-					);
-					throw new Error(
-						"pseudo, tableId ou restaurantId manquant pour la génération du token client"
-					);
+				// Récupérer restaurantId depuis AsyncStorage si non fourni
+				if (!restaurantId) {
+					restaurantId = await AsyncStorage.getItem("restaurantId");
 				}
 
 				const response = await fetch(`${API_CONFIG.BASE_URL}/client/token`, {
@@ -54,7 +29,10 @@ export const clientAuthService = {
 				});
 
 				if (!response.ok) {
-					throw new Error("Erreur génération token client");
+					const errorData = await response.json().catch(() => ({}));
+					throw new Error(
+						errorData.message || "Erreur génération token client",
+					);
 				}
 
 				const data = await response.json();

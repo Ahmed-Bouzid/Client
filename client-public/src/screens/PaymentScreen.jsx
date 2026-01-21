@@ -28,6 +28,10 @@ import stripeService from "../../../shared-api/services/stripeService";
  * - onSuccess: Callback après paiement réussi
  * - onBack: Callback retour
  */
+
+// 🎨 Thème BBQ
+import { PREMIUM_COLORS } from "../theme/colors";
+
 export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 	const [loading, setLoading] = useState(false);
 	const [order, setOrder] = useState(null);

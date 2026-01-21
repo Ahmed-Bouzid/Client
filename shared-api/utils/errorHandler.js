@@ -1,5 +1,4 @@
 import { Alert } from "react-native";
-import { clientAuthService } from "../services/clientAuthService.js";
 
 /**
  * Gestion centralisée des erreurs
@@ -27,11 +26,10 @@ export const errorHandler = {
 	 */
 	async handleAuthError(response) {
 		if (response.status === 401 || response.status === 403) {
-			await clientAuthService.clearClientToken();
 			Alert.alert(
-				"Session expirée",
-				"Votre session a expiré. Veuillez vous reconnecter.",
-				[{ text: "OK" }]
+				"Accès refusé",
+				"Vous n'avez pas les permissions nécessaires.",
+				[{ text: "OK" }],
 			);
 			return true;
 		}
@@ -46,13 +44,10 @@ export const errorHandler = {
 			Alert.alert(
 				"Erreur réseau",
 				"Impossible de se connecter au serveur. Vérifiez votre connexion internet.",
-				[{ text: "OK" }]
+				[{ text: "OK" }],
 			);
 			return true;
 		}
 		return false;
 	},
 };
-
-
-

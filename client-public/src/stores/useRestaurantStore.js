@@ -1,0 +1,65 @@
+import { create } from "zustand";
+import { API_CONFIG } from "../../../shared-api/config/apiConfig.js";
+
+export const useRestaurantStore = create((set, get) => ({
+	category: null, // 'restaurant', 'foodtruck', 'snack', etc.
+	id: null,
+	name: null,
+
+	/**
+	 * Récupère les infos du restaurant (category, name)
+	 */
+	fetchRestaurantInfo: async (restaurantId) => {
+		try {
+			const url = `${API_CONFIG.BASE_URL}/restaurants/${restaurantId}/info`;
+			console.log(
+				"🏪 [RESTAURANT] Fetching info pour:",
+				restaurantId,
+				"->",
+				url,
+			);
+			const response = await fetch(url);
+
+			if (!response.ok) {
+				console.error("❌ Restaurant non trouvé", { status: response.status });
+				const text = await response.text().catch(() => null);
+				console.error("Response body:", text);
+				return false;
+			}
+
+			const data = await response.json();
+			console.log("✅ [RESTAURANT] Info récupérée:", data);
+
+			set({
+				category: data.category || "restaurant",
+				name: data.name,
+			});
+
+			return true;
+		} catch (error) {
+			console.error("❌ Erreur fetch restaurant info:", error);
+			set({ category: "restaurant", name: null }); // Fallback restaurant normal
+			return false;
+		}
+	},
+
+	/**
+	 * Définit l'id du restaurant et récupère ses infos
+	 */
+	setRestaurantId: async (restaurantId) => {
+		if (!restaurantId) {
+			set({ id: null, category: null, name: null });
+			return false;
+		}
+		set({ id: restaurantId });
+		const ok = await get().fetchRestaurantInfo(restaurantId);
+		return ok;
+	},
+
+	/**
+	 * Reset le store
+	 */
+	reset: () => {
+		set({ category: null, name: null });
+	},
+}));

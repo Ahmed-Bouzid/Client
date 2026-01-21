@@ -1,4 +1,3 @@
-import { API_BASE_URL } from "../config/api";
 import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
@@ -17,26 +16,12 @@ import { BlurView } from "expo-blur";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useOrderStore } from "../stores/useOrderStore.js";
-import { orderService } from "../../../shared-api/services/orderService.js";
-import * as RootNavigation from "../utils/RootNavigation";
-import { ReceiptModal } from "../components/receipt/ReceiptModal";
+import { PREMIUM_COLORS } from "../theme/colors";
+import { useStripe } from "@stripe/stripe-react-native";
+import stripeService from "../../../shared-api/services/stripeService";
+import { API_BASE_URL } from "../config/api";
 
 const { width, height } = Dimensions.get("window");
-
-// 🎨 Premium Design System
-const PREMIUM_COLORS = {
-	primary: ["#667eea", "#764ba2"],
-	secondary: ["#f093fb", "#f5576c"],
-	accent: ["#4facfe", "#00f2fe"],
-	success: ["#11998e", "#38ef7d"],
-	warning: ["#f2994a", "#f2c94c"],
-	danger: ["#ff416c", "#ff4b2b"],
-	dark: ["#0f0c29", "#302b63", "#24243e"],
-	glass: "rgba(255, 255, 255, 0.15)",
-	glassBorder: "rgba(255, 255, 255, 0.25)",
-	text: "#ffffff",
-	textMuted: "rgba(255, 255, 255, 0.7)",
-};
 
 // 🎴 Premium Payment Item Card
 const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle }) => {
@@ -121,16 +106,7 @@ const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle }) => {
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
 							>
-								<Text style={{ color: "#fff" }}>
-									<MaterialIcons name="check" size={18} color="#fff" />
-									{item.name}
-									{item.clientName ? (
-										<Text style={{ color: "#4facfe", fontWeight: "bold" }}>
-											{" "}
-											[{item.clientName}]
-										</Text>
-									) : null}
-								</Text>
+								<MaterialIcons name="check" size={18} color="#fff" />
 							</LinearGradient>
 						) : (
 							<View style={styles.checkboxEmpty}>
@@ -195,23 +171,13 @@ const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle }) => {
 };
 
 export default function Payment({
+	allOrders = [],
 	orderId = null,
 	reservationId = null,
 	tableId = null,
-	onSuccess,
+	onSuccess = () => {},
 	onBack = () => {},
 }) {
-	// Redirection par défaut : retour au menu si onSuccess non fourni
-	const handleSuccess =
-		typeof onSuccess === "function"
-			? onSuccess
-			: () => {
-					RootNavigation.navigate("Menu");
-				};
-	// Utilise le store Zustand pour l'historique persistant
-	const { init } = useOrderStore();
-	const [allOrders, setAllOrders] = useState([]); // Liste brute des commandes (Order)
-	const [flatItems, setFlatItems] = useState([]); // Liste aplatie des items (chaque item = 1 produit d'une commande)
 	const [loading, setLoading] = useState(false);
 	const [selectedItems, setSelectedItems] = useState(new Set());
 	const [paidItems, setPaidItems] = useState(new Set());
@@ -222,13 +188,6 @@ export default function Payment({
 		totalDue: 0,
 		totalPaid: 0,
 	});
-
-	// 🎫 État pour le reçu
-	const [showReceipt, setShowReceipt] = useState(false);
-	const [receiptData, setReceiptData] = useState(null);
-	const [currentReservation, setCurrentReservation] = useState(null);
-	const [shouldRedirectAfterReceipt, setShouldRedirectAfterReceipt] =
-		useState(false);
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -249,58 +208,32 @@ export default function Payment({
 				useNativeDriver: true,
 			}),
 		]).start();
-		// Charger toutes les commandes de la réservation au montage
-		const fetchOrders = async () => {
-			if (reservationId) {
-				const orders = await orderService.getOrdersByReservation(reservationId);
-				setAllOrders(orders || []);
-				// Aplatir les items : chaque item hérite de clientName et orderId
-				const items = [];
-				(orders || []).forEach((order) => {
-					(order.items || []).forEach((item) => {
-						items.push({
-							...item,
-							orderId: order._id,
-							clientName: order.clientName || "",
-						});
-					});
-				});
-				setFlatItems(items);
-
-				// Charger les infos de réservation pour le reçu
-				try {
-					const res = await fetch(
-						`${API_BASE_URL}/reservations/${reservationId}`,
-						{
-							headers: {
-								"Content-Type": "application/json",
-							},
-						}
-					);
-					if (res.ok) {
-						const data = await res.json();
-						setCurrentReservation(data);
-					}
-				} catch (err) {
-					console.error("Erreur chargement réservation:", err);
-				}
-			}
-		};
-		fetchOrders();
-	}, [reservationId]);
+	}, []);
 
 	const { markAsPaid, isLoading } = useOrderStore();
+	const { initPaymentSheet, presentPaymentSheet, isApplePaySupported } =
+		useStripe();
+
+	// States Stripe
+	const [applePayAvailable, setApplePayAvailable] = useState(false);
+	const [clientSecret, setClientSecret] = useState(null);
+	const [paymentIntentId, setPaymentIntentId] = useState(null);
 
 	// 🔧 Fonction pour générer un ID unique pour chaque article
-	const getItemId = (item) => {
-		if (!item) return `unknown-${Date.now()}`;
+	const getItemId = (item, index) => {
+		if (!item) return `unknown-${Date.now()}-${Math.random()}`;
 
-		const id = item.productId || item._id || item.id;
+		// ⭐ Utiliser _id MongoDB comme clé unique (toujours unique)
+		if (item._id) return item._id;
+
+		// Fallback avec tous les champs + index aléatoire
+		const id = item.productId || item.id;
 		const name = item.name || "unnamed";
 		const price = item.price || 0;
 		const quantity = item.quantity || 1;
+		const uniqueSuffix = index !== undefined ? index : Math.random();
 
-		return `${id}-${name}-${price}-${quantity}`;
+		return `${id}-${name}-${price}-${quantity}-${uniqueSuffix}`;
 	};
 
 	// 🔧 Clé de stockage unique basée sur reservationId ou orderId
@@ -320,7 +253,12 @@ export default function Payment({
 				const saved = await AsyncStorage.getItem(storageKey);
 				if (saved) {
 					const parsed = JSON.parse(saved);
-
+					console.log(
+						"📂 Chargement paidItems:",
+						storageKey,
+						parsed.length,
+						"articles",
+					);
 					setPaidItems(new Set(parsed));
 				}
 			} catch (error) {
@@ -348,20 +286,52 @@ export default function Payment({
 		savePaidItems();
 	}, [paidItems, reservationId, orderId]);
 
+	// 📱 Vérifier disponibilité Apple Pay
+	useEffect(() => {
+		const checkApplePay = async () => {
+			if (Platform.OS === "ios" && typeof isApplePaySupported === "function") {
+				try {
+					const isSupported = await isApplePaySupported();
+					setApplePayAvailable(isSupported);
+					console.log("📱 Apple Pay disponible:", isSupported);
+				} catch (error) {
+					console.error("Erreur vérification Apple Pay:", error);
+					setApplePayAvailable(false);
+				}
+			} else {
+				setApplePayAvailable(false);
+			}
+		};
+		checkApplePay();
+	}, [isApplePaySupported]);
+
 	// ✅ Initialiser la sélection avec les articles non payés
 	useEffect(() => {
-		if (flatItems && flatItems.length > 0) {
-			const nonPaidItems = flatItems.filter(
-				(item) => !paidItems.has(getItemId(item))
+		console.log("💳 Payment.jsx - allOrders reçus:", allOrders?.length || 0);
+		console.log(
+			"💳 Payment.jsx - Détail allOrders:",
+			JSON.stringify(allOrders?.slice(0, 3), null, 2),
+		);
+
+		if (allOrders && allOrders.length > 0) {
+			const nonPaidItems = allOrders.filter(
+				(item) => !paidItems.has(getItemId(item)),
 			);
 			const nonPaidIds = new Set(nonPaidItems.map((item) => getItemId(item)));
+			console.log(
+				"✅ Items non payés initialisés:",
+				nonPaidItems.length,
+				"items",
+			);
 			setSelectedItems(nonPaidIds);
+		} else {
+			console.warn("⚠️ Aucun item dans allOrders");
 		}
-	}, [flatItems, paidItems]);
+	}, [allOrders, paidItems]);
 
 	// 🔍 Vérifier si la réservation peut être fermée
 	const checkReservationClosure = async () => {
-		if (!flatItems || flatItems.length === 0) {
+		if (!allOrders || allOrders.length === 0) {
 			setReservationStatus({
 				canClose: false,
 				reason: "❌ Aucune commande à analyser",
@@ -372,40 +342,40 @@ export default function Payment({
 			return;
 		}
 
-		const unpaidItems = flatItems.filter(
-			(item) => !paidItems.has(getItemId(item))
+		const unpaidOrders = allOrders.filter(
+			(item) => !paidItems.has(getItemId(item)),
 		);
 
-		const totalDue = unpaidItems.reduce(
+		const totalDue = unpaidOrders.reduce(
 			(sum, item) => sum + (item?.price || 0) * (item?.quantity || 1),
-			0
+			0,
 		);
 
-		const paidItemsList = flatItems.filter((item) =>
-			paidItems.has(getItemId(item))
+		const paidOrdersList = allOrders.filter((item) =>
+			paidItems.has(getItemId(item)),
 		);
 
-		const totalPaid = paidItemsList.reduce(
+		const totalPaid = paidOrdersList.reduce(
 			(sum, item) => sum + (item?.price || 0) * (item?.quantity || 1),
-			0
+			0,
 		);
 
-		const canClose = unpaidItems.length === 0;
+		const canClose = unpaidOrders.length === 0;
 		const reason = canClose
 			? "✅ Toutes les commandes sont payées"
-			: `❌ ${unpaidItems.length} article(s) à payer (${totalDue.toFixed(
-					2
+			: `❌ ${unpaidOrders.length} article(s) à payer (${totalDue.toFixed(
+					2,
 				)}€ dû)`;
 
 		setReservationStatus({
 			canClose,
 			reason,
-			unpaidOrders: unpaidItems,
+			unpaidOrders,
 			totalDue,
 			totalPaid,
 		});
 
-		return { canClose, totalDue, totalPaid, unpaidOrders: unpaidItems };
+		return { canClose, totalDue, totalPaid, unpaidOrders };
 	};
 
 	// 🔄 Mettre à jour le statut de la réservation
@@ -442,6 +412,20 @@ export default function Payment({
 		}
 	};
 
+	// 🎯 Sélectionner 1/3 des articles disponibles
+	const selectOneThird = () => {
+		const nonPaidItems =
+			allOrders?.filter((item) => !paidItems.has(getItemId(item))) || [];
+		if (nonPaidItems.length === 0) return;
+
+		const oneThirdCount = Math.ceil(nonPaidItems.length / 3);
+		const oneThirdItems = nonPaidItems.slice(0, oneThirdCount);
+		const newSelectedItems = new Set(
+			oneThirdItems.map((item) => getItemId(item)),
+		);
+		setSelectedItems(newSelectedItems);
+	};
+
 	// 🚀 Fermer la réservation sur le serveur
 	const closeReservationOnServer = async () => {
 		if (!reservationId) {
@@ -449,9 +433,8 @@ export default function Payment({
 		}
 
 		try {
-			// ⭐ ENLEVEZ LE TOKEN - la nouvelle route n'en a pas besoin
+			console.log("🔍 Tentative fermeture réservation:", reservationId);
 
-			// ⭐ CORRECTION : Body vide ou objet vide
 			const response = await fetch(
 				`${API_BASE_URL}/reservations/client/${reservationId}/close`,
 				{
@@ -459,8 +442,8 @@ export default function Payment({
 					headers: {
 						"Content-Type": "application/json",
 					},
-					body: JSON.stringify({}), // ⭐ Body VIDE
-				}
+					body: JSON.stringify({}),
+				},
 			);
 
 			if (!response.ok) {
@@ -473,6 +456,7 @@ export default function Payment({
 			}
 
 			const data = await response.json();
+			console.log("✅ Réservation fermée:", data);
 
 			// ⭐ LA TABLE SERA LIBÉRÉE AUTOMATIQUEMENT PAR LA ROUTE BACKEND
 			// Pas besoin d'appeler releaseTable séparément
@@ -488,119 +472,230 @@ export default function Payment({
 		}
 	};
 
-	// 🎫 Gestion de la fermeture du reçu
-	const handleCloseReceipt = async () => {
-		setShowReceipt(false);
-
-		// Si paiement complet, rediriger après fermeture du reçu
-		if (shouldRedirectAfterReceipt) {
-			await markAsPaid(orderId);
-			setShouldRedirectAfterReceipt(false);
-			handleSuccess();
-		}
-	};
-
 	// 💳 Traitement du paiement
-	const handlePay = async () => {
-		if (!orderId) {
-			Alert.alert("Erreur", "Aucune commande à payer");
-			return;
-		}
+	const handlePay = async (paymentMethod = "card") => {
+		console.log("⚡ handlePay appelé avec:", paymentMethod);
+		console.log("⚡ selectedItems.size:", selectedItems.size);
+		console.log("⚡ allOrders.length:", allOrders.length);
 
 		if (selectedItems.size === 0) {
+			console.log("❌ STOP: selectedItems.size === 0");
 			Alert.alert(
 				"Erreur",
-				"Veuillez sélectionner au moins un article à payer"
+				"Veuillez sélectionner au moins un article à payer",
 			);
 			return;
 		}
 
+		console.log("✅ Check selectedItems OK");
+
+		// Vérifier que Stripe est bien initialisé
+		if (!initPaymentSheet || !presentPaymentSheet) {
+			console.log("❌ STOP: Stripe hooks manquants");
+			Alert.alert(
+				"Erreur",
+				"Stripe n'est pas correctement initialisé. Veuillez redémarrer l'application.",
+			);
+			console.error("❌ Stripe hooks non disponibles:", {
+				initPaymentSheet: !!initPaymentSheet,
+				presentPaymentSheet: !!presentPaymentSheet,
+			});
+			return;
+		}
+
+		console.log("✅ Check Stripe OK");
+
 		setLoading(true);
+		console.log("🔄 Début du paiement...");
 
 		try {
 			// 1. Filtrer les articles sélectionnés
-			const selectedOrders = flatItems.filter((item) =>
-				selectedItems.has(getItemId(item))
+			const selectedOrders = allOrders.filter((item) =>
+				selectedItems.has(getItemId(item)),
 			);
 
 			// 2. Calculer le montant payé
 			const amountPaid = selectedOrders.reduce(
 				(sum, item) => sum + (item?.price || 0) * (item?.quantity || 1),
-				0
+				0,
 			);
+
+			// 2.5. Créer PaymentIntent via Stripe
+			console.log("💳 Création PaymentIntent pour", amountPaid.toFixed(2), "€");
+			const amountCents = Math.round(amountPaid * 100);
+
+			const paymentMethodTypes =
+				paymentMethod === "apple_pay" ? ["card", "apple_pay"] : ["card"];
+
+			// 2.5. Récupérer orderId depuis le premier article sélectionné
+			const firstOrderId =
+				selectedOrders[0]?.orderId || orderId || allOrders[0]?.orderId;
+			if (!firstOrderId) {
+				Alert.alert("Erreur", "Impossible de trouver l'ID de commande");
+				setLoading(false);
+				return;
+			}
+
+			const paymentIntentResult = await stripeService.createPaymentIntent({
+				orderId: firstOrderId,
+				amount: amountCents,
+				currency: "eur",
+				paymentMethodTypes,
+				tipAmount: 0,
+				paymentMode: "client",
+				reservationId: reservationId,
+			});
+
+			const newClientSecret = paymentIntentResult.clientSecret;
+			const newPaymentIntentId = paymentIntentResult.paymentIntentId;
+			setClientSecret(newClientSecret);
+			setPaymentIntentId(newPaymentIntentId);
+			console.log("✅ PaymentIntent créé:", newPaymentIntentId);
+
+			// 2.6. Initialiser Payment Sheet
+			console.log("🔄 Initialisation Payment Sheet...");
+			const { error: initError } = await initPaymentSheet({
+				paymentIntentClientSecret: newClientSecret,
+				merchantDisplayName: "OrderIt Restaurant",
+				applePay: applePayAvailable
+					? {
+							merchantCountryCode: "FR",
+							merchantIdentifier: "merchant.com.orderit.app",
+							cartItems: [
+								{
+									label: "Commande",
+									amount: (amountCents / 100).toFixed(2),
+								},
+							],
+						}
+					: undefined,
+				returnURL: "orderit://payment",
+			});
+
+			if (initError) {
+				console.error("❌ Erreur init Payment Sheet:", initError);
+				Alert.alert("Erreur", initError.message);
+				setLoading(false);
+				return;
+			}
+
+			console.log("✅ Payment Sheet initialisé");
+
+			// 2.7. Présenter Payment Sheet
+			console.log("🔄 Affichage Payment Sheet...");
+			const { error: presentError } = await presentPaymentSheet();
+
+			if (presentError) {
+				if (presentError.code === "Canceled") {
+					console.log("❌ Paiement annulé par l'utilisateur");
+					setLoading(false);
+					return;
+				}
+				console.error("❌ Erreur paiement:", presentError);
+				Alert.alert("Erreur", presentError.message);
+				setLoading(false);
+				return;
+			}
+
+			console.log("✅ Paiement Stripe réussi!");
 
 			// 3. Ajouter les articles aux paidItems
 			const newPaidItems = new Set(paidItems);
 			selectedOrders.forEach((item) => {
 				newPaidItems.add(getItemId(item));
 			});
-			setPaidItems(newPaidItems);
 
 			// 4. Vérifier si paiement complet
-			const remainingItems = flatItems.filter(
-				(item) => !newPaidItems.has(getItemId(item))
+			const remainingItems = allOrders.filter(
+				(item) => !newPaidItems.has(getItemId(item)),
 			);
 			const isFullPayment = remainingItems.length === 0;
 
-			// 5. Si paiement complet
+			// 5. Si paiement complet → Fermer la réservation
+			let reservationClosed = false;
 			if (isFullPayment) {
+				console.log("✅ Paiement complet - Fermeture de la réservation");
+
 				// Fermer la réservation sur le serveur
 				if (reservationId) {
-					const closureResult = await closeReservationOnServer();
-					if (!closureResult.success) {
+					const closureResult = await closeReservationOnServer().catch(
+						(error) => {
+							console.error("❌ Erreur fermeture réservation:", error);
+							return { success: false, message: error.message };
+						},
+					);
+
+					if (closureResult && closureResult.success) {
+						console.log("✅ Réservation fermée avec succès");
+						reservationClosed = true;
+					} else {
+						console.log(
+							"⚠️ Réservation non fermée:",
+							closureResult?.message || "Erreur inconnue",
+						);
+						Alert.alert(
+							"⚠️ Attention",
+							"Le paiement est effectué mais la fermeture de réservation a échoué. Veuillez contacter le serveur.",
+							[{ text: "OK" }],
+						);
 					}
 				}
 
-				// Nettoyer le stockage
-				const storageKey = getStorageKey();
-				if (storageKey) {
-					await AsyncStorage.removeItem(storageKey);
+				// ⚠️ Nettoyer AsyncStorage SEULEMENT si réservation fermée avec succès
+				if (reservationClosed) {
+					const storageKey = getStorageKey();
+					if (storageKey) {
+						await AsyncStorage.removeItem(storageKey);
+					}
+
+					await AsyncStorage.multiRemove([
+						"currentReservationId",
+						"currentTableId",
+						"currentTableNumber",
+						"currentClientName",
+					]);
 				}
 			}
 
-			// 6. Mettre à jour les stats
-			const updatedStatus = await checkReservationClosure();
+			// 6. Mettre à jour les stats (seulement si réservation PAS terminée)
+			let updatedStatus = null;
+			if (!isFullPayment || !reservationClosed) {
+				updatedStatus = await checkReservationClosure();
+			}
 
 			// 7. Calculer le reste à payer
 			const remainingAmount = remainingItems.reduce(
 				(sum, item) => sum + (item?.price || 0) * (item?.quantity || 1),
-				0
+				0,
 			);
 
-			// 8. Afficher le reçu pour paiement complet
-			if (isFullPayment) {
-				// Préparer les données du reçu
-				setReceiptData({
-					items: selectedOrders.map((item) => ({
-						name: item.name,
-						quantity: item.quantity || 1,
-						price: item.price || 0,
-					})),
-					amount: amountPaid,
-					paymentMethod: "Card",
-					last4Digits: null,
-				});
-				setShowReceipt(true);
-				setShouldRedirectAfterReceipt(true); // Marquer pour redirection après fermeture
-			} else {
-				// 8. Afficher l'alerte de confirmation pour paiement partiel
-				const message =
-					`${selectedOrders.length} article(s) payé(s).\n\n` +
-					`💳 Montant payé: ${amountPaid.toFixed(2)}€\n` +
-					`💰 Total payé: ${updatedStatus?.totalPaid?.toFixed(2) || 0}€\n` +
-					`📋 Reste à payer: ${remainingAmount.toFixed(2)}€ (${
-						remainingItems.length
-					} article${remainingItems.length > 1 ? "s" : ""})`;
+			// 8. Afficher l'alerte de confirmation
+			const message =
+				`${selectedOrders.length} article(s) payé(s).\n\n` +
+				`💳 Montant payé: ${amountPaid.toFixed(2)}€\n` +
+				(updatedStatus
+					? `💰 Total payé: ${updatedStatus?.totalPaid?.toFixed(2) || 0}€\n`
+					: "") +
+				(remainingAmount > 0
+					? `📋 Reste à payer: ${remainingAmount.toFixed(2)}€ (${
+							remainingItems.length
+						} article${remainingItems.length > 1 ? "s" : ""})`
+					: "✅ Tous les articles sont payés !");
 
-				Alert.alert("⚠️ Paiement partiel", message, [
+			Alert.alert(
+				isFullPayment ? "✅ Paiement complet" : "⚠️ Paiement partiel",
+				message,
+				[
 					{
 						text: "OK",
-						onPress: () => {
+						onPress: async () => {
+							// Désélectionner tout
 							setSelectedItems(new Set());
+							onSuccess?.();
 						},
 					},
-				]);
-			}
+				],
+			);
 		} catch (error) {
 			console.error("❌ Erreur paiement:", error);
 			Alert.alert("Erreur", "Échec du paiement. Veuillez réessayer.");
@@ -609,8 +704,8 @@ export default function Payment({
 		}
 	};
 
-	// 🚨 Si pas d'orderId
-	if (!orderId) {
+	// 🚨 Si pas de commandes à afficher
+	if (!allOrders || allOrders.length === 0) {
 		return (
 			<LinearGradient colors={PREMIUM_COLORS.dark} style={styles.container}>
 				<View style={styles.errorContainer}>
@@ -622,10 +717,10 @@ export default function Payment({
 					>
 						<MaterialIcons name="error-outline" size={48} color="#fff" />
 					</LinearGradient>
-					<Text style={styles.errorTitle}>Erreur</Text>
+					<Text style={styles.errorTitle}>Aucune commande</Text>
 					<Text style={styles.errorText}>
-						Aucune commande à payer{"\n"}
-						Retournez au menu et validez une commande d'abord.
+						Aucune commande n'a été trouvée pour cette réservation.{"\n"}
+						Retournez au menu et commandez des articles d'abord.
 					</Text>
 					<TouchableOpacity onPress={() => onBack?.()} activeOpacity={0.8}>
 						<LinearGradient
@@ -646,17 +741,17 @@ export default function Payment({
 	// 📊 Calculs pour l'affichage
 	const isProcessing = loading || isLoading;
 	const availableItems =
-		flatItems?.filter((item) => !paidItems.has(getItemId(item))) || [];
+		allOrders?.filter((item) => !paidItems.has(getItemId(item))) || [];
 	const paidItemsList =
-		flatItems?.filter((item) => paidItems.has(getItemId(item))) || [];
+		allOrders?.filter((item) => paidItems.has(getItemId(item))) || [];
 	const allSelected =
 		selectedItems.size === availableItems.length && availableItems.length > 0;
 	const selectedOrders = availableItems.filter((item) =>
-		selectedItems.has(getItemId(item))
+		selectedItems.has(getItemId(item)),
 	);
 	const total = selectedOrders.reduce(
 		(sum, item) => sum + (item?.price || 0) * (item?.quantity || 1),
-		0
+		0,
 	);
 
 	const handlePressIn = () => {
@@ -673,6 +768,16 @@ export default function Payment({
 			useNativeDriver: true,
 		}).start();
 	};
+
+	// 🔍 Debug : État de la sélection
+	console.log("🔍 État Payment:", {
+		availableItems: availableItems.length,
+		selectedItems: selectedItems.size,
+		selectedOrders: selectedOrders.length,
+		isProcessing,
+		isLoading,
+		total: total.toFixed(2),
+	});
 
 	return (
 		<LinearGradient
@@ -718,99 +823,56 @@ export default function Payment({
 					</LinearGradient>
 					<Text style={styles.title}>Paiement</Text>
 					<Text style={styles.subtitle}>Sélectionnez les articles à payer</Text>
-				</Animated.View>
 
-				{/* Reservation Info Card */}
-				{reservationId && (
-					<View style={styles.infoCard}>
-						<BlurView intensity={20} tint="light" style={styles.infoCardBlur}>
-							{/* Status Badge */}
-							<LinearGradient
-								colors={
-									reservationStatus.canClose
-										? PREMIUM_COLORS.success
-										: PREMIUM_COLORS.warning
-								}
-								style={styles.statusBadge}
-								start={{ x: 0, y: 0 }}
-								end={{ x: 1, y: 0 }}
+					{/* Boutons de sélection rapide */}
+					{availableItems.length > 0 && (
+						<View style={styles.quickSelectButtons}>
+							<TouchableOpacity
+								onPress={selectOneThird}
+								activeOpacity={0.7}
+								style={styles.quickSelectButton}
 							>
-								<MaterialIcons
-									name={
-										reservationStatus.canClose ? "check-circle" : "schedule"
-									}
-									size={16}
-									color="#fff"
-								/>
-								<Text style={styles.statusBadgeText}>
-									{reservationStatus.reason || "Vérification..."}
-								</Text>
-							</LinearGradient>
+								<LinearGradient
+									colors={PREMIUM_COLORS.secondary}
+									style={styles.quickSelectGradient}
+									start={{ x: 0, y: 0 }}
+									end={{ x: 1, y: 0 }}
+								>
+									<MaterialIcons name="pie-chart" size={18} color="#fff" />
+									<Text style={styles.quickSelectText}>1/3</Text>
+								</LinearGradient>
+							</TouchableOpacity>
 
-							{/* Stats Grid */}
-							<View style={styles.statsGrid}>
-								<View style={styles.statCard}>
-									<LinearGradient
-										colors={PREMIUM_COLORS.danger}
-										style={styles.statIconBg}
-										start={{ x: 0, y: 0 }}
-										end={{ x: 1, y: 1 }}
-									>
-										<MaterialIcons name="receipt-long" size={18} color="#fff" />
-									</LinearGradient>
-									<Text style={styles.statLabel}>À payer</Text>
-									<Text style={[styles.statValue, styles.statValueDanger]}>
-										{reservationStatus.totalDue.toFixed(2)}€
+							<TouchableOpacity
+								onPress={toggleAll}
+								activeOpacity={0.7}
+								style={styles.quickSelectButton}
+							>
+								<LinearGradient
+									colors={PREMIUM_COLORS.accent}
+									style={styles.quickSelectGradient}
+									start={{ x: 0, y: 0 }}
+									end={{ x: 1, y: 0 }}
+								>
+									<MaterialIcons
+										name={
+											selectedItems.size === availableItems.length
+												? "deselect"
+												: "select-all"
+										}
+										size={18}
+										color="#fff"
+									/>
+									<Text style={styles.quickSelectText}>
+										{selectedItems.size === availableItems.length
+											? "Tout désélectionner"
+											: "100%"}
 									</Text>
-								</View>
-								<View style={styles.statCard}>
-									<LinearGradient
-										colors={PREMIUM_COLORS.success}
-										style={styles.statIconBg}
-										start={{ x: 0, y: 0 }}
-										end={{ x: 1, y: 1 }}
-									>
-										<MaterialIcons name="check-circle" size={18} color="#fff" />
-									</LinearGradient>
-									<Text style={styles.statLabel}>Payé</Text>
-									<Text style={[styles.statValue, styles.statValueSuccess]}>
-										{reservationStatus.totalPaid.toFixed(2)}€
-									</Text>
-								</View>
-								<View style={styles.statCard}>
-									<LinearGradient
-										colors={PREMIUM_COLORS.accent}
-										style={styles.statIconBg}
-										start={{ x: 0, y: 0 }}
-										end={{ x: 1, y: 1 }}
-									>
-										<MaterialIcons
-											name="shopping-basket"
-											size={18}
-											color="#fff"
-										/>
-									</LinearGradient>
-									<Text style={styles.statLabel}>Articles</Text>
-									<Text style={styles.statValue}>
-										{paidItemsList.length} / {allOrders?.length || 0}
-									</Text>
-								</View>
-							</View>
-
-							{/* IDs */}
-							<View style={styles.idsContainer}>
-								<Text style={styles.idText}>
-									<Text style={styles.idLabel}>Commande: </Text>
-									{orderId.substring(0, 12)}...
-								</Text>
-								<Text style={styles.idText}>
-									<Text style={styles.idLabel}>Réservation: </Text>
-									{reservationId.substring(0, 12)}...
-								</Text>
-							</View>
-						</BlurView>
-					</View>
-				)}
+								</LinearGradient>
+							</TouchableOpacity>
+						</View>
+					)}
+				</Animated.View>
 
 				{/* Items Section */}
 				<View style={styles.itemsSection}>
@@ -875,7 +937,7 @@ export default function Payment({
 									if (storageKey) {
 										AsyncStorage.removeItem(storageKey);
 									}
-									handleSuccess();
+									onSuccess();
 								}}
 								activeOpacity={0.8}
 							>
@@ -999,37 +1061,83 @@ export default function Payment({
 					]}
 				>
 					{availableItems.length > 0 && (
-						<TouchableOpacity
-							onPress={handlePay}
-							onPressIn={handlePressIn}
-							onPressOut={handlePressOut}
-							disabled={isProcessing || selectedItems.size === 0}
-							activeOpacity={0.9}
-						>
-							<LinearGradient
-								colors={
-									isProcessing || selectedItems.size === 0
-										? ["#ccc", "#999"]
-										: PREMIUM_COLORS.success
-								}
-								style={styles.payButton}
-								start={{ x: 0, y: 0 }}
-								end={{ x: 1, y: 0 }}
+						<>
+							{/* Bouton Payer par carte */}
+							<TouchableOpacity
+								onPress={() => {
+									console.log("🔘 Bouton paiement cliqué!");
+									try {
+										handlePay("card");
+									} catch (error) {
+										console.error(
+											"❌ Erreur lors de l'appel handlePay:",
+											error,
+										);
+										Alert.alert(
+											"Erreur",
+											"Une erreur est survenue lors du paiement",
+										);
+										setLoading(false);
+									}
+								}}
+								disabled={isProcessing || selectedItems.size === 0}
 							>
-								{isProcessing ? (
-									<ActivityIndicator color="#fff" />
-								) : (
-									<>
-										<MaterialIcons name="payment" size={24} color="#fff" />
-										<Text style={styles.payButtonText}>
-											Payer {selectedOrders.length} article
-											{selectedOrders.length > 1 ? "s" : ""}
-											{reservationStatus.canClose ? " et fermer" : ""}
-										</Text>
-									</>
-								)}
-							</LinearGradient>
-						</TouchableOpacity>
+								<LinearGradient
+									colors={
+										isProcessing || selectedItems.size === 0
+											? ["#ccc", "#999"]
+											: PREMIUM_COLORS.success
+									}
+									style={styles.payButton}
+									start={{ x: 0, y: 0 }}
+									end={{ x: 1, y: 0 }}
+								>
+									{isProcessing ? (
+										<ActivityIndicator color="#fff" />
+									) : (
+										<>
+											<MaterialIcons name="payment" size={24} color="#fff" />
+											<Text style={styles.payButtonText}>
+												Payer {selectedOrders.length} article
+												{selectedOrders.length > 1 ? "s" : ""}
+												{reservationStatus.canClose ? " et fermer" : ""}
+											</Text>
+										</>
+									)}
+								</LinearGradient>
+							</TouchableOpacity>
+
+							{/* Bouton Apple Pay (si disponible) */}
+							{applePayAvailable && (
+								<TouchableOpacity
+									onPress={() => handlePay("apple_pay")}
+									onPressIn={handlePressIn}
+									onPressOut={handlePressOut}
+									disabled={isProcessing || selectedItems.size === 0}
+									activeOpacity={0.9}
+								>
+									<LinearGradient
+										colors={
+											isProcessing || selectedItems.size === 0
+												? ["#ccc", "#999"]
+												: ["#000", "#333"]
+										}
+										style={styles.applePayButton}
+										start={{ x: 0, y: 0 }}
+										end={{ x: 1, y: 0 }}
+									>
+										{isProcessing ? (
+											<ActivityIndicator color="#fff" />
+										) : (
+											<>
+												<Ionicons name="logo-apple" size={24} color="#fff" />
+												<Text style={styles.payButtonText}>Apple Pay</Text>
+											</>
+										)}
+									</LinearGradient>
+								</TouchableOpacity>
+							)}
+						</>
 					)}
 
 					<TouchableOpacity
@@ -1051,17 +1159,6 @@ export default function Payment({
 					</TouchableOpacity>
 				</Animated.View>
 			</ScrollView>
-
-			{/* Receipt Modal */}
-			<ReceiptModal
-				visible={showReceipt}
-				onClose={handleCloseReceipt}
-				reservation={currentReservation}
-				items={receiptData?.items || []}
-				amount={receiptData?.amount || 0}
-				paymentMethod={receiptData?.paymentMethod}
-				last4Digits={receiptData?.last4Digits}
-			/>
 		</LinearGradient>
 	);
 }
@@ -1498,6 +1595,35 @@ const styles = StyleSheet.create({
 	actionsContainer: {
 		gap: 14,
 	},
+	// Quick Select Buttons
+	quickSelectButtons: {
+		flexDirection: "row",
+		marginTop: 16,
+		gap: 12,
+	},
+	quickSelectButton: {
+		flex: 1,
+		borderRadius: 12,
+		overflow: "hidden",
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.15,
+		shadowRadius: 8,
+		elevation: 5,
+	},
+	quickSelectGradient: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		gap: 8,
+	},
+	quickSelectText: {
+		color: "#fff",
+		fontSize: 14,
+		fontWeight: "700",
+	},
 	payButton: {
 		flexDirection: "row",
 		alignItems: "center",
@@ -1506,6 +1632,19 @@ const styles = StyleSheet.create({
 		borderRadius: 16,
 		gap: 12,
 		shadowColor: "#11998e",
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.35,
+		shadowRadius: 16,
+		elevation: 10,
+	},
+	applePayButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 18,
+		borderRadius: 16,
+		gap: 12,
+		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 8 },
 		shadowOpacity: 0.35,
 		shadowRadius: 16,
