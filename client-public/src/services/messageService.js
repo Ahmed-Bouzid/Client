@@ -31,7 +31,7 @@ export const messageService = {
 
 			const data = await response.json();
 			console.log(
-				`✅ ${data.messages?.length || 0} messages prédéfinis récupérés`
+				`✅ ${data.messages?.length || 0} messages prédéfinis récupérés`,
 			);
 			return data.messages || [];
 		} catch (error) {
@@ -112,6 +112,73 @@ export const messageService = {
 		} catch (error) {
 			console.error("❌ Erreur récupération historique:", error.message);
 			return [];
+		}
+	},
+
+	/**
+	 * 💬 Récupère la conversation complète (messages client + réponses serveur)
+	 * @param {string} reservationId - ID de la réservation
+	 * @returns {Promise<Array>} Conversation fusionnée (client + server) triée chronologiquement
+	 */
+	async fetchConversation(reservationId) {
+		try {
+			const url = `${API_CONFIG.BASE_URL}/client-messages/conversation/${reservationId}`;
+
+			console.log(`💬 Récupération conversation: ${reservationId}`);
+
+			const response = await fetch(url, {
+				method: "GET",
+				headers: {
+					"Content-Type": "application/json",
+				},
+			});
+
+			if (!response.ok) {
+				throw new Error(`Erreur ${response.status}`);
+			}
+
+			const data = await response.json();
+			console.log(
+				`✅ Conversation récupérée: ${data.conversation?.length || 0} messages`,
+			);
+			return data.conversation || [];
+		} catch (error) {
+			console.error("❌ Erreur récupération conversation:", error.message);
+			return [];
+		}
+	},
+
+	/**
+	 * 🔧 Vérifie si la messagerie est activée pour ce restaurant
+	 * @param {string} restaurantId - ID du restaurant
+	 * @returns {Promise<boolean>} true si messagerie activée
+	 */
+	async checkMessagingStatus(restaurantId) {
+		try {
+			const url = `${API_CONFIG.BASE_URL}/client-messages/messaging-status/${restaurantId}`;
+
+			const response = await fetch(url, {
+				method: "GET",
+				headers: {
+					"Content-Type": "application/json",
+				},
+			});
+
+			if (!response.ok) {
+				console.warn(
+					`⚠️ Erreur vérification messagerie (${response.status}), activation par défaut`,
+				);
+				return true; // Par défaut on active
+			}
+
+			const data = await response.json();
+			console.log(
+				`🔧 Messagerie ${data.isMessagingEnabled ? "activée" : "désactivée"}`,
+			);
+			return data.isMessagingEnabled;
+		} catch (error) {
+			console.error("❌ Erreur vérification messagerie:", error.message);
+			return true; // Par défaut on active en cas d'erreur
 		}
 	},
 };

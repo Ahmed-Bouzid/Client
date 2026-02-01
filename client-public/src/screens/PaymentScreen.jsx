@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useStripe } from "@stripe/stripe-react-native";
 import stripeService from "../../../shared-api/services/stripeService";
+import ReceiptTicket from "../components/ReceiptTicket";
 
 /**
  * PaymentScreen - Écran de paiement client avec Stripe
@@ -22,6 +23,7 @@ import stripeService from "../../../shared-api/services/stripeService";
  * - Apple Pay (si disponible)
  * - Ajout de pourboire
  * - Mode fake (dev)
+ * - 🧾 Ticket de caisse avec PDF
  *
  * Props:
  * - orderId: ID de la commande
@@ -39,6 +41,10 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 	const [clientSecret, setClientSecret] = useState(null);
 	const [paymentIntentId, setPaymentIntentId] = useState(null);
 	const [applePayAvailable, setApplePayAvailable] = useState(false);
+
+	// 🧾 États pour le ticket de caisse
+	const [showReceipt, setShowReceipt] = useState(false);
+	const [receiptData, setReceiptData] = useState(null);
 
 	const { initPaymentSheet, presentPaymentSheet, isApplePaySupported } =
 		useStripe();
@@ -83,7 +89,7 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 	const orderAmount = order?.totalAmount || 0;
 	const { totalCents, tipCents, orderCents } = stripeService.calculateTotal(
 		orderAmount,
-		tipPercentage
+		tipPercentage,
 	);
 
 	/**
@@ -149,7 +155,7 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 			console.error("❌ Erreur initialisation paiement:", error);
 			Alert.alert(
 				"Erreur",
-				error.message || "Impossible d'initialiser le paiement"
+				error.message || "Impossible d'initialiser le paiement",
 			);
 			return false;
 		} finally {
@@ -182,7 +188,7 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 
 			// Paiement réussi !
 			console.log("✅ Paiement réussi");
-			handlePaymentSuccess();
+			handlePaymentSuccess("card");
 		} catch (error) {
 			console.error("❌ Erreur présentation Payment Sheet:", error);
 			Alert.alert("Erreur", error.message);
@@ -219,11 +225,11 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 							const result = await stripeService.createFakePayment(
 								order._id,
 								orderCents,
-								tipCents
+								tipCents,
 							);
 
 							console.log("✅ Paiement fake réussi:", result);
-							handlePaymentSuccess();
+							handlePaymentSuccess("fake");
 						} catch (error) {
 							console.error("❌ Erreur paiement fake:", error);
 							Alert.alert("Erreur", error.message);
@@ -232,31 +238,81 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 						}
 					},
 				},
-			]
+			],
 		);
 	};
 
 	/**
-	 * Gère le succès du paiement
+	 * 🎉 Gère le succès du paiement
+	 * Flow: Alert succès → Ticket de caisse → Redirection auto (2-3s)
 	 */
-	const handlePaymentSuccess = () => {
+	const handlePaymentSuccess = (paymentMethod = "card") => {
+		// 1. Alert rapide de confirmation (1s)
 		Alert.alert(
 			"Paiement réussi ! 🎉",
 			"Votre commande a été payée avec succès.",
 			[
 				{
-					text: "OK",
+					text: "Voir le ticket",
 					onPress: () => {
-						if (onSuccess) {
-							onSuccess(order);
-						}
-						if (onBack) {
-							onBack();
-						}
+						// 2. Préparer les données du ticket
+						const receipt = {
+							orderData: {
+								_id: order._id,
+								orderNumber:
+									order.orderNumber ||
+									`ORD-${order._id?.slice(-8).toUpperCase()}`,
+								tableNumber: order.tableNumber || "N/A",
+								clientName: order.clientName || "Client",
+								items:
+									order.items?.map((item) => ({
+										name: item.name || item.productName,
+										quantity: item.quantity,
+										price: item.price,
+									})) || [],
+							},
+							paymentData: {
+								method: paymentMethod,
+								date: new Date(),
+								tipAmount: (order.totalAmount * tipPercentage) / 100,
+								transactionId: paymentIntentId || `TXN-${Date.now()}`,
+								paymentIntentId: paymentIntentId,
+							},
+							restaurantData: {
+								name: order.restaurantName || "Restaurant",
+								address: order.restaurantAddress || "Adresse non disponible",
+								phone: order.restaurantPhone || "N/A",
+							},
+						};
+
+						setReceiptData(receipt);
+
+						// 3. Afficher le ticket
+						setTimeout(() => {
+							setShowReceipt(true);
+						}, 300);
 					},
 				},
-			]
+			],
+			{ cancelable: false },
 		);
+	};
+
+	/**
+	 * 🏠 Gère la fermeture du ticket et redirection
+	 */
+	const handleReceiptClose = () => {
+		setShowReceipt(false);
+
+		// Redirection automatique après 500ms
+		setTimeout(() => {
+			if (onSuccess) {
+				onSuccess(order);
+			}
+			if (onBack) {
+				onBack();
+			}
+		}, 500);
 	};
 
 	if (!order) {
@@ -391,6 +447,17 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 					<ActivityIndicator size="large" color="#4A90E2" />
 					<Text style={styles.loadingText}>Traitement en cours...</Text>
 				</View>
+			)}
+
+			{/* 🧾 Ticket de caisse */}
+			{showReceipt && receiptData && (
+				<ReceiptTicket
+					visible={showReceipt}
+					onClose={handleReceiptClose}
+					orderData={receiptData.orderData}
+					paymentData={receiptData.paymentData}
+					restaurantData={receiptData.restaurantData}
+				/>
 			)}
 		</SafeAreaView>
 	);

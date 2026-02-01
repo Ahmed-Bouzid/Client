@@ -1,4 +1,17 @@
 // src/components/index.js
-export { default as AddOn } from "./AddOn";
-export { default as OrderList } from "./OrderList";
-export { default as MenuItems } from "./MenuItems";
+// ============ Export centralisé de tous les composants ============
+
+// 📦 Menu
+export { MenuItems, AddOn } from "./menu";
+
+// 🛒 Order
+export { OrderList } from "./order";
+
+// 💬 Messaging
+export { MessagingBubble } from "./messaging";
+
+// 🧩 Common
+export { AllergenBadge } from "./common";
+
+// 🧾 Receipt
+export { ReceiptTicket, ReceiptModal } from "./receipt";

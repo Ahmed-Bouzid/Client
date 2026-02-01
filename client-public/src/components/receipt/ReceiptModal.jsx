@@ -14,7 +14,7 @@ import {
 import { BlurView } from "expo-blur";
 import { MaterialIcons } from "@expo/vector-icons";
 import { ReceiptTicket } from "./ReceiptTicket";
-import { useReceiptExport } from "../../utils/useReceiptExport";
+import { useReceiptExport } from "../../hooks/useReceiptExport";
 
 const { height } = Dimensions.get("window");
 
@@ -37,7 +37,7 @@ const ConfettiParticle = ({ delay, left, visible }) => {
 						toValue: 1,
 						duration: 1000,
 						useNativeDriver: true,
-					})
+					}),
 				),
 			]).start();
 		}

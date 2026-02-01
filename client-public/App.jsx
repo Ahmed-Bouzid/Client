@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { API_BASE_URL } from "./src/config/api";
+import { Resto_id_key } from "./src/config/restaurantConfig";
 import JoinOrCreateTable from "./src/screens/JoinOrCreateTable";
 import Menu from "./src/screens/Menu";
-import AddOn from "./src/components/AddOn";
+import AddOn from "./src/components/menu/AddOn";
 import Payment from "./src/screens/Payment";
 import OrderSummary from "./src/screens/OrderSummary";
 import { StripeProvider } from "@stripe/stripe-react-native";
@@ -22,7 +23,7 @@ export default function App() {
 
 	// IDs en dur pour les tests
 	const DEFAULT_TABLE_ID = "686af692bb4cba684ff3b757";
-	const DEFAULT_RESTAURANT_ID = "686af511bb4cba684ff3b72e";
+	const DEFAULT_RESTAURANT_ID = Resto_id_key;
 
 	// Stores
 	const {
@@ -83,6 +84,11 @@ export default function App() {
 			}
 		};
 		initialize();
+	}, []);
+
+	// Log de débogage pour l'ID du restaurant
+	useEffect(() => {
+		console.log(`[DEBUG] Restaurant ID: ${Resto_id_key}`);
 	}, []);
 
 	// Initialiser le panier quand le userName change
@@ -284,9 +290,7 @@ export default function App() {
 				{step === "menu" && (
 					<Menu
 						userName={userName}
-						// ⭐⭐ AJOUTEZ CES PROPS ⭐⭐
-						reservationId={reservationId}
-						tableId={tableId || DEFAULT_TABLE_ID}
+						restaurantId={restaurantId || DEFAULT_RESTAURANT_ID} // ✨ NOUVEAU : Pour charger la config dynamique
 						tableNumber={tableNumber}
 						clientId={clientId}
 						orders={currentOrder}

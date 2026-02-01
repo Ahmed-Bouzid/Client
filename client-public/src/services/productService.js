@@ -1,4 +1,5 @@
 import { API_CONFIG } from "../../../shared-api/config/apiConfig.js";
+import { getRestaurantId } from "../../../shared-api/utils/getRestaurantId.js";
 
 export const productService = {
 	async fetchProducts(token = null) {
@@ -16,13 +17,17 @@ export const productService = {
 			headers.Authorization = `Bearer ${token}`;
 			console.log(
 				"📨 Headers Authorization:",
-				headers.Authorization.substring(0, 30) + "..."
+				headers.Authorization.substring(0, 30) + "...",
 			);
 		}
 
-		const url = `${API_CONFIG.BASE_URL}/products/restaurant/${API_CONFIG.RESTAURANT_ID}`;
+		// Récupérer dynamiquement le restaurantId
+		const restaurantId = await getRestaurantId();
+		console.log("🍽️ Restaurant ID utilisé:", restaurantId);
+
+		const url = `${API_CONFIG.BASE_URL}/products/restaurant/${restaurantId}`;
 		// console.log("🌐 URL complète:", url);
-		// console.log("🍽️ Restaurant ID:", API_CONFIG.RESTAURANT_ID);
+		// console.log("🍽️ Restaurant ID:", API_CONFIG.Resto_id_key);
 
 		try {
 			// console.log("📤 Envoi de la requête...");
@@ -35,7 +40,7 @@ export const productService = {
 				const errorText = await response.text();
 				console.error("❌ Contenu de l'erreur:", errorText);
 				throw new Error(
-					`Failed to fetch products: ${response.status} - ${errorText}`
+					`Failed to fetch products: ${response.status} - ${errorText}`,
 				);
 			}
 

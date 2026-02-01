@@ -5,7 +5,7 @@ import { errorHandler } from "../../../shared-api/utils/errorHandler.js";
 
 export const useClientTableStore = create((set, get) => ({
 	tableId: null,
-	restaurantId: API_CONFIG.RESTAURANT_ID, // Par défaut depuis la config
+	restaurantId: API_CONFIG.Resto_id_key, // Par défaut depuis la config
 	userName: null,
 
 	/**
@@ -21,7 +21,7 @@ export const useClientTableStore = create((set, get) => ({
 			const finalTableId =
 				tableId || savedTableId || API_CONFIG.DEFAULT_TABLE_ID;
 			const finalRestaurantId =
-				restaurantId || savedRestaurantId || API_CONFIG.RESTAURANT_ID;
+				restaurantId || savedRestaurantId || API_CONFIG.Resto_id_key;
 
 			set({
 				tableId: finalTableId,
@@ -66,11 +66,11 @@ export const useClientTableStore = create((set, get) => ({
 			const finalTableId = tableId || state.tableId;
 			// Toujours utiliser restaurantId depuis le store ou API_CONFIG
 			const finalRestaurantId =
-				restaurantId || state.restaurantId || API_CONFIG.RESTAURANT_ID;
+				restaurantId || state.restaurantId || API_CONFIG.Resto_id_key;
 
 			if (!finalTableId) {
 				throw new Error(
-					"TableId manquant. Veuillez scanner le QR code de la table."
+					"TableId manquant. Veuillez scanner le QR code de la table.",
 				);
 			}
 

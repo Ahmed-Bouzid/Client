@@ -20,6 +20,7 @@ import { PREMIUM_COLORS } from "../theme/colors";
 import { useStripe } from "@stripe/stripe-react-native";
 import stripeService from "../../../shared-api/services/stripeService";
 import { API_BASE_URL } from "../config/api";
+import ReceiptTicket from "../components/receipt/ReceiptTicket";
 
 const { width, height } = Dimensions.get("window");
 
@@ -175,6 +176,9 @@ export default function Payment({
 	orderId = null,
 	reservationId = null,
 	tableId = null,
+	tableNumber = null, // 🆕
+	userName = null, // 🆕
+	clientId = null, // 🆕
 	onSuccess = () => {},
 	onBack = () => {},
 }) {
@@ -188,6 +192,10 @@ export default function Payment({
 		totalDue: 0,
 		totalPaid: 0,
 	});
+
+	// 🧾 États pour le ticket de caisse
+	const [showReceipt, setShowReceipt] = useState(false);
+	const [receiptData, setReceiptData] = useState(null);
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;

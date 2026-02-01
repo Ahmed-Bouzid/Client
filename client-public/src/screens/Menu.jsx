@@ -13,6 +13,7 @@ import {
 	Dimensions,
 	TextInput,
 	Platform,
+	ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -26,13 +27,15 @@ import useProductStore from "../stores/useProductStore.js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useOrderStore } from "../stores/useOrderStore.js";
 import DietaryPreferences from "./DietaryPreferences.jsx";
+import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
+import { useStyleUpdates } from "../hooks/useSocketClient.js"; // ⭐ NOUVEAU : WebSocket temps réel
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const BUTTON_SMALL = 60;
 const BUTTON_EXPANDED = SCREEN_WIDTH - 40 - 60 * 3 - 8 * 3;
 
-// 🎨 Premium Design System (identique OrderSummary/Payment)
+// ⚠️ LEGACY: Garder comme fallback si la config échoue
 const PREMIUM_COLORS = {
 	primary: ["#667eea", "#764ba2"],
 	secondary: ["#f093fb", "#f5576c"],
@@ -422,7 +425,11 @@ const AnimatedCategoryButton = ({
 			>
 				{/* Background gradient (toujours présent mais visible si sélectionné) */}
 				<LinearGradient
-					colors={isSelected ? category.gradient : ["#fff", "#fff"]}
+					colors={
+						isSelected
+							? category.gradient || ["#667eea", "#764ba2"]
+							: ["#fff", "#fff"]
+					}
 					start={{ x: 0, y: 0 }}
 					end={{ x: 1, y: 1 }}
 					style={StyleSheet.absoluteFill}
@@ -434,7 +441,8 @@ const AnimatedCategoryButton = ({
 						styles.glowEffect,
 						{
 							opacity: glowOpacity,
-							backgroundColor: category.gradient[0],
+							backgroundColor:
+								(category.gradient && category.gradient[0]) || "#667eea",
 						},
 					]}
 				/>
@@ -456,7 +464,7 @@ const AnimatedCategoryButton = ({
 						},
 					]}
 				>
-					{category.emoji}
+					{category?.emoji || "🍽️"}
 				</Animated.Text>
 
 				{/* Texte (visible quand sélectionné) */}
@@ -476,7 +484,7 @@ const AnimatedCategoryButton = ({
 						},
 					]}
 				>
-					{category.title.toUpperCase()}
+					{category?.title?.toUpperCase() || "CATÉGORIE"}
 				</Animated.Text>
 			</Animated.View>
 		</TouchableOpacity>
@@ -495,7 +503,47 @@ export default function Menu({
 	onNavigateToPayment = () => {},
 	onNavigateToOrders = () => {},
 	navigation = null,
+	restaurantId, // ✨ NOUVEAU : ID du restaurant pour charger la config
 }) {
+	// ✨ NOUVEAU : Charger la config dynamique (VERSION SIMPLIFIÉE)
+	const {
+		config,
+		loading: configLoading,
+		error: configError,
+	} = useRestaurantConfig(restaurantId);
+
+	// ⭐ NOUVEAU : Écouter les changements de style en temps réel via WebSocket
+	const { style: liveStyle, isConnected: socketConnected } =
+		useStyleUpdates(restaurantId);
+	const [currentStyle, setCurrentStyle] = useState(
+		config?.style || PREMIUM_COLORS,
+	);
+
+	// Mettre à jour le style quand un nouveau style est appliqué en temps réel
+	useEffect(() => {
+		if (liveStyle && liveStyle.config) {
+			console.log(
+				"🎨 [Menu] Nouveau style reçu via WebSocket:",
+				liveStyle.style_id,
+			);
+			setCurrentStyle(liveStyle.config.colors || PREMIUM_COLORS);
+
+			// Optionnel : Afficher une notification à l'utilisateur
+			Alert.alert(
+				"🎨 Nouveau style",
+				"L'apparence du menu a été mise à jour !",
+				[{ text: "OK" }],
+			);
+		}
+	}, [liveStyle]);
+
+	// Mettre à jour le style quand la config initiale est chargée
+	useEffect(() => {
+		if (config?.style) {
+			setCurrentStyle(config.style);
+		}
+	}, [config]);
+
 	const products = useProductStore((state) => state.products);
 	const fetchProducts = useProductStore((state) => state.fetchProducts);
 	const { cart } = useCartStore();
@@ -507,8 +555,8 @@ export default function Menu({
 	const [searchQuery, setSearchQuery] = useState("");
 	const [showDietaryModal, setShowDietaryModal] = useState(false);
 
-	// ⚡ Catégories avec gradients (style moderne)
-	const categories = [
+	// ⚠️ LEGACY : Catégories hardcodées comme fallback
+	const legacyCategories = [
 		{
 			id: "boisson",
 			title: "Boissons",
@@ -517,18 +565,11 @@ export default function Menu({
 			icon: "glass-cocktail",
 		},
 		{
-			id: "entrée",
-			title: "Entrées",
-			emoji: "🥗",
-			gradient: ["#80FF72", "#7EE8FA"],
-			icon: "leaf",
-		},
-		{
-			id: "plat",
-			title: "Plats",
-			emoji: "🍝",
-			gradient: ["#FF9966", "#FF5E62"],
-			icon: "food",
+			id: "autre",
+			title: "Sandwiches",
+			emoji: "🥪",
+			gradient: ["#FFD700", "#FF8C00"],
+			icon: "sandwich",
 		},
 		{
 			id: "dessert",
@@ -538,6 +579,35 @@ export default function Menu({
 			icon: "cake",
 		},
 	];
+
+	// ✨ NOUVEAU : Extraire les couleurs et catégories de la config
+	const COLORS = currentStyle; // Utiliser le style en temps réel
+
+	// ✅ Mapper les catégories reçues du backend (strings) vers les objets legacyCategories
+	const apiCategories = config?.categories || []; // Backend retourne ["boisson", "dessert"]
+	const dynamicCategories = apiCategories
+		.map((catName) => {
+			// Chercher dans legacyCategories
+			return legacyCategories.find((legacy) => legacy.id === catName);
+		})
+		.filter((cat) => cat !== undefined); // Supprimer les undefined
+
+	const categories =
+		dynamicCategories.length > 0 ? dynamicCategories : legacyCategories;
+
+	// Add a mapping function to handle category display
+	const mapCategoryDisplay = (categoryId) => {
+		if (categoryId === "autre") {
+			return {
+				id: "autre",
+				title: "Sandwiches",
+				emoji: "🥪",
+				gradient: ["#FFD700", "#FF8C00"],
+				icon: "sandwich",
+			};
+		}
+		return categories.find((cat) => cat.id === categoryId);
+	};
 
 	// ============ FONCTIONS ============
 	const handleIncrease = async (item) => {
@@ -617,7 +687,10 @@ export default function Menu({
 
 	// ⭐ Produits filtrés par catégorie sélectionnée
 	const categoryProducts = selectedCategory
-		? products.filter((p) => p.category?.toLowerCase() === selectedCategory.id)
+		? products.filter((p) => {
+				const mappedCategory = mapCategoryDisplay(p.category?.toLowerCase());
+				return mappedCategory && mappedCategory.id === selectedCategory.id;
+			})
 		: [];
 
 	// 💰 Total du panier
@@ -627,9 +700,34 @@ export default function Menu({
 	);
 
 	// 🎯 ÉCRAN UNIFIÉ : Catégories + Produits
+	// Afficher un loader si la config est en cours de chargement
+	if (configLoading) {
+		return (
+			<LinearGradient
+				colors={["#0f0c29", "#302b63", "#24243e"]}
+				style={styles.container}
+				start={{ x: 0, y: 0 }}
+				end={{ x: 1, y: 1 }}
+			>
+				<View
+					style={{
+						flex: 1,
+						justifyContent: "center",
+						alignItems: "center",
+					}}
+				>
+					<ActivityIndicator size="large" color="#667eea" />
+					<Text style={{ color: "#ffffff", marginTop: 16, fontSize: 16 }}>
+						Chargement de la configuration...
+					</Text>
+				</View>
+			</LinearGradient>
+		);
+	}
+
 	return (
 		<LinearGradient
-			colors={PREMIUM_COLORS.dark}
+			colors={COLORS?.dark || PREMIUM_COLORS.dark}
 			style={styles.container}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 1 }}
@@ -637,11 +735,14 @@ export default function Menu({
 			{/* Décorations premium */}
 			<View style={styles.bgDecor} pointerEvents="none">
 				<LinearGradient
-					colors={[...PREMIUM_COLORS.primary, "transparent"]}
+					colors={[
+						...(COLORS?.primary || PREMIUM_COLORS.primary),
+						"transparent",
+					]}
 					style={[styles.bgCircle, styles.bgCircle1]}
 				/>
 				<LinearGradient
-					colors={[...PREMIUM_COLORS.accent, "transparent"]}
+					colors={[...(COLORS?.accent || PREMIUM_COLORS.accent), "transparent"]}
 					style={[styles.bgCircle, styles.bgCircle2]}
 				/>
 			</View>
