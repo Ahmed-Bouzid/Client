@@ -4,4 +4,4 @@
 // ⚠️ Utilise une IP locale par défaut si la variable d'environnement n'est pas définie
 export const API_BASE_URL =
 	process.env.EXPO_PUBLIC_API_BASE_URL ||
-	"https://sunnygo-backend-6y1m.onrender.com";
+	"https://orderit-backend-6y1m.onrender.com";

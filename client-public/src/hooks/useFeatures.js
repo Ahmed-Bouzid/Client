@@ -37,7 +37,7 @@ export const useFeatures = () => {
 			setError(null);
 
 			const response = await fetch(
-				`https://sunnygo-backend-6y1m.onrender.com/api/developer/features/${restaurant._id}`,
+				`https://orderit-backend-6y1m.onrender.com/api/developer/features/${restaurant._id}`,
 			);
 
 			if (response.ok) {

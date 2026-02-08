@@ -668,7 +668,7 @@ export default function Payment({
 
 			logger.debug("Calcul montant paiement", {
 				totalItems: paidItems.length,
-				amount: "[CENSORED]"
+				amount: "[CENSORED]",
 			});
 
 			logger.info("Création PaymentIntent");
