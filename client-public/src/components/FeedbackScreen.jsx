@@ -13,13 +13,11 @@ import {
 	Platform,
 	Keyboard,
 	ActivityIndicator,
-	Clipboard,
-	KeyboardAvoidingView,
-	ScrollView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { PREMIUM_COLORS } from "../theme/colors";
 import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 API Service
 
@@ -48,12 +46,7 @@ export default function FeedbackScreen({
 	restaurantData = {},
 	customerData = {},
 }) {
-	// �️ Protection: Ne pas rendre si pas visible ou données manquantes
-	if (!visible) {
-		return null;
-	}
-
-	// �📱 États du questionnaire
+	// 📱 États du questionnaire
 	const [answers, setAnswers] = useState({
 		serviceRating: null, // "Le service à table vous a-t-il satisfait ?"
 		foodQuality: null, // "Vos plats étaient-ils à votre goût ?"
@@ -139,21 +132,6 @@ export default function FeedbackScreen({
 
 	// 📤 Soumettre le feedback
 	const handleSubmitFeedback = async () => {
-		// 🛡️ Protection: Éviter soumission multiple ou données incomplètes
-		if (isSubmitting) {
-			console.warn("🔄 [FEEDBACK-SCREEN] Soumission déjà en cours, ignorée");
-			return;
-		}
-
-		// 🛡️ Vérifier que les données essentielles sont présentes
-		if (!restaurantData || !customerData) {
-			console.error("❌ [FEEDBACK-SCREEN] Données manquantes:", { restaurantData, customerData });
-			Alert.alert("Erreur", "Données incomplètes. Fermeture du feedback.", [
-				{ text: "OK", onPress: onClose }
-			]);
-			return;
-		}
-
 		setIsSubmitting(true);
 
 		try {
@@ -196,26 +174,64 @@ export default function FeedbackScreen({
 	// 📋 Copier le commentaire
 	const handleCopyComment = async () => {
 		if (comment.trim()) {
-			Clipboard.setString(comment.trim());
+			await Clipboard.setStringAsync(comment.trim());
 			setShowCopiedAlert(true);
 			setTimeout(() => setShowCopiedAlert(false), 2000);
 		}
 	};
 
-	// 🔗 Rediriger vers Google
+	// 🔗 Rediriger vers Google (SÉCURISÉ)
 	const handleRedirectToGoogle = async () => {
 		try {
-			// URL Google Avis générique - à adapter selon le restaurant
-			const googleUrl =
-				restaurantData.googleUrl ||
-				`https://search.google.com/local/writereview?placeid=${restaurantData.googlePlaceId || "YOUR_PLACE_ID"}`;
+			// ✅ SÉCURITÉ: Validation stricte des données de redirection
+			const placeId = restaurantData?.googlePlaceId;
+			const googleUrl = restaurantData?.googleUrl;
 
-			console.log("🔗 Redirection Google:", googleUrl);
+			// ✅ SÉCURITÉ: Vérifier que nous avons des données valides
+			if (!placeId && !googleUrl) {
+				console.error("❌ Données Google manquantes");
+				Alert.alert("Erreur", "Informations Google manquantes");
+				return;
+			}
+
+			let finalUrl;
+
+			if (googleUrl) {
+				// ✅ SÉCURITÉ: Valider que l'URL est bien une URL Google
+				if (
+					!googleUrl.startsWith("https://google.com") &&
+					!googleUrl.startsWith("https://www.google.com") &&
+					!googleUrl.startsWith("https://search.google.com")
+				) {
+					console.error("❌ URL Google invalide:", googleUrl);
+					Alert.alert("Erreur", "URL de redirection invalide");
+					return;
+				}
+				finalUrl = googleUrl;
+			} else if (placeId) {
+				// ✅ SÉCURITÉ: Valider le format du place_id
+				if (placeId === "YOUR_PLACE_ID" || placeId.length < 10) {
+					console.error("❌ Place ID invalide:", placeId);
+					Alert.alert("Erreur", "ID Google Places invalide");
+					return;
+				}
+				// ✅ SÉCURITÉ: Encoder l'ID pour éviter l'injection
+				finalUrl = `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
+			}
+
+			console.log("🔗 Redirection Google (sécurisée)");
+
+			// ✅ SÉCURITÉ: Vérifier que l'URL peut être ouverte
+			const canOpen = await Linking.canOpenURL(finalUrl);
+			if (!canOpen) {
+				Alert.alert("Erreur", "Impossible d'ouvrir le lien Google");
+				return;
+			}
 
 			// Mettre à jour le statut de redirection
 			// TODO: API call pour marquer redirectedToGoogle = true
 
-			await Linking.openURL(googleUrl);
+			await Linking.openURL(finalUrl);
 
 			// Fermer après redirection
 			setTimeout(() => {
@@ -297,11 +313,6 @@ export default function FeedbackScreen({
 			{ key: "venueExperience", text: "Le lieu vous a-t-il plu ?" },
 		];
 
-		// 🛡️ Protection défensive
-		if (!questions || questions.length === 0) {
-			return null;
-		}
-
 		return (
 			<View style={styles.questionsContainer}>
 				<Text style={styles.title}>Votre avis nous intéresse ! 🌟</Text>
@@ -309,7 +320,7 @@ export default function FeedbackScreen({
 					Aidez-nous à améliorer votre expérience
 				</Text>
 
-				{(questions || []).map((question, index) => (
+				{questions.map((question, index) => (
 					<View key={question.key} style={styles.questionBlock}>
 						<Text style={styles.questionText}>{question.text}</Text>
 						<View style={styles.answersRow}>
@@ -384,9 +395,6 @@ export default function FeedbackScreen({
 					value={comment}
 					onChangeText={setComment}
 					maxLength={500}
-					returnKeyType="done"
-					blurOnSubmit={true}
-					onSubmitEditing={() => Keyboard.dismiss()}
 				/>
 
 				<Text style={styles.characterCount}>
@@ -514,52 +522,41 @@ export default function FeedbackScreen({
 			animationType="none"
 			onRequestClose={handleClose}
 		>
-			<KeyboardAvoidingView
-				style={{ flex: 1 }}
-				behavior={Platform.OS === "ios" ? "padding" : "height"}
-				keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
-			>
-				<Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-					<BlurView intensity={20} tint="dark" style={styles.blurOverlay} />
+			<Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
+				<BlurView intensity={20} tint="dark" style={styles.blurOverlay} />
 
-					<Animated.View
-						style={[
-							styles.container,
-							{
-								transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
-							},
-						]}
+				<Animated.View
+					style={[
+						styles.container,
+						{
+							transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+						},
+					]}
+				>
+					<LinearGradient
+						colors={PREMIUM_COLORS.dark}
+						style={styles.modalContent}
 					>
-						<LinearGradient
-							colors={PREMIUM_COLORS.dark}
-							style={styles.modalContent}
-						>
-							{/* Header avec bouton fermer */}
-							<View style={styles.header}>
-								<View style={styles.headerIndicator} />
-								<TouchableOpacity
-									style={styles.closeIconButton}
-									onPress={handleClose}
-								>
-									<Ionicons name="close" size={24} color="#fff" />
-								</TouchableOpacity>
-							</View>
-
-							{/* Contenu selon l'étape avec ScrollView */}
-							<ScrollView
-								style={styles.content}
-								showsVerticalScrollIndicator={false}
-								keyboardShouldPersistTaps="handled"
-								contentContainerStyle={{ flexGrow: 1 }}
+						{/* Header avec bouton fermer */}
+						<View style={styles.header}>
+							<View style={styles.headerIndicator} />
+							<TouchableOpacity
+								style={styles.closeIconButton}
+								onPress={handleClose}
 							>
-								{currentStep === "questions" && renderQuestions()}
-								{currentStep === "feedback" && renderFeedback()}
-								{currentStep === "success" && renderSuccess()}
-							</ScrollView>
-						</LinearGradient>
-					</Animated.View>
+								<Ionicons name="close" size={24} color="#fff" />
+							</TouchableOpacity>
+						</View>
+
+						{/* Contenu selon l'étape */}
+						<View style={styles.content}>
+							{currentStep === "questions" && renderQuestions()}
+							{currentStep === "feedback" && renderFeedback()}
+							{currentStep === "success" && renderSuccess()}
+						</View>
+					</LinearGradient>
 				</Animated.View>
-			</KeyboardAvoidingView>
+			</Animated.View>
 		</Modal>
 	);
 }
@@ -712,19 +709,16 @@ const styles = StyleSheet.create({
 		fontWeight: "500",
 	},
 	commentInput: {
-		backgroundColor: "rgba(255, 255, 255, 0.1)",
+		backgroundColor: "rgba(255, 255, 255, 0.05)",
 		borderRadius: 16,
 		padding: 16,
 		color: "#fff",
 		fontSize: 16,
-		borderWidth: 2,
-		borderColor: "rgba(255, 152, 0, 0.3)",
+		borderWidth: 1,
+		borderColor: "rgba(255, 255, 255, 0.1)",
 		minHeight: 100,
 		textAlignVertical: "top",
 		alignSelf: "stretch",
-		// Améliorer la visibilité du texte
-		fontWeight: "400",
-		lineHeight: 22,
 	},
 	characterCount: {
 		fontSize: 12,
