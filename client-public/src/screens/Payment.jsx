@@ -18,6 +18,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useOrderStore } from "../stores/useOrderStore.js";
 import { PREMIUM_COLORS } from "../theme/colors";
 import { useStripe } from "@stripe/stripe-react-native";
+import logger from "../utils/secureLogger"; // ✅ Logger sécurisé
 import stripeService from "../services/stripeService";
 import { API_BASE_URL } from "../config/api";
 import { ReceiptModal } from "../components/receipt/ReceiptModal";
@@ -309,7 +310,7 @@ export default function Payment({
 				const itemsArray = Array.from(paidItems);
 				await AsyncStorage.setItem(storageKey, JSON.stringify(itemsArray));
 			} catch (error) {
-				console.error("❌ Erreur sauvegarde paidItems:", error);
+				logger.error("Erreur sauvegarde paiement", error.message);
 			}
 		};
 
@@ -347,10 +348,10 @@ export default function Payment({
 			const nonPaidItems = allOrders.filter(
 				(item) => !paidItems.has(getItemId(item)),
 			);
-			const nonPaidIds = new Set((nonPaidItems || []).map((item) => getItemId(item)));
+			const nonPaidIds = new Set(nonPaidItems.map((item) => getItemId(item)));
 			console.log(
 				"✅ Items non payés initialisés:",
-				(nonPaidItems || []).length,
+				nonPaidItems.length,
 				"items",
 			);
 			setSelectedItems(nonPaidIds);
@@ -433,7 +434,7 @@ export default function Payment({
 			allOrders?.filter((item) => !paidItems.has(getItemId(item))) || [];
 		if (nonPaidItems.length === 0) return;
 
-		const allNonPaidIds = new Set((nonPaidItems || []).map((item) => getItemId(item)));
+		const allNonPaidIds = new Set(nonPaidItems.map((item) => getItemId(item)));
 
 		if (selectedItems.size === allNonPaidIds.size) {
 			setSelectedItems(new Set());
@@ -451,7 +452,7 @@ export default function Payment({
 		const oneThirdCount = Math.ceil(nonPaidItems.length / 3);
 		const oneThirdItems = nonPaidItems.slice(0, oneThirdCount);
 		const newSelectedItems = new Set(
-			(oneThirdItems || []).map((item) => getItemId(item)),
+			oneThirdItems.map((item) => getItemId(item)),
 		);
 		setSelectedItems(newSelectedItems);
 	};
@@ -554,7 +555,7 @@ export default function Payment({
 					name: restaurantName,
 				},
 			},
-			items: (selectedOrders || []).map((item) => ({
+			items: selectedOrders.map((item) => ({
 				name: item.name || item.productName || "Article",
 				quantity: parseInt(item.quantity) || 1,
 				price: parseFloat(item.price) || 0,
@@ -665,18 +666,12 @@ export default function Payment({
 				0,
 			);
 
-			console.log("🔍 DEBUG amountPaid:", {
-				amountPaid,
-				type: typeof amountPaid,
-				isNaN: isNaN(amountPaid),
+			logger.debug("Calcul montant paiement", {
+				totalItems: paidItems.length,
+				amount: "[CENSORED]"
 			});
 
-			// 2.5. Créer PaymentIntent via Stripe
-			console.log(
-				"💳 Création PaymentIntent pour",
-				(amountPaid || 0).toFixed(2),
-				"€",
-			);
+			logger.info("Création PaymentIntent");
 			const amountCents = Math.round(amountPaid * 100);
 
 			const paymentMethodTypes =
@@ -1123,7 +1118,7 @@ export default function Payment({
 						</View>
 					) : (
 						<View style={styles.itemsList}>
-							{(availableItems || []).map((item, index) => {
+							{availableItems.map((item, index) => {
 								const itemId = getItemId(item);
 								const isSelected = selectedItems.has(itemId);
 								return (
@@ -1157,7 +1152,7 @@ export default function Payment({
 								</Text>
 							</View>
 							<View style={styles.itemsList}>
-								{(paidItemsList || []).map((item, index) => (
+								{paidItemsList.map((item, index) => (
 									<PremiumPaymentItem
 										key={getItemId(item)}
 										item={item}
@@ -1339,15 +1334,12 @@ export default function Payment({
 			)}
 
 			{/* 🌟 Feedback & Avis Google modal */}
-			{showFeedback && 
-			 feedbackData && 
-			 feedbackData.restaurantData && 
-			 feedbackData.customerData && (
+			{showFeedback && feedbackData && (
 				<FeedbackScreen
 					visible={showFeedback}
 					onClose={handleFeedbackClose}
-					restaurantData={feedbackData.restaurantData || {}}
-					customerData={feedbackData.customerData || {}}
+					restaurantData={feedbackData.restaurantData}
+					customerData={feedbackData.customerData}
 				/>
 			)}
 		</LinearGradient>
