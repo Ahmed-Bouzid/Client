@@ -3,3 +3,5 @@ export { default as useCartStore } from "./useCartStore";
 export { default as useOrderStore } from "./useOrderStore";
 export { default as useProductStore } from "./useProductStore";
 export { default as useClientTableStore } from "./useClientTableStore";
+export { useRestaurantStore } from "./useRestaurantStore";
+export { useFeatureLevelStore, useFeatureLevel } from "./useFeatureLevelStore";

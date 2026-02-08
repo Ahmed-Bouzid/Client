@@ -31,7 +31,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { messageService } from "../../services/messageService";
 import { useSocketClient } from "../../hooks/useSocketClient";
-import socketService from "../../services/socketService";
 import { getRestaurantId } from "../../utils/getRestaurantId";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -122,14 +121,6 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 	const [sending, setSending] = useState(null); // ID du message en cours d'envoi
 	const [selectedCategory, setSelectedCategory] = useState(null);
 	const conversationRef = useRef(null);
-	const isOpenRef = useRef(isOpen);
-	const reservationIdRef = useRef(reservationId);
-
-	// Sync refs with state/props
-	useEffect(() => {
-		isOpenRef.current = isOpen;
-		reservationIdRef.current = reservationId;
-	}, [isOpen, reservationId]);
 
 	// Animations
 	const bubbleScale = useRef(new Animated.Value(0)).current;
@@ -146,87 +137,59 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 		init();
 	}, []);
 
-	// Handlers stables (ne changent JAMAIS pour éviter re-trigger du useEffect WebSocket)
-	const handleServerResponse = useCallback((event) => {
-		if (event.data?.reservationId !== reservationIdRef.current) return;
-
-		setConversation((prev) => [
-			...prev,
-			{
-				type: "server",
-				text: event.data.responseText,
-				serverName: event.data.serverName || "Serveur",
-				createdAt: new Date().toISOString(),
-				_id: event.data.responseId,
-			},
-		]);
-
-		// Utiliser le ref au lieu de isOpen direct
-		if (!isOpenRef.current) {
-			setUnreadCount((prev) => prev + 1);
-		}
-
-		if (Platform.OS !== "web") {
-			Vibration.vibrate([0, 100]);
-		}
-
-		setTimeout(() => {
-			conversationRef.current?.scrollToEnd({ animated: true });
-		}, 100);
-	}, []);
-
-	const handleMessageStatus = useCallback((event) => {
-		console.log("🔔 [MessagingBubble] Événement message-status reçu:", event);
-		if (event.type === "read" && event.data?.messageId) {
-			const targetId = event.data.messageId.toString();
-			console.log("✅ Message marqué comme lu:", targetId);
-
-			setConversation((prev) => {
-				console.log(
-					"🔍 Conversation avant:",
-					prev.map((m) => ({ _id: m._id, status: m.status })),
-				);
-				const updated = prev.map((msg) =>
-					msg._id?.toString() === targetId
-						? { ...msg, status: "read", readAt: event.data.readAt }
-						: msg,
-				);
-				console.log(
-					"🔍 Conversation après:",
-					updated.map((m) => ({ _id: m._id, status: m.status })),
-				);
-				return updated;
-			});
-		}
-	}, []);
-
-	// WebSocket - Rejoindre room + attacher listeners (ordre critique!)
+	// WebSocket - Réponses serveur
 	useEffect(() => {
-		if (!isConnected || !reservationId || !restaurantId) return;
+		if (!isConnected || !reservationId) return;
 
-		// 1️⃣ ATTACHER LES LISTENERS D'ABORD
+		const handleServerResponse = (event) => {
+			if (event.data?.reservationId !== reservationId) return;
+
+			setConversation((prev) => [
+				...prev,
+				{
+					type: "server",
+					text: event.data.responseText,
+					serverName: event.data.serverName || "Serveur",
+					createdAt: new Date().toISOString(),
+					_id: event.data.responseId,
+				},
+			]);
+
+			if (!isOpen) {
+				setUnreadCount((prev) => prev + 1);
+			}
+
+			if (Platform.OS !== "web") {
+				Vibration.vibrate([0, 100]);
+			}
+
+			setTimeout(() => {
+				conversationRef.current?.scrollToEnd({ animated: true });
+			}, 100);
+		};
+
+		// Nouveau : écouter les mises à jour de statut (message lu)
+		const handleMessageStatus = (event) => {
+			if (event.type === "read" && event.data?.messageId) {
+				console.log("✅ Message marqué comme lu:", event.data.messageId);
+				// Mettre à jour le statut dans la conversation
+				setConversation((prev) =>
+					prev.map((msg) =>
+						msg._id === event.data.messageId
+							? { ...msg, status: "read", readAt: event.data.readAt }
+							: msg,
+					),
+				);
+			}
+		};
+
 		on("server-response", handleServerResponse);
 		on("message-status", handleMessageStatus);
-		console.log(
-			"✅ [MessagingBubble] Listeners attachés (server-response, message-status)",
-		);
-
-		// 2️⃣ REJOINDRE LA ROOM APRÈS (garantit que les listeners sont prêts)
-		console.log(
-			`🔌 [MessagingBubble] Rejoindre room: reservation-${reservationId}`,
-		);
-		socketService.joinReservation(reservationId);
-
 		return () => {
-			console.log(
-				`🔌 [MessagingBubble] Quitter room: reservation-${reservationId}`,
-			);
-			socketService.leaveReservation(reservationId);
 			off("server-response", handleServerResponse);
 			off("message-status", handleMessageStatus);
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [isConnected, reservationId, restaurantId]);
+	}, [isConnected, reservationId, isOpen, on, off]);
 
 	// Charger conversation existante
 	useEffect(() => {
@@ -376,17 +339,13 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 						clientName,
 					});
 
-					// ✅ IMPORTANT: Utiliser le vrai _id retourné par le backend
-					const realMessageId = result.data?.messageId || result.data?._id;
-					console.log("📝 Message envoyé, ID backend:", realMessageId);
-
 					setConversation((prev) => [
 						...prev,
 						{
 							type: "client",
 							text: message.text,
 							createdAt: new Date().toISOString(),
-							_id: realMessageId || Date.now().toString(),
+							_id: result.data?._id || Date.now().toString(),
 							status: "sent",
 						},
 					]);
@@ -570,11 +529,14 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 														minute: "2-digit",
 													})}
 												</Text>
-												{/* Badge vert si message lu */}
+												{/* Check si message lu (seulement pour messages clients) */}
 												{isClient && msg.status === "read" && (
-													<View style={styles.readBadge}>
-														<Ionicons name="checkmark" size={12} color="#fff" />
-													</View>
+													<Ionicons
+														name="checkmark-done"
+														size={16}
+														color="rgba(255,255,255,0.7)"
+														style={{ marginLeft: 4 }}
+													/>
 												)}
 											</View>
 										</View>

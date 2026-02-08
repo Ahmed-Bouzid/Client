@@ -1,11 +1,11 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { API_CONFIG } from "../../../shared-api/config/apiConfig.js";
-import { errorHandler } from "../../../shared-api/utils/errorHandler.js";
+import { API_CONFIG } from "shared-api/config/apiConfig.js";
+import { errorHandler } from "shared-api/utils/errorHandler.js";
 
 export const useClientTableStore = create((set, get) => ({
 	tableId: null,
-	restaurantId: API_CONFIG.Resto_id_key, // Par défaut depuis la config
+	restaurantId: API_CONFIG.RESTAURANT_ID, // Par défaut depuis la config
 	userName: null,
 
 	/**
@@ -21,7 +21,7 @@ export const useClientTableStore = create((set, get) => ({
 			const finalTableId =
 				tableId || savedTableId || API_CONFIG.DEFAULT_TABLE_ID;
 			const finalRestaurantId =
-				restaurantId || savedRestaurantId || API_CONFIG.Resto_id_key;
+				restaurantId || savedRestaurantId || API_CONFIG.RESTAURANT_ID;
 
 			set({
 				tableId: finalTableId,
@@ -66,7 +66,7 @@ export const useClientTableStore = create((set, get) => ({
 			const finalTableId = tableId || state.tableId;
 			// Toujours utiliser restaurantId depuis le store ou API_CONFIG
 			const finalRestaurantId =
-				restaurantId || state.restaurantId || API_CONFIG.Resto_id_key;
+				restaurantId || state.restaurantId || API_CONFIG.RESTAURANT_ID;
 
 			if (!finalTableId) {
 				throw new Error(

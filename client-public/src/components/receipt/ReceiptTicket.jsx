@@ -13,12 +13,12 @@ export const ReceiptTicket = React.forwardRef(
 			amount,
 			date,
 			items = [],
-			restaurantName = "OrderIt Restaurant",
+			restaurantName = "SunnyGo Restaurant",
 			tableNumber,
 			paymentMethod = "Card",
 			last4Digits,
 		},
-		ref
+		ref,
 	) => {
 		const scaleAnim = useRef(new Animated.Value(0)).current;
 		const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -48,8 +48,9 @@ export const ReceiptTicket = React.forwardRef(
 			backgroundColor: "#1a1a2e",
 		};
 
-		const formattedAmount = `${amount.toFixed(2)}€`;
-		const formattedDate = new Date(date).toLocaleDateString("fr-FR", {
+		const formattedAmount = `${(parseFloat(amount) || 0).toFixed(2)}€`;
+		const dateObj = date instanceof Date ? date : new Date(date);
+		const formattedDate = dateObj.toLocaleDateString("fr-FR", {
 			day: "numeric",
 			month: "long",
 			year: "numeric",
@@ -147,7 +148,11 @@ export const ReceiptTicket = React.forwardRef(
 										<Text
 											style={[styles.itemPrice, { color: colors.textColor }]}
 										>
-											{(item.price * (item.quantity || 1)).toFixed(2)}€
+											{(
+												(parseFloat(item.price) || 0) *
+												(parseInt(item.quantity) || 1)
+											).toFixed(2)}
+											€
 										</Text>
 									</View>
 								))}
@@ -207,13 +212,13 @@ export const ReceiptTicket = React.forwardRef(
 							Merci de votre visite !
 						</Text>
 						<Text style={[styles.footerText, { color: "#999" }]}>
-							www.orderit.fr
+							www.sunnygo.fr
 						</Text>
 					</View>
 				</View>
 			</Animated.View>
 		);
-	}
+	},
 );
 
 const styles = StyleSheet.create({

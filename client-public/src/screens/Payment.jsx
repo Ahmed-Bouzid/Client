@@ -18,9 +18,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useOrderStore } from "../stores/useOrderStore.js";
 import { PREMIUM_COLORS } from "../theme/colors";
 import { useStripe } from "@stripe/stripe-react-native";
-import stripeService from "../../../shared-api/services/stripeService";
+import stripeService from "../services/stripeService";
 import { API_BASE_URL } from "../config/api";
-import ReceiptTicket from "../components/receipt/ReceiptTicket";
+import { ReceiptModal } from "../components/receipt/ReceiptModal";
+import { useRestaurantStore } from "../stores/useRestaurantStore";
+import { useReservationStatus } from "../hooks/useReservationStatus"; // 🚪 Écoute fermeture réservation
+import FeedbackScreen from "../components/FeedbackScreen"; // 🌟 Feedback & Avis Google
+import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 API Feedback
 
 const { width, height } = Dimensions.get("window");
 
@@ -64,7 +68,16 @@ const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle }) => {
 		onToggle?.();
 	};
 
-	const itemTotal = (item?.price || 0) * (item?.quantity || 1);
+	const itemTotal =
+		(parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1);
+	console.log("🔍 DEBUG PremiumPaymentItem:", {
+		name: item?.name,
+		price: item?.price,
+		quantity: item?.quantity,
+		itemTotal,
+		type: typeof itemTotal,
+		isNaN: isNaN(itemTotal),
+	});
 
 	return (
 		<Animated.View
@@ -181,6 +194,7 @@ export default function Payment({
 	clientId = null, // 🆕
 	onSuccess = () => {},
 	onBack = () => {},
+	onReservationClosed = () => {}, // 🚪 Callback si la réservation est fermée
 }) {
 	const [loading, setLoading] = useState(false);
 	const [selectedItems, setSelectedItems] = useState(new Set());
@@ -196,6 +210,14 @@ export default function Payment({
 	// 🧾 États pour le ticket de caisse
 	const [showReceipt, setShowReceipt] = useState(false);
 	const [receiptData, setReceiptData] = useState(null);
+
+	// 🌟 États pour le feedback & avis Google
+	const [showFeedback, setShowFeedback] = useState(false);
+	const [feedbackData, setFeedbackData] = useState(null);
+
+	// 🚪 Écouter la fermeture de réservation et rediriger automatiquement
+	const restaurantId = useRestaurantStore((state) => state.id);
+	useReservationStatus(restaurantId, reservationId, onReservationClosed);
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -325,10 +347,10 @@ export default function Payment({
 			const nonPaidItems = allOrders.filter(
 				(item) => !paidItems.has(getItemId(item)),
 			);
-			const nonPaidIds = new Set(nonPaidItems.map((item) => getItemId(item)));
+			const nonPaidIds = new Set((nonPaidItems || []).map((item) => getItemId(item)));
 			console.log(
 				"✅ Items non payés initialisés:",
-				nonPaidItems.length,
+				(nonPaidItems || []).length,
 				"items",
 			);
 			setSelectedItems(nonPaidIds);
@@ -411,7 +433,7 @@ export default function Payment({
 			allOrders?.filter((item) => !paidItems.has(getItemId(item))) || [];
 		if (nonPaidItems.length === 0) return;
 
-		const allNonPaidIds = new Set(nonPaidItems.map((item) => getItemId(item)));
+		const allNonPaidIds = new Set((nonPaidItems || []).map((item) => getItemId(item)));
 
 		if (selectedItems.size === allNonPaidIds.size) {
 			setSelectedItems(new Set());
@@ -429,7 +451,7 @@ export default function Payment({
 		const oneThirdCount = Math.ceil(nonPaidItems.length / 3);
 		const oneThirdItems = nonPaidItems.slice(0, oneThirdCount);
 		const newSelectedItems = new Set(
-			oneThirdItems.map((item) => getItemId(item)),
+			(oneThirdItems || []).map((item) => getItemId(item)),
 		);
 		setSelectedItems(newSelectedItems);
 	};
@@ -480,6 +502,119 @@ export default function Payment({
 		}
 	};
 
+	/**
+	 * 🧾 Affiche le ticket de caisse avec les détails du paiement
+	 */
+	const showReceiptTicket = (paymentDetails, selectedOrders) => {
+		console.log("🧾 showReceiptTicket appelé:", {
+			paymentDetails,
+			selectedOrdersCount: selectedOrders.length,
+		});
+
+		// Récupérer le nom du restaurant depuis le store
+		const restaurantName = useRestaurantStore.getState().name || "Restaurant";
+
+		// Générer le numéro de ticket : INITIALES-YYYYMMDD-HHMM
+		const now = new Date();
+		const initiales = restaurantName
+			.split(" ")
+			.map((w) => w[0])
+			.join("")
+			.toUpperCase()
+			.slice(0, 3);
+		const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+		const timeStr = `${now.getHours().toString().padStart(2, "0")}${now.getMinutes().toString().padStart(2, "0")}`;
+		const ticketNumber = `${initiales}-${dateStr}-${timeStr}`;
+
+		// Calculer le montant total
+		const totalAmount = selectedOrders.reduce(
+			(sum, item) =>
+				sum + (parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1),
+			0,
+		);
+
+		console.log("🧾 Montant calculé:", totalAmount);
+		console.log("🧾 Numéro de ticket:", ticketNumber);
+
+		// Traduire le mode de paiement
+		const paymentMethodLabel =
+			{
+				card: "Paiement par carte",
+				apple_pay: "Apple Pay",
+				fake: "Test",
+			}[paymentDetails.method] || "Paiement par carte";
+
+		// Créer l'objet pour ReceiptModal
+		const receipt = {
+			reservation: {
+				_id: ticketNumber,
+				tableNumber: tableNumber,
+				clientName: userName || "Client",
+				restaurantId: {
+					name: restaurantName,
+				},
+			},
+			items: (selectedOrders || []).map((item) => ({
+				name: item.name || item.productName || "Article",
+				quantity: parseInt(item.quantity) || 1,
+				price: parseFloat(item.price) || 0,
+			})),
+			amount: totalAmount,
+			paymentMethod: paymentMethodLabel,
+			last4Digits: paymentDetails.last4 || null,
+		};
+
+		console.log("🧾 Receipt data:", receipt);
+
+		setReceiptData(receipt);
+		setShowReceipt(true);
+	};
+
+	/**
+	 * 🏠 Gère la fermeture du ticket et redirection
+	 */
+	const handleReceiptClose = () => {
+		setShowReceipt(false);
+
+		// 🌟 Préparer les données pour le feedback
+		const restaurantStore = useRestaurantStore.getState();
+
+		setTimeout(() => {
+			// Préparer les données feedback
+			setFeedbackData({
+				restaurantData: {
+					id: restaurantId || restaurantStore.id,
+					name: restaurantStore.name || "Restaurant",
+					googleUrl: restaurantStore.googleUrl || null,
+					googlePlaceId: restaurantStore.googlePlaceId || null,
+				},
+				customerData: {
+					clientId: clientId,
+					clientName: userName,
+					tableId: tableId,
+					tableNumber: tableNumber,
+					reservationId: reservationId,
+				},
+			});
+
+			// Afficher le feedback au lieu de fermer directement
+			setShowFeedback(true);
+		}, 300); // Délai pour que le ticket se ferme proprement
+	};
+
+	/**
+	 * 🌟 Gère la fermeture du feedback (retour au menu final)
+	 */
+	const handleFeedbackClose = () => {
+		setShowFeedback(false);
+		setFeedbackData(null);
+
+		setTimeout(() => {
+			setSelectedItems(new Set());
+			onSuccess?.();
+		}, 300);
+	};
+
 	// 💳 Traitement du paiement
 	const handlePay = async (paymentMethod = "card") => {
 		console.log("⚡ handlePay appelé avec:", paymentMethod);
@@ -524,12 +659,24 @@ export default function Payment({
 
 			// 2. Calculer le montant payé
 			const amountPaid = selectedOrders.reduce(
-				(sum, item) => sum + (item?.price || 0) * (item?.quantity || 1),
+				(sum, item) =>
+					sum +
+					(parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1),
 				0,
 			);
 
+			console.log("🔍 DEBUG amountPaid:", {
+				amountPaid,
+				type: typeof amountPaid,
+				isNaN: isNaN(amountPaid),
+			});
+
 			// 2.5. Créer PaymentIntent via Stripe
-			console.log("💳 Création PaymentIntent pour", amountPaid.toFixed(2), "€");
+			console.log(
+				"💳 Création PaymentIntent pour",
+				(amountPaid || 0).toFixed(2),
+				"€",
+			);
 			const amountCents = Math.round(amountPaid * 100);
 
 			const paymentMethodTypes =
@@ -564,11 +711,11 @@ export default function Payment({
 			console.log("🔄 Initialisation Payment Sheet...");
 			const { error: initError } = await initPaymentSheet({
 				paymentIntentClientSecret: newClientSecret,
-				merchantDisplayName: "OrderIt Restaurant",
+				merchantDisplayName: "SunnyGo Restaurant",
 				applePay: applePayAvailable
 					? {
 							merchantCountryCode: "FR",
-							merchantIdentifier: "merchant.com.orderit.app",
+							merchantIdentifier: "merchant.com.sunnygo.app",
 							cartItems: [
 								{
 									label: "Commande",
@@ -577,7 +724,7 @@ export default function Payment({
 							],
 						}
 					: undefined,
-				returnURL: "orderit://payment",
+				returnURL: "sunnygo://payment",
 			});
 
 			if (initError) {
@@ -673,36 +820,43 @@ export default function Payment({
 
 			// 7. Calculer le reste à payer
 			const remainingAmount = remainingItems.reduce(
-				(sum, item) => sum + (item?.price || 0) * (item?.quantity || 1),
+				(sum, item) =>
+					sum +
+					(parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1),
 				0,
 			);
+
+			console.log("🔍 DEBUG values:", {
+				amountPaid,
+				remainingAmount,
+				updatedStatus_totalPaid: updatedStatus?.totalPaid,
+				types: {
+					amountPaid: typeof amountPaid,
+					remainingAmount: typeof remainingAmount,
+					totalPaid: typeof updatedStatus?.totalPaid,
+				},
+			});
 
 			// 8. Afficher l'alerte de confirmation
 			const message =
 				`${selectedOrders.length} article(s) payé(s).\n\n` +
-				`💳 Montant payé: ${amountPaid.toFixed(2)}€\n` +
+				`💳 Montant payé: ${(amountPaid || 0).toFixed(2)}€\n` +
 				(updatedStatus
-					? `💰 Total payé: ${updatedStatus?.totalPaid?.toFixed(2) || 0}€\n`
+					? `💰 Total payé: ${(parseFloat(updatedStatus?.totalPaid) || 0).toFixed(2)}€\n`
 					: "") +
 				(remainingAmount > 0
-					? `📋 Reste à payer: ${remainingAmount.toFixed(2)}€ (${
+					? `📋 Reste à payer: ${(remainingAmount || 0).toFixed(2)}€ (${
 							remainingItems.length
 						} article${remainingItems.length > 1 ? "s" : ""})`
 					: "✅ Tous les articles sont payés !");
 
-			Alert.alert(
-				isFullPayment ? "✅ Paiement complet" : "⚠️ Paiement partiel",
-				message,
-				[
-					{
-						text: "OK",
-						onPress: async () => {
-							// Désélectionner tout
-							setSelectedItems(new Set());
-							onSuccess?.();
-						},
-					},
-				],
+			// 🧾 Afficher le ticket de caisse au lieu d'un simple Alert
+			showReceiptTicket(
+				{
+					method: paymentMethod,
+					paymentIntentId: newPaymentIntentId,
+				},
+				selectedOrders,
 			);
 		} catch (error) {
 			console.error("❌ Erreur paiement:", error);
@@ -757,8 +911,9 @@ export default function Payment({
 	const selectedOrders = availableItems.filter((item) =>
 		selectedItems.has(getItemId(item)),
 	);
-	const total = selectedOrders.reduce(
-		(sum, item) => sum + (item?.price || 0) * (item?.quantity || 1),
+	const total = (selectedOrders || []).reduce(
+		(sum, item) =>
+			sum + (parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1),
 		0,
 	);
 
@@ -784,7 +939,7 @@ export default function Payment({
 		selectedOrders: selectedOrders.length,
 		isProcessing,
 		isLoading,
-		total: total.toFixed(2),
+		total: (total || 0).toFixed(2),
 	});
 
 	return (
@@ -968,7 +1123,7 @@ export default function Payment({
 						</View>
 					) : (
 						<View style={styles.itemsList}>
-							{availableItems.map((item, index) => {
+							{(availableItems || []).map((item, index) => {
 								const itemId = getItemId(item);
 								const isSelected = selectedItems.has(itemId);
 								return (
@@ -1002,7 +1157,7 @@ export default function Payment({
 								</Text>
 							</View>
 							<View style={styles.itemsList}>
-								{paidItemsList.map((item, index) => (
+								{(paidItemsList || []).map((item, index) => (
 									<PremiumPaymentItem
 										key={getItemId(item)}
 										item={item}
@@ -1036,7 +1191,9 @@ export default function Payment({
 										</Text>
 									</View>
 								</View>
-								<Text style={styles.totalValue}>{total.toFixed(2)}€</Text>
+								<Text style={styles.totalValue}>
+									{(total || 0).toFixed(2)}€
+								</Text>
 							</View>
 						</LinearGradient>
 					</View>
@@ -1167,6 +1324,32 @@ export default function Payment({
 					</TouchableOpacity>
 				</Animated.View>
 			</ScrollView>
+
+			{/* 🧾 Ticket de caisse modal */}
+			{showReceipt && receiptData && (
+				<ReceiptModal
+					visible={showReceipt}
+					onClose={handleReceiptClose}
+					reservation={receiptData.reservation}
+					items={receiptData.items}
+					amount={receiptData.amount}
+					paymentMethod={receiptData.paymentMethod}
+					last4Digits={receiptData.last4Digits}
+				/>
+			)}
+
+			{/* 🌟 Feedback & Avis Google modal */}
+			{showFeedback && 
+			 feedbackData && 
+			 feedbackData.restaurantData && 
+			 feedbackData.customerData && (
+				<FeedbackScreen
+					visible={showFeedback}
+					onClose={handleFeedbackClose}
+					restaurantData={feedbackData.restaurantData || {}}
+					customerData={feedbackData.customerData || {}}
+				/>
+			)}
 		</LinearGradient>
 	);
 }

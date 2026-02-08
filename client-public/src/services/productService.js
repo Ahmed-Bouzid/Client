@@ -1,5 +1,5 @@
-import { API_CONFIG } from "../../../shared-api/config/apiConfig.js";
-import { getRestaurantId } from "../../../shared-api/utils/getRestaurantId.js";
+import { API_CONFIG } from "shared-api/config/apiConfig.js";
+import { getRestaurantId } from "../utils/getRestaurantId.js";
 
 export const productService = {
 	async fetchProducts(token = null) {

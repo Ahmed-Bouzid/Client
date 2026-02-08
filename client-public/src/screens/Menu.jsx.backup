@@ -37,7 +37,7 @@ import { useFeatureLevel } from "../stores/useFeatureLevelStore.js"; // 🎯 Fea
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const BUTTON_SMALL = 60;
-const BUTTON_EXPANDED = 140; // 🎯 Largeur fixe pour éviter l'écrasement
+const BUTTON_EXPANDED = SCREEN_WIDTH - 40 - 60 * 3 - 8 * 3;
 
 // ⚠️ LEGACY: Garder comme fallback si la config échoue
 const PREMIUM_COLORS = {
@@ -539,12 +539,8 @@ export default function Menu({
 	const { style: liveStyle, isConnected: socketConnected } =
 		useStyleUpdates(restaurantId);
 
-	// 🚪 NOUVEAU : Écouter la fermeture de réservation et rediriger automatiquement (seulement si reservationId existe)
-	useReservationStatus(
-		reservationId ? restaurantId : null,
-		reservationId,
-		reservationId ? onReservationClosed : () => {},
-	);
+	// 🚪 NOUVEAU : Écouter la fermeture de réservation et rediriger automatiquement
+	useReservationStatus(restaurantId, reservationId, onReservationClosed);
 
 	const [currentStyle, setCurrentStyle] = useState(
 		config?.style || PREMIUM_COLORS,
@@ -632,63 +628,11 @@ export default function Menu({
 			const legacy = legacyCategories.find((l) => l.id === catName);
 			if (legacy) return legacy;
 
-			// Mapping automatique par nom de catégorie
-			const getEmojiByCategory = (name) => {
-				const lowerName = name.toLowerCase();
-				if (lowerName.includes("entree") || lowerName.includes("entrée"))
-					return "🥗";
-				if (lowerName.includes("plat") || lowerName.includes("principal"))
-					return "🍽️";
-				if (
-					lowerName.includes("dessert") ||
-					lowerName.includes("sucré") ||
-					lowerName.includes("tiramisu")
-				)
-					return "🍰";
-				if (
-					lowerName.includes("café") ||
-					lowerName.includes("coffee") ||
-					lowerName.includes("thé") ||
-					lowerName.includes("tea")
-				)
-					return "☕";
-				if (
-					lowerName.includes("burger") ||
-					lowerName.includes("sandwich") ||
-					lowerName.includes("salé")
-				)
-					return "🍔";
-				if (lowerName.includes("pizza")) return "🍕";
-				if (lowerName.includes("salade")) return "🥗";
-				if (lowerName.includes("pâtes") || lowerName.includes("pasta"))
-					return "🍝";
-				if (lowerName.includes("mocktail") || lowerName.includes("cocktail"))
-					return "🍹";
-				if (lowerName.includes("milkshake") || lowerName.includes("one shot"))
-					return "🥛";
-				if (lowerName.includes("smoothie")) return "🥤";
-				if (
-					lowerName.includes("jus") ||
-					lowerName.includes("eaux") ||
-					lowerName.includes("soft")
-				)
-					return "🧃";
-				if (lowerName.includes("boisson") || lowerName.includes("drink"))
-					return "☕";
-				if (
-					lowerName.includes("offre") ||
-					lowerName.includes("moment") ||
-					lowerName.includes("nouveauté")
-				)
-					return "⭐";
-				return "🍽️"; // Défaut
-			};
-
-			// Sinon, créer une config avec emoji automatique
+			// Sinon, créer une config générique
 			return {
 				id: catName,
 				title: catName.charAt(0).toUpperCase() + catName.slice(1),
-				emoji: getEmojiByCategory(catName),
+				emoji: "🍽️",
 				gradient: ["#667eea", "#764ba2"],
 				icon: "restaurant",
 			};
@@ -711,52 +655,6 @@ export default function Menu({
 			: mappedProductCategories.length > 0
 				? mappedProductCategories
 				: legacyCategories;
-
-	// 🔍 DEBUG: Afficher toutes les catégories dans la console
-	console.log("🔍 DEBUG Catégories:");
-	console.log("  dynamicCategories:", dynamicCategories);
-	console.log("  mappedProductCategories:", mappedProductCategories);
-	console.log("  legacyCategories:", legacyCategories);
-	console.log("  categories FINAL:", categories);
-
-	// 🎨 ALGORITHME ADAPTATIF : Calcule le layout optimal selon le nombre de catégories
-	const getCategoriesLayout = (categoriesCount) => {
-		if (categoriesCount <= 4) {
-			// 4 catégories ou moins : affichage classique en ligne unique
-			return {
-				itemsPerRow: categoriesCount,
-				rows: 1,
-				justifyContent: "center",
-				layout: "single-row",
-			};
-		} else if (categoriesCount === 8) {
-			// 8 catégories : 4 par ligne sur 2 lignes
-			return {
-				itemsPerRow: 4,
-				rows: 2,
-				justifyContent: "space-between",
-				layout: "grid",
-			};
-		} else if (categoriesCount === 9) {
-			// 9 catégories : 3 par ligne sur 3 lignes
-			return {
-				itemsPerRow: 3,
-				rows: 3,
-				justifyContent: "center",
-				layout: "grid",
-			};
-		} else {
-			// Autres cas : grille 3 par ligne
-			return {
-				itemsPerRow: 3,
-				rows: Math.ceil(categoriesCount / 3),
-				justifyContent: "space-between",
-				layout: "grid",
-			};
-		}
-	};
-
-	const categoriesLayout = getCategoriesLayout(categories.length);
 
 	// Add a mapping function to handle category display
 	const mapCategoryDisplay = (categoryId) => {
@@ -964,27 +862,21 @@ export default function Menu({
 				onClear={() => setSearchQuery("")}
 			/>
 
-			{/* ⭐ Zone fixe pour les boutons de catégories */}
+			{/* ⭐ Barre de catégories animées style gradient-menu (masquée si recherche active) */}
 			{!searchQuery.trim() && (
-				<View style={styles.categoriesFixedZone}>
-					<ScrollView
-						horizontal
-						showsHorizontalScrollIndicator={false}
-						contentContainerStyle={styles.horizontalCategoriesContainer}
-					>
-						{categories.map((cat) => {
-							const isSelected = selectedCategory?.id === cat.id;
-							return (
-								<AnimatedCategoryButton
-									key={cat.id}
-									category={cat}
-									isSelected={isSelected}
-									otherSelected={selectedCategory && !isSelected}
-									onPress={() => setSelectedCategory(isSelected ? null : cat)}
-								/>
-							);
-						})}
-					</ScrollView>
+				<View style={styles.categoriesBar}>
+					{categories.map((cat) => {
+						const isSelected = selectedCategory?.id === cat.id;
+						return (
+							<AnimatedCategoryButton
+								key={cat.id}
+								category={cat}
+								isSelected={isSelected}
+								otherSelected={selectedCategory && !isSelected}
+								onPress={() => setSelectedCategory(isSelected ? null : cat)}
+							/>
+						);
+					})}
 				</View>
 			)}
 
@@ -1332,37 +1224,6 @@ const styles = StyleSheet.create({
 		marginBottom: 20,
 		paddingHorizontal: 5,
 	},
-	// ⭐ Layout en grille pour 8, 9 catégories
-	categoriesGrid: {
-		flexDirection: "column",
-		flexWrap: "nowrap",
-		alignItems: "center",
-		paddingHorizontal: 0,
-		gap: 6,
-	},
-	categoryRow: {
-		flexDirection: "row",
-		gap: 8,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	// ⭐ Scroll horizontal pour tous les boutons
-	horizontalCategoriesBar: {
-		marginBottom: 10,
-	},
-	// ⭐ Zone fixe pour les boutons
-	categoriesFixedZone: {
-		height: 80,
-		marginHorizontal: -20,
-		marginBottom: 10,
-		justifyContent: "center",
-	},
-	horizontalCategoriesContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 8,
-		paddingHorizontal: 5,
-	},
 	// 🎨 Bouton animé style gradient-menu
 	animatedButton: {
 		borderRadius: 30,
@@ -1397,8 +1258,6 @@ const styles = StyleSheet.create({
 		letterSpacing: 1.5,
 		textTransform: "uppercase",
 		position: "absolute",
-		textAlign: "center",
-		width: "100%",
 	},
 	// Anciens styles gardés pour compatibilité
 	categoryPillWrapper: {

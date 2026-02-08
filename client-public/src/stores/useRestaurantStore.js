@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { API_CONFIG } from "../../../shared-api/config/apiConfig.js";
+import { API_CONFIG } from "shared-api/config/apiConfig.js";
+import { useFeatureLevelStore } from "./useFeatureLevelStore.js";
 
 export const useRestaurantStore = create((set, get) => ({
 	category: null, // 'restaurant', 'foodtruck', 'snack', etc.
@@ -8,6 +9,7 @@ export const useRestaurantStore = create((set, get) => ({
 
 	/**
 	 * Récupère les infos du restaurant (category, name)
+	 * Et initialise automatiquement le Feature Level Store
 	 */
 	fetchRestaurantInfo: async (restaurantId) => {
 		try {
@@ -30,15 +32,22 @@ export const useRestaurantStore = create((set, get) => ({
 			const data = await response.json();
 			console.log("✅ [RESTAURANT] Info récupérée:", data);
 
+			const category = data.category || "restaurant";
+
 			set({
-				category: data.category || "restaurant",
+				category,
 				name: data.name,
 			});
+
+			// 🎯 Initialiser automatiquement le Feature Level Store
+			useFeatureLevelStore.getState().init(category);
 
 			return true;
 		} catch (error) {
 			console.error("❌ Erreur fetch restaurant info:", error);
 			set({ category: "restaurant", name: null }); // Fallback restaurant normal
+			// Fallback : niveau complet
+			useFeatureLevelStore.getState().init("restaurant");
 			return false;
 		}
 	},

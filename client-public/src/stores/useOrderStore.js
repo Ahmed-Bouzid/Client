@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { orderService } from "../../../shared-api/services/orderService.js";
-import { errorHandler } from "../../../shared-api/utils/errorHandler.js";
+import { orderService } from "shared-api/services/orderService.js";
+import { errorHandler } from "shared-api/utils/errorHandler.js";
 
 export const useOrderStore = create((set, get) => ({
 	currentOrder: [], // Commande en cours de construction

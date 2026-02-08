@@ -19,6 +19,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import socketService from "../services/socketService";
+import { clientAuthService } from "shared-api/services/clientAuthService";
 
 export const useSocketClient = (
 	restaurantId,
@@ -45,7 +46,21 @@ export const useSocketClient = (
 		}
 
 		console.log(`🔌 useSocketClient: Connexion au restaurant ${restaurantId}`);
-		socketService.connect(restaurantId, tableId, guestToken);
+
+		// ✅ Récupérer le token client avant de connecter
+		const connectWithToken = async () => {
+			try {
+				const token = guestToken || (await clientAuthService.getClientToken());
+				console.log(
+					`🔑 Token client pour Socket.io: ${token?.substring(0, 20)}...`,
+				);
+				socketService.connect(restaurantId, tableId, token);
+			} catch (error) {
+				console.error("❌ Erreur récupération token pour Socket.io:", error);
+			}
+		};
+
+		connectWithToken();
 
 		// Surveiller l'état de connexion
 		const checkConnection = setInterval(() => {

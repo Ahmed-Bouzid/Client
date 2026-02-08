@@ -3,8 +3,8 @@
  * Gère les messages prédéfinis et l'envoi de messages
  */
 
-import { API_CONFIG } from "../../../shared-api/config/apiConfig.js";
-import { getRestaurantId } from "../../../shared-api/utils/getRestaurantId.js";
+import { API_CONFIG } from "shared-api/config/apiConfig.js";
+import { getRestaurantId } from "../utils/getRestaurantId.js";
 
 export const messageService = {
 	/**
@@ -83,6 +83,92 @@ export const messageService = {
 			return data;
 		} catch (error) {
 			console.error("❌ Erreur envoi message:", error.message);
+			throw error;
+		}
+	},
+
+	/**
+	 * Envoie un message personnalisé (texte libre)
+	 * Créé un message prédéfini temporaire puis l'envoie
+	 * @param {Object} params - Paramètres du message
+	 * @param {string} params.messageText - Texte du message
+	 * @param {string} params.reservationId - ID de la réservation
+	 * @param {string} params.clientId - ID du client
+	 * @param {string} params.clientName - Nom du client
+	 * @returns {Promise<Object>} Résultat de l'envoi
+	 */
+	async sendCustomMessage({
+		messageText,
+		reservationId,
+		clientId,
+		clientName,
+	}) {
+		try {
+			// 🎯 Créer d'abord un message prédéfini temporaire côté backend
+			const restaurantId = await getRestaurantId();
+
+			console.log(`📤 Création message temporaire: ${messageText}`);
+
+			// Créer le message prédéfini temporaire
+			const createResponse = await fetch(
+				`${API_CONFIG.BASE_URL}/client-messages/predefined/create-temp`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						text: messageText,
+						category: "autre",
+						restaurantId,
+					}),
+				},
+			);
+
+			let predefinedMessageId;
+
+			if (createResponse.ok) {
+				const tempData = await createResponse.json();
+				predefinedMessageId = tempData.data?.messageId;
+			}
+
+			// Si échec création, utiliser un ID factice et envoyer quand même
+			if (!predefinedMessageId) {
+				console.warn("⚠️ Impossible de créer message temporaire, envoi direct");
+				// Fallback : envoyer directement sans predefinedMessageId
+				// Le backend devrait accepter au moins le messageText
+				predefinedMessageId = "temp-" + Date.now();
+			}
+
+			// Maintenant envoyer avec le predefinedMessageId
+			const url = `${API_CONFIG.BASE_URL}/client-messages/send`;
+
+			console.log(`📤 Envoi message avec ID: ${predefinedMessageId}`);
+
+			const response = await fetch(url, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					predefinedMessageId,
+					messageText, // Envoyer aussi le texte en secours
+					reservationId,
+					clientId,
+					clientName,
+				}),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.message || `Erreur ${response.status}`);
+			}
+
+			const data = await response.json();
+			console.log("✅ Message personnalisé envoyé avec succès:", messageText);
+			return data;
+		} catch (error) {
+			console.error("❌ Erreur envoi message personnalisé:", error.message);
 			throw error;
 		}
 	},

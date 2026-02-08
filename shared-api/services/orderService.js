@@ -18,10 +18,8 @@ export const orderService = {
 		origin = "client",
 	}) {
 		try {
-			// Obtenir le token client
 			const token = await clientAuthService.getClientToken();
 
-			// Utiliser la route /orders/ avec le token
 			const response = await fetch(`${API_CONFIG.BASE_URL}/orders/`, {
 				method: "POST",
 				headers: {
@@ -65,9 +63,20 @@ export const orderService = {
 	 */
 	async getActiveOrder() {
 		try {
-			const response = await fetch(`${API_CONFIG.BASE_URL}/orders/active`);
+			const token = await clientAuthService.getClientToken();
+			if (!token) {
+				return null;
+			}
+
+			const response = await fetch(`${API_CONFIG.BASE_URL}/orders/active`, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
 
 			if (!response.ok) {
+				if (response.status === 401 || response.status === 403) {
+					await clientAuthService.clearClientToken();
+					return null;
+				}
 				return null;
 			}
 
@@ -86,16 +95,66 @@ export const orderService = {
 	},
 
 	/**
+	 * Récupère toutes les commandes d'une réservation
+	 */
+	async getOrdersByReservation(reservationId) {
+		try {
+			const token = await clientAuthService.getClientToken();
+			if (!token) {
+				throw new Error("Token manquant");
+			}
+
+			const response = await fetch(
+				`${API_CONFIG.BASE_URL}/client-orders/${reservationId}`,
+				{
+					method: "GET",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${token}`,
+					},
+				},
+			);
+
+			if (!response.ok) {
+				let errorText = "Erreur lors de la récupération des commandes";
+				try {
+					const errorData = await response.json();
+					errorText = errorData.message || errorText;
+				} catch (e) {
+					// Si ce n'est pas du JSON, utiliser le message par défaut
+				}
+
+				if (response.status === 401 || response.status === 403) {
+					await clientAuthService.clearClientToken();
+					throw new Error("Session expirée. Veuillez vous reconnecter.");
+				}
+				throw new Error(errorText);
+			}
+
+			return await response.json();
+		} catch (error) {
+			console.error("❌ Erreur getOrdersByReservation:", error);
+			throw error;
+		}
+	},
+
+	/**
 	 * Marque une commande comme payée
 	 */
 	async markAsPaid(orderId) {
 		try {
+			const token = await clientAuthService.getClientToken();
+			if (!token) {
+				throw new Error("Token manquant");
+			}
+
 			const response = await fetch(
 				`${API_CONFIG.BASE_URL}/orders/${orderId}/mark-as-paid`,
 				{
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
+						Authorization: `Bearer ${token}`,
 					},
 				},
 			);
@@ -108,6 +167,11 @@ export const orderService = {
 				} catch (e) {
 					// Si ce n'est pas du JSON, utiliser le message par défaut
 				}
+
+				if (response.status === 401 || response.status === 403) {
+					await clientAuthService.clearClientToken();
+					throw new Error("Session expirée. Veuillez vous reconnecter.");
+				}
 				throw new Error(errorText);
 			}
 
@@ -115,28 +179,6 @@ export const orderService = {
 		} catch (error) {
 			console.error("❌ Erreur paiement:", error);
 			throw error;
-		}
-	},
-
-	/**
-	 * Récupère toutes les commandes d'une réservation
-	 */
-	async getOrdersByReservation(reservationId) {
-		try {
-			const response = await fetch(
-				`${API_CONFIG.BASE_URL}/client-orders/${reservationId}`,
-			);
-
-			if (!response.ok) {
-				console.warn(`⚠️ Pas de commandes pour reservation ${reservationId}`);
-				return { orders: [] };
-			}
-
-			const data = await response.json();
-			return data;
-		} catch (error) {
-			console.error("❌ Erreur récupération commandes:", error);
-			return { orders: [] };
 		}
 	},
 };

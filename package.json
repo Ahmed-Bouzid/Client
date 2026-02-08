@@ -1,5 +1,5 @@
 {
-	"name": "client-end",
+	"name": "sunnygo-client",
 	"main": "client-public/index.js",
 	"scripts": {
 		"start": "expo start",
@@ -27,5 +27,9 @@
 		"shared-api": "file:../shared-api",
 		"socket.io-client": "^4.8.3",
 		"zustand": "^5.0.8"
+	},
+	"devDependencies": {
+		"@types/react": "~19.1.10",
+		"typescript": "~5.9.2"
 	}
 }

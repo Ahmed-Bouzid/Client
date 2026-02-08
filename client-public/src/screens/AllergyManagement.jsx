@@ -32,7 +32,7 @@ export default function AllergyManagement({ onClose }) {
 		try {
 			const token = await AsyncStorage.getItem("clientToken");
 			const response = await fetch(
-				`${process.env.EXPO_PUBLIC_API_URL || "https://orderit-backend-6y1m.onrender.com"}/allergens`,
+				`${process.env.EXPO_PUBLIC_API_URL || "https://sunnygo-backend-6y1m.onrender.com"}/allergens`,
 				{
 					headers: {
 						Authorization: `Bearer ${token}`,

@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useStripe } from "@stripe/stripe-react-native";
-import stripeService from "../../../shared-api/services/stripeService";
+import stripeService from "../services/stripeService";
 import ReceiptTicket from "../components/ReceiptTicket";
 
 /**
@@ -140,7 +140,7 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 							],
 						}
 					: undefined,
-				returnURL: "orderit://payment",
+				returnURL: "sunnygo://payment",
 			});
 
 			if (error) {

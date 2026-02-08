@@ -15,12 +15,15 @@
 import { io } from "socket.io-client";
 
 // ============ CONFIGURATION ============
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:3000";
+const SOCKET_URL =
+	process.env.EXPO_PUBLIC_SOCKET_URL ||
+	process.env.EXPO_PUBLIC_API_BASE_URL ||
+	"http://localhost:3000";
 
 const SOCKET_CONFIG = {
 	transports: ["polling", "websocket"], // Polling en premier pour compatibilité HTTPS
 	reconnection: true,
-	reconnectionAttempts: Infinity,
+	reconnectionAttempts: 10, // ⭐ Limité à 10 tentatives (évite boucle infinie)
 	reconnectionDelay: 1000,
 	reconnectionDelayMax: 30000,
 	timeout: 20000,
@@ -195,6 +198,39 @@ const joinRooms = (socket, restaurantId, tableId) => {
 };
 
 /**
+ * Rejoindre une room de réservation (pour recevoir les mises à jour de messages)
+ */
+export const joinReservation = (reservationId) => {
+	if (!socketInstance || !socketInstance.connected) {
+		console.warn(
+			"⚠️ Impossible de joindre la room reservation: socket non connecté",
+		);
+		return;
+	}
+
+	console.log(`🔌 Rejoindre room: reservation-${reservationId}`);
+
+	socketInstance.emit("join-reservation", { reservationId }, (ack) => {
+		if (ack?.success) {
+			console.log(`✅ Rejoint room reservation-${reservationId}`);
+		} else {
+			console.error(`❌ Échec join reservation-${reservationId}:`, ack?.error);
+		}
+	});
+};
+
+/**
+ * Quitter une room de réservation
+ */
+export const leaveReservation = (reservationId) => {
+	if (!socketInstance) return;
+
+	console.log(`🔌 Quitter room: reservation-${reservationId}`);
+
+	socketInstance.emit("leave-reservation", { reservationId });
+};
+
+/**
  * Quitter les rooms actuelles
  */
 const leaveRooms = (socket) => {
@@ -275,12 +311,38 @@ export const connectSocket = (
 	});
 
 	socket.on("connect_error", (error) => {
-		console.error("❌ Erreur connexion Socket:", error.message);
+		const errorMsg = error?.message || error?.toString() || "unknown";
+		console.error("❌ Erreur connexion Socket:", errorMsg);
 		isConnected = false;
+
+		// ⭐ Vérifier si c'est une erreur d'authentification
+		// Dans ce cas, arrêter complètement la reconnexion
+		if (
+			errorMsg.toLowerCase().includes("token invalide") ||
+			errorMsg.toLowerCase().includes("unauthorized") ||
+			errorMsg.toLowerCase().includes("authentification") ||
+			errorMsg.toLowerCase().includes("invalid token")
+		) {
+			console.error("🔐 Erreur d'authentification Socket → Arrêt complet");
+			// Déconnecter proprement pour éviter la boucle infinie
+			stopHeartbeat();
+			socket.disconnect();
+			socketInstance = null;
+			eventListeners.clear();
+			eventQueue = [];
+			retryQueue = [];
+		}
 	});
 
 	socket.on("reconnect_attempt", (attemptNumber) => {
 		console.log(`🔄 Tentative de reconnexion #${attemptNumber}`);
+	});
+
+	// ⭐ Arrêter après échec définitif
+	socket.on("reconnect_failed", () => {
+		console.error("❌ Reconnexion échouée définitivement → Arrêt du socket");
+		stopHeartbeat();
+		isConnected = false;
 	});
 
 	// ============ ÉVÉNEMENTS MÉTIER ============
@@ -319,6 +381,18 @@ export const connectSocket = (
 	socket.on("server_message", (payload) => {
 		console.log("💬 Message du serveur reçu");
 		notifyListeners("server_message", payload);
+	});
+
+	// 📨 Réponse du serveur (messagerie client-serveur)
+	socket.on("server-response", (payload) => {
+		console.log("📨 Réponse serveur reçue:", payload.type);
+		notifyListeners("server-response", payload);
+	});
+
+	// ✅ Statut de message (lu/non lu) pour messagerie client-serveur
+	socket.on("message-status", (payload) => {
+		console.log("✅ [socketService] Événement message-status reçu:", payload);
+		notifyListeners("message-status", payload);
 	});
 
 	// 🔔 Notification générique
@@ -453,4 +527,6 @@ export default {
 	isConnected: isSocketConnected,
 	getRestaurantId: getCurrentRestaurantId,
 	getTableId: getCurrentTableId,
+	joinReservation,
+	leaveReservation,
 };

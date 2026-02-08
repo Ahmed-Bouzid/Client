@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 	View,
 	Text,
@@ -9,6 +9,7 @@ import {
 	Alert,
 	Modal,
 	ScrollView,
+	Animated,
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -16,6 +17,94 @@ import { useAllergyStore } from "../stores/useAllergyStore";
 import { useRestrictionStore } from "../stores/useRestrictionStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PREMIUM_COLORS } from "../theme/colors";
+
+// 🎯 Allergènes par défaut (fallback si API échoue)
+const DEFAULT_ALLERGENS = [
+	{
+		_id: "default-allergen-1",
+		name: "Gluten",
+		icon: "🌾",
+		description: "Blé, seigle, orge, avoine",
+	},
+	{
+		_id: "default-allergen-2",
+		name: "Crustacés",
+		icon: "🦞",
+		description: "Crevettes, crabes, homards",
+	},
+	{
+		_id: "default-allergen-3",
+		name: "Œufs",
+		icon: "🥚",
+		description: "Tous types d'œufs",
+	},
+	{
+		_id: "default-allergen-4",
+		name: "Poissons",
+		icon: "🐟",
+		description: "Tous types de poissons",
+	},
+	{
+		_id: "default-allergen-5",
+		name: "Arachides",
+		icon: "🥜",
+		description: "Cacahuètes",
+	},
+	{
+		_id: "default-allergen-6",
+		name: "Soja",
+		icon: "🫘",
+		description: "Soja et dérivés",
+	},
+	{
+		_id: "default-allergen-7",
+		name: "Lait",
+		icon: "🥛",
+		description: "Lactose et produits laitiers",
+	},
+	{
+		_id: "default-allergen-8",
+		name: "Fruits à coque",
+		icon: "🌰",
+		description: "Amandes, noisettes, noix, etc.",
+	},
+	{
+		_id: "default-allergen-9",
+		name: "Céleri",
+		icon: "🥬",
+		description: "Céleri et dérivés",
+	},
+	{
+		_id: "default-allergen-10",
+		name: "Moutarde",
+		icon: "🌭",
+		description: "Graines de moutarde",
+	},
+	{
+		_id: "default-allergen-11",
+		name: "Sésame",
+		icon: "🫙",
+		description: "Graines de sésame",
+	},
+	{
+		_id: "default-allergen-12",
+		name: "Sulfites",
+		icon: "🍷",
+		description: "Conservateurs sulfités",
+	},
+	{
+		_id: "default-allergen-13",
+		name: "Lupin",
+		icon: "🌸",
+		description: "Graines de lupin",
+	},
+	{
+		_id: "default-allergen-14",
+		name: "Mollusques",
+		icon: "🦪",
+		description: "Huîtres, moules, escargots",
+	},
+];
 
 const RESTRICTIONS_OPTIONS = [
 	{
@@ -61,10 +150,23 @@ export default function DietaryPreferences({ visible, onClose }) {
 	const [allergens, setAllergens] = useState([]);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [loading, setLoading] = useState(true);
+	const fadeAnim = useRef(new Animated.Value(0)).current; // 🎯 Fade in/out
 
+	// Animation d'apparition/disparition
 	useEffect(() => {
 		if (visible) {
 			loadAllergens();
+			Animated.timing(fadeAnim, {
+				toValue: 1,
+				duration: 300,
+				useNativeDriver: true,
+			}).start();
+		} else {
+			Animated.timing(fadeAnim, {
+				toValue: 0,
+				duration: 200,
+				useNativeDriver: true,
+			}).start();
 		}
 	}, [visible]);
 
@@ -73,10 +175,11 @@ export default function DietaryPreferences({ visible, onClose }) {
 		try {
 			const token = await AsyncStorage.getItem("clientToken");
 			const response = await fetch(
-				`${process.env.EXPO_PUBLIC_API_URL || "https://orderit-backend-6y1m.onrender.com"}/allergens`,
+				`${process.env.EXPO_PUBLIC_API_URL || "https://sunnygo-backend-6y1m.onrender.com"}/allergens`,
 				{
 					headers: {
-						Authorization: `Bearer ${token}`,
+						...(token && { Authorization: `Bearer ${token}` }),
+						"Content-Type": "application/json",
 					},
 				},
 			);
@@ -86,11 +189,20 @@ export default function DietaryPreferences({ visible, onClose }) {
 				setAllergens(Array.isArray(data) ? data : []);
 				setAllergensCache(Array.isArray(data) ? data : []);
 			} else {
-				throw new Error("Erreur chargement allergènes");
+				console.warn(
+					"⚠️ API allergènes indisponible, utilisation des données par défaut",
+				);
+				setAllergens(DEFAULT_ALLERGENS);
+				setAllergensCache(DEFAULT_ALLERGENS);
 			}
 		} catch (error) {
-			console.error("❌ Erreur chargement allergènes:", error);
-			// Alert.alert("Erreur", "Impossible de charger les allergènes");
+			console.warn(
+				"⚠️ Erreur chargement allergènes (silencieuse):",
+				error.message,
+			);
+			// Mode silencieux : utiliser les allergènes par défaut
+			setAllergens(DEFAULT_ALLERGENS);
+			setAllergensCache(DEFAULT_ALLERGENS);
 		} finally {
 			setLoading(false);
 		}
@@ -271,188 +383,219 @@ export default function DietaryPreferences({ visible, onClose }) {
 	return (
 		<Modal
 			visible={visible}
-			animationType="slide"
-			transparent={false}
+			transparent
+			animationType="none"
 			onRequestClose={onClose}
 		>
-			<View style={{ flex: 1, backgroundColor: "#f8f9fa" }}>
-				{/* Header */}
-				<LinearGradient
-					colors={["#ff9800", "#ff6f00"]}
-					start={{ x: 0, y: 0 }}
-					end={{ x: 1, y: 0 }}
+			<View
+				style={{
+					flex: 1,
+					backgroundColor: "rgba(0,0,0,0.5)",
+					justifyContent: "flex-start",
+				}}
+			>
+				{/* Backdrop cliquable */}
+				<TouchableOpacity
+					style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+					activeOpacity={1}
+					onPress={onClose}
+				/>
+
+				{/* Container animé */}
+				<Animated.View
 					style={{
-						paddingTop: 50,
-						paddingBottom: 16,
-						paddingHorizontal: 20,
-						flexDirection: "row",
-						alignItems: "center",
-						justifyContent: "space-between",
+						height: "50%",
+						backgroundColor: "#f8f9fa",
+						borderBottomLeftRadius: 24,
+						borderBottomRightRadius: 24,
+						shadowColor: "#000",
+						shadowOffset: { width: 0, height: 4 },
+						shadowOpacity: 0.2,
+						shadowRadius: 12,
+						elevation: 10,
+						opacity: fadeAnim,
 					}}
 				>
-					<Text
+					{/* Header */}
+					<LinearGradient
+						colors={["#ff9800", "#ff6f00"]}
+						start={{ x: 0, y: 0 }}
+						end={{ x: 1, y: 0 }}
 						style={{
-							fontSize: 24,
-							fontWeight: "bold",
-							color: "#fff",
-							flex: 1,
-						}}
-					>
-						Préférences alimentaires
-					</Text>
-					<TouchableOpacity
-						onPress={onClose}
-						style={{
-							width: 40,
-							height: 40,
-							borderRadius: 20,
-							backgroundColor: "rgba(255,255,255,0.2)",
+							paddingTop: 50,
+							paddingBottom: 16,
+							paddingHorizontal: 20,
+							flexDirection: "row",
 							alignItems: "center",
-							justifyContent: "center",
+							justifyContent: "space-between",
 						}}
-					>
-						<Ionicons name="close" size={24} color="#fff" />
-					</TouchableOpacity>
-				</LinearGradient>
-
-				{/* Tabs */}
-				<View
-					style={{
-						flexDirection: "row",
-						paddingHorizontal: 16,
-						paddingVertical: 16,
-						backgroundColor: "#fff",
-						borderBottomWidth: 1,
-						borderBottomColor: "#eee",
-					}}
-				>
-					<TouchableOpacity
-						style={{
-							flex: 1,
-							paddingVertical: 12,
-							borderBottomWidth: 3,
-							borderBottomColor:
-								activeTab === "allergies" ? "#ff512f" : "transparent",
-						}}
-						onPress={() => setActiveTab("allergies")}
 					>
 						<Text
 							style={{
-								textAlign: "center",
-								fontSize: 16,
-								fontWeight: activeTab === "allergies" ? "bold" : "500",
-								color: activeTab === "allergies" ? "#ff512f" : "#666",
+								fontSize: 24,
+								fontWeight: "bold",
+								color: "#fff",
+								flex: 1,
 							}}
 						>
-							⚠️ Allergies
+							Préférences alimentaires
 						</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						style={{
-							flex: 1,
-							paddingVertical: 12,
-							borderBottomWidth: 3,
-							borderBottomColor:
-								activeTab === "restrictions" ? "#ff9800" : "transparent",
-						}}
-						onPress={() => setActiveTab("restrictions")}
-					>
-						<Text
+						<TouchableOpacity
+							onPress={onClose}
 							style={{
-								textAlign: "center",
-								fontSize: 16,
-								fontWeight: activeTab === "restrictions" ? "bold" : "500",
-								color: activeTab === "restrictions" ? "#ff9800" : "#666",
+								width: 40,
+								height: 40,
+								borderRadius: 20,
+								backgroundColor: "rgba(255,255,255,0.2)",
+								alignItems: "center",
+								justifyContent: "center",
 							}}
 						>
-							🍴 Restrictions
-						</Text>
-					</TouchableOpacity>
-				</View>
+							<Ionicons name="close" size={24} color="#fff" />
+						</TouchableOpacity>
+					</LinearGradient>
 
-				{/* Content */}
-				{activeTab === "allergies" ? (
-					<View style={{ flex: 1 }}>
-						{/* Search bar */}
-						<View
+					{/* Tabs */}
+					<View
+						style={{
+							flexDirection: "row",
+							paddingHorizontal: 16,
+							paddingVertical: 16,
+							backgroundColor: "#fff",
+							borderBottomWidth: 1,
+							borderBottomColor: "#eee",
+						}}
+					>
+						<TouchableOpacity
 							style={{
-								paddingHorizontal: 16,
+								flex: 1,
 								paddingVertical: 12,
-								backgroundColor: "#fff",
-								borderBottomWidth: 1,
-								borderBottomColor: "#eee",
+								borderBottomWidth: 3,
+								borderBottomColor:
+									activeTab === "allergies" ? "#ff512f" : "transparent",
 							}}
+							onPress={() => setActiveTab("allergies")}
 						>
-							<View
+							<Text
 								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									backgroundColor: "#f5f5f5",
-									borderRadius: 12,
-									paddingHorizontal: 12,
+									textAlign: "center",
+									fontSize: 16,
+									fontWeight: activeTab === "allergies" ? "bold" : "500",
+									color: activeTab === "allergies" ? "#ff512f" : "#666",
 								}}
 							>
-								<Ionicons name="search" size={20} color="#999" />
-								<TextInput
+								⚠️ Allergies
+							</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={{
+								flex: 1,
+								paddingVertical: 12,
+								borderBottomWidth: 3,
+								borderBottomColor:
+									activeTab === "restrictions" ? "#ff9800" : "transparent",
+							}}
+							onPress={() => setActiveTab("restrictions")}
+						>
+							<Text
+								style={{
+									textAlign: "center",
+									fontSize: 16,
+									fontWeight: activeTab === "restrictions" ? "bold" : "500",
+									color: activeTab === "restrictions" ? "#ff9800" : "#666",
+								}}
+							>
+								🍴 Restrictions
+							</Text>
+						</TouchableOpacity>
+					</View>
+
+					{/* Content */}
+					{activeTab === "allergies" ? (
+						<View style={{ flex: 1 }}>
+							{/* Search bar */}
+							<View
+								style={{
+									paddingHorizontal: 16,
+									paddingVertical: 12,
+									backgroundColor: "#fff",
+									borderBottomWidth: 1,
+									borderBottomColor: "#eee",
+								}}
+							>
+								<View
+									style={{
+										flexDirection: "row",
+										alignItems: "center",
+										backgroundColor: "#f5f5f5",
+										borderRadius: 12,
+										paddingHorizontal: 12,
+									}}
+								>
+									<Ionicons name="search" size={20} color="#999" />
+									<TextInput
+										style={{
+											flex: 1,
+											padding: 12,
+											fontSize: 16,
+											color: "#333",
+										}}
+										placeholder="Rechercher un allergène..."
+										value={searchQuery}
+										onChangeText={setSearchQuery}
+										placeholderTextColor="#999"
+									/>
+									{searchQuery.length > 0 && (
+										<TouchableOpacity onPress={() => setSearchQuery("")}>
+											<Ionicons name="close-circle" size={20} color="#999" />
+										</TouchableOpacity>
+									)}
+								</View>
+							</View>
+
+							{/* List */}
+							{loading ? (
+								<View
 									style={{
 										flex: 1,
-										padding: 12,
-										fontSize: 16,
-										color: "#333",
+										justifyContent: "center",
+										alignItems: "center",
 									}}
-									placeholder="Rechercher un allergène..."
-									value={searchQuery}
-									onChangeText={setSearchQuery}
-									placeholderTextColor="#999"
+								>
+									<ActivityIndicator size="large" color="#ff512f" />
+								</View>
+							) : (
+								<FlatList
+									data={filteredAllergens}
+									renderItem={renderAllergenItem}
+									keyExtractor={(item) => item._id}
+									contentContainerStyle={{ paddingVertical: 8 }}
+									ListEmptyComponent={
+										<View
+											style={{
+												padding: 32,
+												alignItems: "center",
+											}}
+										>
+											<Text style={{ fontSize: 16, color: "#999" }}>
+												Aucun allergène trouvé
+											</Text>
+										</View>
+									}
 								/>
-								{searchQuery.length > 0 && (
-									<TouchableOpacity onPress={() => setSearchQuery("")}>
-										<Ionicons name="close-circle" size={20} color="#999" />
-									</TouchableOpacity>
-								)}
-							</View>
+							)}
 						</View>
-
-						{/* List */}
-						{loading ? (
-							<View
-								style={{
-									flex: 1,
-									justifyContent: "center",
-									alignItems: "center",
-								}}
-							>
-								<ActivityIndicator size="large" color="#ff512f" />
-							</View>
-						) : (
+					) : (
+						<View style={{ flex: 1 }}>
 							<FlatList
-								data={filteredAllergens}
-								renderItem={renderAllergenItem}
-								keyExtractor={(item) => item._id}
+								data={RESTRICTIONS_OPTIONS}
+								renderItem={renderRestrictionItem}
+								keyExtractor={(item) => item.id}
 								contentContainerStyle={{ paddingVertical: 8 }}
-								ListEmptyComponent={
-									<View
-										style={{
-											padding: 32,
-											alignItems: "center",
-										}}
-									>
-										<Text style={{ fontSize: 16, color: "#999" }}>
-											Aucun allergène trouvé
-										</Text>
-									</View>
-								}
 							/>
-						)}
-					</View>
-				) : (
-					<FlatList
-						data={RESTRICTIONS_OPTIONS}
-						renderItem={renderRestrictionItem}
-						keyExtractor={(item) => item.id}
-						contentContainerStyle={{ paddingVertical: 8 }}
-					/>
-				)}
+						</View>
+					)}
+				</Animated.View>
 			</View>
 		</Modal>
 	);

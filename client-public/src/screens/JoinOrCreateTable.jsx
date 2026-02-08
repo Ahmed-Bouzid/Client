@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { API_BASE_URL } from "../config/api";
+import { API_CONFIG } from "shared-api/config/apiConfig.js";
 import {
 	View,
 	Text,
@@ -8,7 +8,6 @@ import {
 	StyleSheet,
 	KeyboardAvoidingView,
 	Platform,
-	FlatList,
 	Alert,
 	Animated,
 	Dimensions,
@@ -19,9 +18,10 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
-import { clientAuthService } from "../../../shared-api/services/clientAuthService.js";
+import { clientAuthService } from "shared-api/services/clientAuthService.js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useClientTableStore } from "../stores/useClientTableStore.js";
+import { useRestaurantStore } from "../stores/useRestaurantStore.js";
 import RNUUID from "react-native-uuid";
 
 const { width, height } = Dimensions.get("window");
@@ -43,6 +43,7 @@ export default function JoinOrCreateTable({
 	const [tableAvailable, setTableAvailable] = useState(null);
 	const [orders, setOrders] = useState([]);
 	const [reservationIdState, setReservationIdState] = useState(null);
+	const [hasJoinedTable, setHasJoinedTable] = useState(false); // ⭐ Nouveau state
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -57,6 +58,7 @@ export default function JoinOrCreateTable({
 	]).current;
 
 	const { restaurantId } = useClientTableStore();
+	const restaurantName = useRestaurantStore((state) => state.name);
 
 	// 🎬 Entrance animations
 	useEffect(() => {
@@ -127,7 +129,7 @@ export default function JoinOrCreateTable({
 		async function fetchTableInfo() {
 			if (!tableId) return;
 			try {
-				const urlGuests = `${API_BASE_URL}/client-tables/${tableId}/guests`;
+				const urlGuests = `${API_CONFIG.BASE_URL}/client-tables/${tableId}/guests`;
 				console.log("[FETCH] Guests URL:", urlGuests);
 				const resGuests = await fetch(urlGuests);
 				console.log("[FETCH] Guests status:", resGuests.status);
@@ -178,7 +180,7 @@ export default function JoinOrCreateTable({
 			if (reservationId) {
 				try {
 					const res = await fetch(
-						`${API_BASE_URL}/client-orders/${reservationId}`,
+						`${API_CONFIG.BASE_URL}/client-orders/${reservationId}`,
 					);
 					if (res.ok) {
 						const data = await res.json();
@@ -255,7 +257,7 @@ export default function JoinOrCreateTable({
 			};
 
 			const response = await fetch(
-				`${API_BASE_URL}/reservations/client/reservations`,
+				`${API_CONFIG.BASE_URL}/reservations/client/reservations`,
 				{
 					method: "POST",
 					headers: {
@@ -331,6 +333,9 @@ export default function JoinOrCreateTable({
 			await AsyncStorage.setItem("currentClientName", name.trim());
 			await AsyncStorage.setItem("currentClientId", clientId);
 			// Note: pseudo et tableId déjà stockés avant getClientToken
+
+			// ⭐ Marquer que l'utilisateur a rejoint dans cette session
+			setHasJoinedTable(true);
 
 			onJoin?.(name.trim(), reservationId, tableId, tableNumber, clientId);
 
@@ -429,7 +434,22 @@ export default function JoinOrCreateTable({
 						</Animated.View>
 
 						{/* 📝 Welcome Title */}
-						<Text style={styles.title}>Bienvenue !</Text>
+						<Text style={styles.title}>
+							Bienvenue
+							{restaurantName
+								? ` ${
+										restaurantName.toLowerCase().startsWith("chez ") ||
+										restaurantName.toLowerCase().startsWith("au ") ||
+										restaurantName.toLowerCase().startsWith("à la ") ||
+										restaurantName.toLowerCase().startsWith("le ") ||
+										restaurantName.toLowerCase().startsWith("la ") ||
+										restaurantName.toLowerCase().startsWith("les ")
+											? restaurantName
+											: `chez ${restaurantName}`
+									}`
+								: ""}{" "}
+							!
+						</Text>
 
 						{/* Situation 1 : Table ouverte (isAvailable true) - Vous êtes le créateur */}
 						{tableAvailable === true && (
@@ -547,41 +567,6 @@ export default function JoinOrCreateTable({
 								</LinearGradient>
 							</View>
 						) : null}
-
-						{/* � Payment Button (si commandes existent) */}
-						{orders.length > 0 && reservationIdState && (
-							<Animated.View
-								style={{
-									transform: [{ scale: buttonScale }],
-									marginBottom: 16,
-								}}
-							>
-								<TouchableOpacity
-									onPress={() =>
-										onJoin?.(
-											name.trim() || "Client",
-											reservationIdState,
-											tableId,
-											displayTableNumber,
-											null,
-										)
-									}
-									activeOpacity={0.9}
-								>
-									<LinearGradient
-										colors={["#667eea", "#764ba2"]}
-										style={styles.joinButton}
-										start={{ x: 0, y: 0 }}
-										end={{ x: 1, y: 0 }}
-									>
-										<MaterialIcons name="payment" size={24} color="#fff" />
-										<Text style={styles.joinButtonText}>
-											Payer mes commandes ({orders.length})
-										</Text>
-									</LinearGradient>
-								</TouchableOpacity>
-							</Animated.View>
-						)}
 
 						{/* �🚀 Premium Join Button */}
 						<Animated.View style={{ transform: [{ scale: buttonScale }] }}>

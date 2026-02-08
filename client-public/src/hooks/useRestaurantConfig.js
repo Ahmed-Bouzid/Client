@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { API_CONFIG } from "../../../shared-api/config/apiConfig.js";
+import { API_CONFIG } from "shared-api/config/apiConfig.js";
 
 /**
  * Hook pour charger la configuration dynamique d'un restaurant (style + menu)

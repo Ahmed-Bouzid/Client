@@ -342,6 +342,7 @@ export default function App() {
 						userName={userName}
 						onSuccess={handlePaymentSuccess}
 						onBack={() => setStep("menu")}
+						onReservationClosed={() => setStep("join")}
 					/>
 				)}
 
