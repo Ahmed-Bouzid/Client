@@ -74,8 +74,14 @@ export const useOrderStore = create((set, get) => ({
 	 */
 	submitOrder: async (orderData) => {
 		// ⭐ CHANGE : accepter orderData complet
-		const { tableId, restaurantId, reservationId, clientId, clientName } =
-			orderData;
+		const {
+			tableId,
+			restaurantId,
+			reservationId,
+			clientId,
+			clientName,
+			clientPhone,
+		} = orderData;
 
 		const state = get();
 
@@ -114,6 +120,7 @@ export const useOrderStore = create((set, get) => ({
 				reservationId, // ⭐ ENVOYÉ
 				clientId, // ⭐ ENVOYÉ
 				clientName, // ⭐ ENVOYÉ
+				clientPhone, // 📱 ENVOYÉ
 				status: "in_progress",
 				origin: "client",
 			});
@@ -176,8 +183,10 @@ export const useOrderStore = create((set, get) => ({
 
 	/**
 	 * Récupère toutes les commandes d'une réservation depuis l'API
+	 * @param {string} reservationId - ID de la réservation
+	 * @param {string} [clientId] - ID du client (pour foodtruck multi-user)
 	 */
-	fetchOrdersByReservation: async (reservationId) => {
+	fetchOrdersByReservation: async (reservationId, clientId = null) => {
 		if (!reservationId) {
 			console.warn("⚠️ fetchOrdersByReservation: reservationId manquant");
 			return [];
@@ -185,29 +194,45 @@ export const useOrderStore = create((set, get) => ({
 
 		set({ isLoading: true });
 		try {
-			console.log(`🔍 Appel API /client-orders/${reservationId}...`);
-			const data = await orderService.getOrdersByReservation(reservationId);
-			const orders = data.orders || [];
-
 			console.log(
-				`✅ Commandes chargées pour reservation ${reservationId}:`,
-				orders.length,
-				"commandes",
+				"\n🌐🌐🌐 ========== USEORDERSTORE - FETCH API ========== 🌐🌐🌐",
 			);
-			console.log("📊 Détail des commandes:", JSON.stringify(orders, null, 2));
+			console.log(`🔍 Appel API /client-orders/${reservationId}...`);
+			if (clientId) {
+				console.log(`🔑 Avec clientId: ${clientId} (filtrage foodtruck)`);
+			}
+			const data = await orderService.getOrdersByReservation(
+				reservationId,
+				clientId,
+			);
+			console.log("🔥 Réponse brute API:", JSON.stringify(data, null, 2));
+
+			const orders = data.orders || [];
+			console.log(`📊 Nombre de commandes retournées: ${orders.length}`);
+
+			// Analyser chaque commande
+			orders.forEach((order, idx) => {
+				console.log(`\n📦 COMMANDE ${idx + 1}:`, {
+					_id: order._id,
+					reservationId: order.reservationId,
+					clientName: order.clientName,
+					items: order.items?.length || 0,
+					paid: order.paid,
+					totalAmount: order.totalAmount,
+					createdAt: order.createdAt,
+				});
+			});
 
 			// ⭐ APLATIR les items de toutes les commandes en un seul tableau
 			// Payment.jsx s'attend à un tableau d'items, pas un tableau d'orders
 			const allItems = [];
 			orders.forEach((order, orderIndex) => {
-				console.log(`📦 Commande ${orderIndex + 1}:`, {
-					_id: order._id,
-					items: order.items?.length || 0,
-					paid: order.paid,
-					totalAmount: order.totalAmount,
-				});
+				console.log(
+					`\n🔍 Traitement commande ${orderIndex + 1} (ID: ${order._id}):`,
+				);
 
 				if (order.items && Array.isArray(order.items)) {
+					console.log(`  └─ ${order.items.length} items trouvés`);
 					order.items.forEach((item, itemIndex) => {
 						const enrichedItem = {
 							...item,
@@ -216,28 +241,34 @@ export const useOrderStore = create((set, get) => ({
 							orderPaid: order.paid,
 							totalAmount: order.totalAmount,
 						};
-						console.log(`   Item ${itemIndex + 1}:`, {
-							name: item.name,
-							quantity: item.quantity,
-							price: item.price,
-							productId: item.productId,
-						});
+						console.log(
+							`     ${itemIndex + 1}. ${item.name} x${item.quantity} - ${item.price}€`,
+						);
 						allItems.push(enrichedItem);
 					});
 				} else {
-					console.warn(`⚠️ Commande ${orderIndex + 1} n'a pas d'items`);
+					console.warn(`  ⚠️ AUCUN ITEM dans cette commande`);
 				}
 			});
 
-			console.log(`✅ Items extraits:`, allItems.length, "items au total");
+			console.log(`\n✅ RÉSULTAT FINAL: ${allItems.length} items au total`);
+			console.log("📋 DÉTAIL COMPLET des items aplatis:");
+			allItems.forEach((item, idx) => {
+				console.log(`  ${idx + 1}. ${item.name} (orderId: ${item.orderId})`);
+				console.log(`     - Quantité: ${item.quantity}`);
+				console.log(`     - Prix: ${item.price}€`);
+				console.log(
+					`     - Total item: ${(item.price * item.quantity).toFixed(2)}€`,
+				);
+			});
+
+			const totalGlobal = allItems.reduce(
+				(sum, i) => sum + i.price * i.quantity,
+				0,
+			);
+			console.log(`\n💰 TOTAL GLOBAL: ${totalGlobal.toFixed(2)}€`);
 			console.log(
-				"📋 Liste des items:",
-				allItems.map((i) => ({
-					name: i.name,
-					quantity: i.quantity,
-					price: i.price,
-					_id: i._id || i.productId,
-				})),
+				"🌐🌐🌐 ================================================= 🌐🌐🌐\n",
 			);
 
 			// Mettre à jour allOrders avec les items aplatis

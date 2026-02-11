@@ -14,6 +14,7 @@ export const orderService = {
 		reservationId, // ⭐ AJOUTER
 		clientId, // ⭐ AJOUTER
 		clientName, // ⭐ AJOUTER
+		clientPhone = null, // 📱 AJOUTER
 		status = "in_progress",
 		origin = "client",
 	}) {
@@ -34,6 +35,7 @@ export const orderService = {
 					reservationId, // ⭐ UTILISER LE PARAMÈTRE
 					clientId, // ⭐ UTILISER LE PARAMÈTRE
 					clientName, // ⭐ UTILISER LE PARAMÈTRE
+					clientPhone, // 📱 UTILISER LE PARAMÈTRE
 					serverId: null,
 					status: status,
 					origin: origin,
@@ -96,24 +98,28 @@ export const orderService = {
 
 	/**
 	 * Récupère toutes les commandes d'une réservation
+	 * @param {string} reservationId - ID de la réservation
+	 * @param {string} [clientId] - ID du client (pour foodtruck multi-user)
 	 */
-	async getOrdersByReservation(reservationId) {
+	async getOrdersByReservation(reservationId, clientId = null) {
 		try {
 			const token = await clientAuthService.getClientToken();
 			if (!token) {
 				throw new Error("Token manquant");
 			}
 
-			const response = await fetch(
-				`${API_CONFIG.BASE_URL}/client-orders/${reservationId}`,
-				{
-					method: "GET",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${token}`,
-					},
+			// ⭐ Ajouter clientId en query param si fourni (foodtruck)
+			const url = clientId
+				? `${API_CONFIG.BASE_URL}/client-orders/${reservationId}?clientId=${clientId}`
+				: `${API_CONFIG.BASE_URL}/client-orders/${reservationId}`;
+
+			const response = await fetch(url, {
+				method: "GET",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
 				},
-			);
+			});
 
 			if (!response.ok) {
 				let errorText = "Erreur lors de la récupération des commandes";

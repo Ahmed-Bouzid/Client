@@ -14,6 +14,7 @@ import { useOrderStore } from "./src/stores/useOrderStore";
 import { useCartStore } from "./src/stores/useCartStore";
 import { useAllergyStore } from "./src/stores/useAllergyStore";
 import { useRestrictionStore } from "./src/stores/useRestrictionStore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function App() {
 	const [step, setStep] = useState("join"); // join, menu, addOn, orders, payment
@@ -164,6 +165,9 @@ export default function App() {
 		}
 
 		try {
+			// 📱 Récupérer le téléphone depuis AsyncStorage
+			const clientPhone = await AsyncStorage.getItem("clientPhone");
+
 			// Préparer les données COMPLÈTES
 			const orderData = {
 				tableId: tableId || DEFAULT_TABLE_ID,
@@ -171,6 +175,7 @@ export default function App() {
 				reservationId: reservationId, // ⭐ DÉJÀ PRÉSENT
 				clientId: clientId, // ⭐ AJOUTER
 				clientName: userName, // ⭐ AJOUTER (userName vient du store)
+				clientPhone: clientPhone || null, // 📱 AJOUTER LE TÉLÉPHONE
 				items: currentOrder.map((item) => ({
 					productId: item._id,
 					name: item.name,
@@ -247,10 +252,37 @@ export default function App() {
 		try {
 			// ⭐ CHARGER LES COMMANDES DEPUIS L'API AVANT DE NAVIGUER
 			console.log(
+				"\n🚀🚀🚀 ========== APP.JSX - NAVIGATION PAYMENT ========== 🚀🚀🚀",
+			);
+			console.log("📋 Données session:", {
+				reservationId,
+				tableId,
+				tableNumber,
+				userName,
+				clientId,
+			});
+			console.log(
 				"🔍 Chargement des commandes pour reservation:",
 				reservationId,
 			);
-			await useOrderStore.getState().fetchOrdersByReservation(reservationId);
+			console.log("🔑 Avec clientId:", clientId, "(filtrage foodtruck)");
+			await useOrderStore
+				.getState()
+				.fetchOrdersByReservation(reservationId, clientId);
+
+			// Vérifier ce qui a été chargé
+			const loadedOrders = useOrderStore.getState().allOrders;
+			console.log(
+				"✅ Commandes chargées depuis store:",
+				loadedOrders?.length || 0,
+			);
+			console.log(
+				"📦 Détail allOrders avant passage à Payment:",
+				JSON.stringify(loadedOrders, null, 2),
+			);
+			console.log(
+				"🚀🚀🚀 ===================================================== 🚀🚀🚀\n",
+			);
 
 			// Passer à l'écran de paiement
 			setStep("payment");
@@ -263,11 +295,46 @@ export default function App() {
 	};
 
 	// Handler après paiement réussi
-	const handlePaymentSuccess = () => {
+	const handlePaymentSuccess = async () => {
 		// Le paiement a déjà été effectué dans Payment.js
+		// Nettoyer complètement la session
+		try {
+			// Nettoyer AsyncStorage (garder clientId qui est un UUID permanent)
+			await AsyncStorage.multiRemove([
+				"currentReservationId",
+				"currentTableId",
+				"currentTableNumber",
+				"currentClientName",
+				"currentClientId",
+				"currentClientPhone",
+				"pseudo",
+				"tableId",
+				"restaurantId",
+				"clientPhone",
+			]);
 
-		// On redirige simplement vers le menu
-		setStep("join");
+			// Reset les stores
+			await useClientTableStore.getState().reset?.();
+			resetOrder();
+			useCartStore.getState().clearCart?.();
+			useAllergyStore.getState().clearAllergies?.();
+			useRestrictionStore.getState().clearRestrictions?.();
+
+			// Reset les states locaux
+			setReservationId(null);
+			setTableNumber(null);
+			setUserName("");
+			setClientId(null);
+
+			// On redirige vers join (écran de départ)
+			setStep("join");
+
+			console.log("✅ Session nettoyée après paiement réussi");
+		} catch (error) {
+			console.error("❌ Erreur nettoyage session:", error);
+			// Même en cas d'erreur, on redirige
+			setStep("join");
+		}
 	};
 
 	return (
