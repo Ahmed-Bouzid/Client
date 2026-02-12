@@ -34,8 +34,6 @@ import { useStyleUpdates } from "../hooks/useSocketClient.js"; // ⭐ NOUVEAU : 
 import { useReservationStatus } from "../hooks/useReservationStatus.js"; // 🚪 Écoute fermeture réservation
 import { useFeatureLevel } from "../stores/useFeatureLevelStore.js"; // 🎯 Feature Levels
 import { useRestaurantStore } from "../stores/useRestaurantStore"; // 🏪 Store restaurant
-import { GRILLZ_THEME } from "../theme/colors"; // 🔥 Thème Grillz
-import { useCustomHeaderRestaurant, getRestaurantTheme } from "../utils/restaurantHelpers"; // 🔒 Helpers isolation
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -62,7 +60,7 @@ const GrillzHeader = ({
 	restaurantName,
 	onOpenDietary,
 	showDietaryFeature = true,
-	theme = GRILLZ_THEME,
+	theme,
 	styleConfig = {},
 }) => {
 	return (
@@ -620,7 +618,7 @@ export default function Menu({
 	// � ARCHITECTURE 100% JSON-DRIVEN : Lecture des flags depuis config.style
 	const restaurantName = useRestaurantStore((state) => state.name) || "";
 	const useCustomHeader = config?.style?.useCustomHeader || false;
-	
+
 	// 🎨 Thème dynamique selon le restaurant (fallback si pas de config)
 	const baseTheme = config?.style || PREMIUM_COLORS;
 

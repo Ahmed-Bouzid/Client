@@ -92,9 +92,10 @@ export default function JoinOrCreateTable({
 
 	// 🚀 ARCHITECTURE 100% JSON-DRIVEN : Lecture des flags depuis config.style
 	const useCustomBackground = config?.style?.useCustomBackground || false;
-	const backgroundImage = useCustomBackground && config?.style?.backgroundImage
-		? CUSTOM_BACKGROUNDS[config.style.backgroundImage] || null
-		: null;
+	const backgroundImage =
+		useCustomBackground && config?.style?.backgroundImage
+			? CUSTOM_BACKGROUNDS[config.style.backgroundImage] || null
+			: null;
 
 	// 🎨 Thème dynamique selon le restaurant (fallback si pas de config)
 	const theme = config?.style || PREMIUM_COLORS;
@@ -652,10 +653,14 @@ export default function JoinOrCreateTable({
 									>
 										<LinearGradient
 											colors={
-												useCustomBackground ? [theme.orange, theme.rouge] : theme.primary
+												useCustomBackground
+													? [theme.orange, theme.rouge]
+													: theme.primary
 											}
 											style={
-												useCustomBackground ? styles.grillzInputIcon : styles.inputIcon
+												useCustomBackground
+													? styles.grillzInputIcon
+													: styles.inputIcon
 											}
 											start={{ x: 0, y: 0 }}
 											end={{ x: 1, y: 1 }}
@@ -676,7 +681,9 @@ export default function JoinOrCreateTable({
 										<MaterialIcons
 											name="expand-more"
 											size={24}
-											color={useCustomBackground ? theme.orange : theme.primary[0]}
+											color={
+												useCustomBackground ? theme.orange : theme.primary[0]
+											}
 										/>
 									</TouchableOpacity>
 								</BlurView>
@@ -684,16 +691,24 @@ export default function JoinOrCreateTable({
 						)}
 
 					{/* 📋 Formulaire avec inputs stylisés (conditionnel) */}
-					<View style={useCustomBackground ? styles.grillzFormCard : styles.formCard}>
+					<View
+						style={
+							useCustomBackground ? styles.grillzFormCard : styles.formCard
+						}
+					>
 						<BlurView
 							intensity={30}
 							tint="light"
-							style={useCustomBackground ? styles.grillzFormBlur : styles.formBlur}
+							style={
+								useCustomBackground ? styles.grillzFormBlur : styles.formBlur
+							}
 						>
 							{/* Input Nom */}
 							<Animated.View
 								style={[
-									useCustomBackground ? styles.grillzInputWrapper : styles.inputWrapper,
+									useCustomBackground
+										? styles.grillzInputWrapper
+										: styles.inputWrapper,
 									{
 										opacity: inputAnimations[0],
 										transform: [
@@ -716,16 +731,24 @@ export default function JoinOrCreateTable({
 								>
 									<LinearGradient
 										colors={
-											useCustomBackground ? [theme.orange, theme.rouge] : theme.primary
+											useCustomBackground
+												? [theme.orange, theme.rouge]
+												: theme.primary
 										}
-										style={useCustomBackground ? styles.grillzInputIcon : styles.inputIcon}
+										style={
+											useCustomBackground
+												? styles.grillzInputIcon
+												: styles.inputIcon
+										}
 										start={{ x: 0, y: 0 }}
 										end={{ x: 1, y: 1 }}
 									>
 										<MaterialIcons name="person" size={22} color="#fff" />
 									</LinearGradient>
 									<TextInput
-										style={useCustomBackground ? styles.grillzInput : styles.input}
+										style={
+											useCustomBackground ? styles.grillzInput : styles.input
+										}
 										placeholder="Votre nom ou prénom"
 										value={name}
 										onChangeText={setName}
@@ -742,7 +765,9 @@ export default function JoinOrCreateTable({
 							{isFoodtruck && (
 								<Animated.View
 									style={[
-										useCustomBackground ? styles.grillzInputWrapper : styles.inputWrapper,
+										useCustomBackground
+											? styles.grillzInputWrapper
+											: styles.inputWrapper,
 										{
 											opacity: inputAnimations[1],
 											transform: [
@@ -765,10 +790,14 @@ export default function JoinOrCreateTable({
 									>
 										<LinearGradient
 											colors={
-												useCustomBackground ? [theme.orange, theme.rouge] : theme.primary
+												useCustomBackground
+													? [theme.orange, theme.rouge]
+													: theme.primary
 											}
 											style={
-												useCustomBackground ? styles.grillzInputIcon : styles.inputIcon
+												useCustomBackground
+													? styles.grillzInputIcon
+													: styles.inputIcon
 											}
 											start={{ x: 0, y: 0 }}
 											end={{ x: 1, y: 1 }}
@@ -776,7 +805,9 @@ export default function JoinOrCreateTable({
 											<MaterialIcons name="phone" size={22} color="#fff" />
 										</LinearGradient>
 										<TextInput
-											style={useCustomBackground ? styles.grillzInput : styles.input}
+											style={
+												useCustomBackground ? styles.grillzInput : styles.input
+											}
 											placeholder="Votre numéro de téléphone"
 											value={phone}
 											onChangeText={setPhone}
@@ -796,22 +827,32 @@ export default function JoinOrCreateTable({
 					{error ? (
 						<View
 							style={
-								useCustomBackground ? styles.grillzErrorContainer : styles.errorContainer
+								useCustomBackground
+									? styles.grillzErrorContainer
+									: styles.errorContainer
 							}
 						>
 							<LinearGradient
 								colors={
-									useCustomBackground ? [theme.rouge, "#8B0000"] : ["#ff6b6b", "#ee5a5a"]
+									useCustomBackground
+										? [theme.rouge, "#8B0000"]
+										: ["#ff6b6b", "#ee5a5a"]
 								}
 								style={
-									useCustomBackground ? styles.grillzErrorGradient : styles.errorGradient
+									useCustomBackground
+										? styles.grillzErrorGradient
+										: styles.errorGradient
 								}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 0 }}
 							>
 								<MaterialIcons name="warning" size={22} color="#fff" />
 								<Text
-									style={useCustomBackground ? styles.grillzErrorText : styles.errorText}
+									style={
+										useCustomBackground
+											? styles.grillzErrorText
+											: styles.errorText
+									}
 								>
 									{error}
 								</Text>
@@ -834,39 +875,39 @@ export default function JoinOrCreateTable({
 								colors={
 									!name.trim() || loading || (isFoodtruck && !phone.trim())
 										? ["#ccc", "#999"]
-									: useCustomBackground
-										? [theme.dore, theme.orange]
-										: theme.success
-							}
-							style={styles.joinButton}
-							start={{ x: 0, y: 0 }}
-							end={{ x: 1, y: 0 }}
-						>
-							{loading ? (
-								<View style={styles.loadingContainer}>
-									<Animated.View style={styles.loadingSpinner}>
-										<MaterialIcons name="refresh" size={24} color="#fff" />
-									</Animated.View>
-									<Text style={styles.joinButtonText}>Connexion...</Text>
-								</View>
-							) : (
-							<>
-								<MaterialIcons
-									name={tableId ? "login" : "add-circle"}
-									size={24}
-									color="#fff"
-								/>
+										: useCustomBackground
+											? [theme.dore, theme.orange]
+											: theme.success
+								}
+								style={styles.joinButton}
+								start={{ x: 0, y: 0 }}
+								end={{ x: 1, y: 0 }}
+							>
+								{loading ? (
+									<View style={styles.loadingContainer}>
+										<Animated.View style={styles.loadingSpinner}>
+											<MaterialIcons name="refresh" size={24} color="#fff" />
+										</Animated.View>
+										<Text style={styles.joinButtonText}>Connexion...</Text>
+									</View>
+								) : (
+									<>
+										<MaterialIcons
+											name={tableId ? "login" : "add-circle"}
+											size={24}
+											color="#fff"
+										/>
 
-								<Text style={styles.joinButtonText}>
-									{tableId
-										? !isFoodtruck
-											? "Commencer votre commande"
-											: "Rejoindre la table"
-										: "Créer une table"}
-								</Text>
-							</>
-					)}
-				</LinearGradient>
+										<Text style={styles.joinButtonText}>
+											{tableId
+												? !isFoodtruck
+													? "Commencer votre commande"
+													: "Rejoindre la table"
+												: "Créer une table"}
+										</Text>
+									</>
+								)}
+							</LinearGradient>
 						</TouchableOpacity>
 					</Animated.View>
 				</Animated.View>
@@ -997,7 +1038,7 @@ const styles = StyleSheet.create({
 		borderRadius: 55,
 		justifyContent: "center",
 		alignItems: "center",
-		shadowColor: GRILLZ_THEME.rouge,
+		shadowColor: "#BF360C",
 		shadowOffset: { width: 0, height: 10 },
 		shadowOpacity: 0.6,
 		shadowRadius: 20,
@@ -1006,7 +1047,7 @@ const styles = StyleSheet.create({
 		position: "absolute",
 		bottom: -8,
 		right: -8,
-		backgroundColor: GRILLZ_THEME.dore,
+		backgroundColor: "#FF8C00",
 		width: 45,
 		height: 45,
 		borderRadius: 22.5,
@@ -1064,7 +1105,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 20,
 		paddingVertical: 8,
 		borderRadius: 25,
-		shadowColor: GRILLZ_THEME.orange,
+		shadowColor: "#FF6F00",
 		shadowOffset: { width: 0, height: 4 },
 		shadowOpacity: 0.4,
 		shadowRadius: 8,
@@ -1101,7 +1142,7 @@ const styles = StyleSheet.create({
 		textShadowRadius: 3,
 	},
 	grillzTableHighlight: {
-		color: GRILLZ_THEME.dore,
+		color: "#FF8C00",
 		fontWeight: "bold",
 		fontSize: 22,
 		textShadowColor: "rgba(0, 0, 0, 0.6)",
@@ -1205,7 +1246,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 45,
 		borderRadius: 18,
 		gap: 15,
-		shadowColor: GRILLZ_THEME.rouge,
+		shadowColor: "#BF360C",
 		shadowOffset: { width: 0, height: 10 },
 		shadowOpacity: 0.4,
 		shadowRadius: 20,
@@ -1509,7 +1550,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	creatorBadge: {
-		color: GRILLZ_THEME.orange,
+		color: "#FF6F00",
 		fontWeight: "bold",
 		fontSize: 14,
 		marginLeft: 10,
