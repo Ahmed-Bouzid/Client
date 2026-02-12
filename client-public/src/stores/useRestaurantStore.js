@@ -6,6 +6,8 @@ export const useRestaurantStore = create((set, get) => ({
 	category: null, // 'restaurant', 'foodtruck', 'snack', etc.
 	id: null,
 	name: null,
+	googlePlaceId: null,
+	googleUrl: null,
 
 	/**
 	 * Récupère les infos du restaurant (category, name)
@@ -37,14 +39,8 @@ export const useRestaurantStore = create((set, get) => ({
 			set({
 				category,
 				name: data.name,
-			});
-
-			// 🎯 Initialiser automatiquement le Feature Level Store
-			useFeatureLevelStore.getState().init(category);
-
-			return true;
-		} catch (error) {
-			console.error("❌ Erreur fetch restaurant info:", error);
+			googlePlaceId: data.googlePlaceId || null,
+			googleUrl: data.googleUrl || null,
 			set({ category: "restaurant", name: null }); // Fallback restaurant normal
 			// Fallback : niveau complet
 			useFeatureLevelStore.getState().init("restaurant");
@@ -69,6 +65,6 @@ export const useRestaurantStore = create((set, get) => ({
 	 * Reset le store
 	 */
 	reset: () => {
-		set({ category: null, name: null });
+		set({ category: null, name: null, googlePlaceId: null, googleUrl: null });
 	},
 }));
