@@ -18,7 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
-import { PREMIUM_COLORS } from "../theme/colors";
+import GRILLZ_COLORS, { GRILLZ_PREMIUM } from "../theme/grillzColors"; // 🔥 Design Grillz personnalisé
 import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 API Service
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -135,20 +135,142 @@ export default function FeedbackScreen({
 		setIsSubmitting(true);
 
 		try {
+			// 🛠️ Helper pour valider un ObjectId MongoDB (24 caractères hexadécimaux)
+			const isValidObjectId = (id) => {
+				if (!id || typeof id !== "string") return false;
+				return /^[a-f\d]{24}$/i.test(id);
+			};
+
+			// 🛠️ Construction du payload avec filtrage des champs optionnels invalides
+			const restaurantId = restaurantData.id || restaurantData._id;
+			const tableId = customerData.tableId;
+			const reservationId = customerData.reservationId;
+			const clientId = customerData.clientId;
+
 			const feedbackData = {
-				restaurantId: restaurantData.id || restaurantData._id,
-				tableId: customerData.tableId,
-				reservationId: customerData.reservationId,
-				clientId: customerData.clientId,
-				clientName: customerData.clientName,
+				restaurantId,
 				serviceRating: answers.serviceRating,
 				foodQuality: answers.foodQuality,
 				venueExperience: answers.venueExperience,
 				comment: comment.trim(),
-				redirectedToGoogle: false, // Sera mis à jour si redirection
+				redirectedToGoogle: false,
 			};
 
+			// ✅ Ajouter tableId UNIQUEMENT s'il est un ObjectId valide
+			if (isValidObjectId(tableId)) {
+				feedbackData.tableId = tableId;
+			}
+
+			// ✅ Ajouter reservationId UNIQUEMENT s'il est un ObjectId valide
+			if (isValidObjectId(reservationId)) {
+				feedbackData.reservationId = reservationId;
+			}
+
+			// ✅ Ajouter clientId (String, pas ObjectId) s'il existe
+			if (clientId && typeof clientId === "string" && clientId.length > 0) {
+				feedbackData.clientId = clientId;
+			}
+
+			// ✅ Ajouter clientName s'il existe
+			if (
+				customerData.clientName &&
+				typeof customerData.clientName === "string" &&
+				customerData.clientName.trim().length > 0
+			) {
+				feedbackData.clientName = customerData.clientName.trim();
+			}
+
+			console.log("📝 [FEEDBACK-SCREEN] Props reçues:");
+			console.log("  - restaurantData:", restaurantData);
+			console.log("  - customerData:", customerData);
 			console.log("📝 [FEEDBACK-SCREEN] Soumission feedback:", feedbackData);
+			console.log("📝 [FEEDBACK-SCREEN] Types des données:");
+			console.log(
+				"  - restaurantId:",
+				typeof feedbackData.restaurantId,
+				"=",
+				feedbackData.restaurantId,
+			);
+			console.log(
+				"  - serviceRating:",
+				typeof feedbackData.serviceRating,
+				"=",
+				feedbackData.serviceRating,
+			);
+			console.log(
+				"  - foodQuality:",
+				typeof feedbackData.foodQuality,
+				"=",
+				feedbackData.foodQuality,
+			);
+			console.log(
+				"  - venueExperience:",
+				typeof feedbackData.venueExperience,
+				"=",
+				feedbackData.venueExperience,
+			);
+			if (feedbackData.tableId) {
+				console.log(
+					"  - tableId:",
+					typeof feedbackData.tableId,
+					"=",
+					feedbackData.tableId,
+				);
+			}
+			if (feedbackData.clientId) {
+				console.log(
+					"  - clientId:",
+					typeof feedbackData.clientId,
+					"=",
+					feedbackData.clientId,
+				);
+			}
+			if (feedbackData.clientName) {
+				console.log(
+					"  - clientName:",
+					typeof feedbackData.clientName,
+					"=",
+					feedbackData.clientName,
+				);
+			}
+			if (feedbackData.reservationId) {
+				console.log(
+					"  - reservationId:",
+					typeof feedbackData.reservationId,
+					"=",
+					feedbackData.reservationId,
+				);
+			}
+
+			// 🚨 Validation côté client pour éviter les erreurs de validation serveur
+			const validationErrors = [];
+			if (!isValidObjectId(restaurantId)) {
+				validationErrors.push("restaurantId manquant ou invalide");
+			}
+			if (typeof feedbackData.serviceRating !== "boolean") {
+				validationErrors.push("serviceRating doit être un booléen");
+			}
+			if (typeof feedbackData.foodQuality !== "boolean") {
+				validationErrors.push("foodQuality doit être un booléen");
+			}
+			if (typeof feedbackData.venueExperience !== "boolean") {
+				validationErrors.push("venueExperience doit être un booléen");
+			}
+
+			if (validationErrors.length > 0) {
+				console.error(
+					"❌ [FEEDBACK-SCREEN] Erreurs de validation côté client:",
+					validationErrors,
+				);
+				Alert.alert(
+					"Erreur",
+					"Données invalides détectées côté client: " +
+						validationErrors.join(", "),
+					[{ text: "OK", onPress: () => setCurrentStep("success") }], // Continuer vers Google quand même
+				);
+				setIsSubmitting(false);
+				return;
+			}
 
 			// 🌐 Appel API pour sauvegarder le feedback
 			const response = await clientFeedbackService.submitFeedback(feedbackData);
@@ -342,7 +464,7 @@ export default function FeedbackScreen({
 					<LinearGradient
 						colors={
 							Object.values(answers).every((a) => a !== null)
-								? PREMIUM_COLORS.orange
+								? GRILLZ_PREMIUM.primary
 								: ["#666", "#555"]
 						}
 						style={styles.nextButtonGradient}
@@ -408,7 +530,7 @@ export default function FeedbackScreen({
 						disabled={isSubmitting}
 					>
 						<LinearGradient
-							colors={PREMIUM_COLORS.orange}
+							colors={GRILLZ_PREMIUM.primary}
 							style={styles.submitButtonGradient}
 						>
 							{isSubmitting ? (
@@ -445,7 +567,7 @@ export default function FeedbackScreen({
 			<View style={styles.successContainer}>
 				<LinearGradient
 					colors={
-						fulllySatisfied ? PREMIUM_COLORS.success : PREMIUM_COLORS.orange
+						fulllySatisfied ? GRILLZ_PREMIUM.success : GRILLZ_PREMIUM.primary
 					}
 					style={styles.successIcon}
 				>
@@ -534,7 +656,7 @@ export default function FeedbackScreen({
 					]}
 				>
 					<LinearGradient
-						colors={PREMIUM_COLORS.dark}
+						colors={GRILLZ_PREMIUM.dark}
 						style={styles.modalContent}
 					>
 						{/* Header avec bouton fermer */}
