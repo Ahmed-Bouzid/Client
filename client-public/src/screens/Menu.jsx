@@ -631,8 +631,8 @@ export default function Menu({
 				"🎨 [Menu] Nouveau style reçu via WebSocket:",
 				liveStyle.style_id,
 			);
-			// 🚀 Appliquer le style depuis WebSocket (liveStyle.config contient déjà les couleurs)
-			setCurrentStyle(liveStyle.config);
+			// 🚀 Appliquer le style depuis WebSocket (merger avec PREMIUM_COLORS pour fallback)
+			setCurrentStyle({ ...PREMIUM_COLORS, ...liveStyle.config });
 
 			// Optionnel : Afficher une notification à l'utilisateur
 			Alert.alert(
@@ -646,7 +646,8 @@ export default function Menu({
 	// Mettre à jour le style quand la config initiale est chargée
 	useEffect(() => {
 		if (config?.style) {
-			setCurrentStyle(config.style);
+			// Merger avec PREMIUM_COLORS pour garantir toutes les propriétés
+			setCurrentStyle({ ...PREMIUM_COLORS, ...config.style });
 		}
 	}, [config]);
 
