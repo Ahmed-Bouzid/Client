@@ -42,8 +42,11 @@ const PREMIUM_COLORS = {
 	dore: "#FFD700",
 };
 
-// 🔥 Image de fond custom (utilisée uniquement si useCustomBackground = true)
-const GRILLZ_BG_IMAGE = require("../../../assets/grillz-flyer.jpg");
+// 🎨 Mapping statique des images de fond custom (Metro ne supporte pas require() dynamique)
+const CUSTOM_BACKGROUNDS = {
+	"grillz-flyer.jpg": require("../../../assets/grillz-flyer.jpg"),
+	// Ajouter ici d'autres images custom au fur et à mesure
+};
 
 export default function JoinOrCreateTable({
 	tableId = null,
@@ -90,7 +93,7 @@ export default function JoinOrCreateTable({
 	// 🚀 ARCHITECTURE 100% JSON-DRIVEN : Lecture des flags depuis config.style
 	const useCustomBackground = config?.style?.useCustomBackground || false;
 	const backgroundImage = useCustomBackground && config?.style?.backgroundImage
-		? require(`../../../assets/${config.style.backgroundImage}`)
+		? CUSTOM_BACKGROUNDS[config.style.backgroundImage] || null
 		: null;
 
 	// 🎨 Thème dynamique selon le restaurant (fallback si pas de config)
