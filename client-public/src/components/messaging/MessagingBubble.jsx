@@ -110,7 +110,12 @@ const DEFAULT_PREDEFINED_MESSAGES = [
 const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 	// WebSocket
 	const [restaurantId, setRestaurantId] = useState(null);
-	const { isConnected, on, off } = useSocketClient(restaurantId);
+
+	// ✅ Ne pas connecter si restaurantId est invalide
+	const shouldConnect = restaurantId && typeof restaurantId === "string";
+	const { isConnected, on, off } = useSocketClient(
+		shouldConnect ? restaurantId : null,
+	);
 
 	// États
 	const [isVisible, setIsVisible] = useState(false);
@@ -202,7 +207,8 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 
 	// WebSocket - Rejoindre room + attacher listeners (ordre critique!)
 	useEffect(() => {
-		if (!isConnected || !reservationId || !restaurantId) return;
+		if (!shouldConnect || !isConnected || !reservationId || !restaurantId)
+			return;
 
 		// 1️⃣ ATTACHER LES LISTENERS D'ABORD
 		on("server-response", handleServerResponse);
@@ -226,7 +232,7 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 			off("message-status", handleMessageStatus);
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [isConnected, reservationId, restaurantId]);
+	}, [shouldConnect, isConnected, reservationId, restaurantId]);
 
 	// Charger conversation existante
 	useEffect(() => {
@@ -675,7 +681,7 @@ const styles = StyleSheet.create({
 	// Bulle flottante
 	bubbleContainer: {
 		position: "absolute",
-		bottom: 100,
+		bottom: 0,
 		right: 20,
 		zIndex: 1000,
 	},

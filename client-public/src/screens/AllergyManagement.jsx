@@ -14,8 +14,15 @@ import { useAllergyStore } from "../stores/useAllergyStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { PREMIUM_COLORS } from "../theme/colors";
+import useRestaurantConfig from "../hooks/useRestaurantConfig";
+import { useRestaurantStore } from "../stores/useRestaurantStore";
 
 export default function AllergyManagement({ onClose }) {
+	// 🎨 Thème dynamique depuis la BDD, fallback PREMIUM_COLORS
+	const restaurantId = useRestaurantStore((state) => state.id);
+	const { config } = useRestaurantConfig(restaurantId);
+	const theme = config?.style ? { ...PREMIUM_COLORS, ...config.style } : PREMIUM_COLORS;
+
 	const { userAllergenIds, toggleAllergen, allergensCache, setAllergensCache } =
 		useAllergyStore();
 
@@ -37,7 +44,7 @@ export default function AllergyManagement({ onClose }) {
 					headers: {
 						Authorization: `Bearer ${token}`,
 					},
-				}
+				},
 			);
 
 			if (response.ok) {
@@ -56,7 +63,7 @@ export default function AllergyManagement({ onClose }) {
 	};
 
 	const filteredAllergens = allergens.filter((a) =>
-		a.name.toLowerCase().includes(searchQuery.toLowerCase())
+		a.name.toLowerCase().includes(searchQuery.toLowerCase()),
 	);
 
 	const renderAllergenItem = ({ item }) => {
@@ -147,7 +154,7 @@ export default function AllergyManagement({ onClose }) {
 		<View style={{ flex: 1, backgroundColor: "#f8f9fa", height: "100%" }}>
 			{/* Header */}
 			<LinearGradient
-				colors={PREMIUM_COLORS.primary}
+				colors={theme.primary}
 				style={{
 					paddingTop: 60,
 					paddingBottom: 20,
@@ -323,12 +330,12 @@ export default function AllergyManagement({ onClose }) {
 							Alert.alert(
 								"Sauvegardé",
 								"Vos allergies sont automatiquement sauvegardées",
-								[{ text: "OK" }]
+								[{ text: "OK" }],
 							);
 						}}
 					>
 						<LinearGradient
-							colors={PREMIUM_COLORS.success}
+							colors={theme.success}
 							style={{
 								padding: 16,
 								borderRadius: 12,

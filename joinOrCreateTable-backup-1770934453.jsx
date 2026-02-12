@@ -26,6 +26,11 @@ import { useClientTableStore } from "../stores/useClientTableStore.js";
 import { useRestaurantStore } from "../stores/useRestaurantStore.js";
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
 import RNUUID from "react-native-uuid";
+import { GRILLZ_THEME } from "../theme/colors";
+import {
+	isGrillzRestaurant,
+	getRestaurantTheme,
+} from "../utils/restaurantHelpers"; // 🔒 Helpers isolation
 
 const { width, height } = Dimensions.get("window");
 
@@ -42,7 +47,7 @@ const PREMIUM_COLORS = {
 	dore: "#FFD700",
 };
 
-// 🔥 Image de fond custom (utilisée uniquement si useCustomBackground = true)
+// 🔥 Image de fond GRILLZ (utilisée uniquement pour Le Grillz)
 const GRILLZ_BG_IMAGE = require("../../../assets/grillz-flyer.jpg");
 
 export default function JoinOrCreateTable({
@@ -51,7 +56,7 @@ export default function JoinOrCreateTable({
 	onJoin = () => {},
 }) {
 	const [name, setName] = useState("");
-	const [phone, setPhone] = useState("");
+	const [phone, setPhone] = useState(""); // 📱 Nouveau champ téléphone //isGrillz
 	const [error, setError] = useState("");
 	const [participants, setParticipants] = useState([]);
 	const [showGuestsDropdown, setShowGuestsDropdown] = useState(false);
@@ -87,14 +92,14 @@ export default function JoinOrCreateTable({
 	// 🎨 Config dynamique du restaurant (style depuis la BDD)
 	const { config, loading: configLoading } = useRestaurantConfig(restaurantId);
 
-	// 🚀 ARCHITECTURE 100% JSON-DRIVEN : Lecture des flags depuis config.style
-	const useCustomBackground = config?.style?.useCustomBackground || false;
-	const backgroundImage = useCustomBackground && config?.style?.backgroundImage
-		? require(`../../../assets/${config.style.backgroundImage}`)
+	// 🚀 ARCHITECTURE 100% JSON-DRIVEN : Lecture des flags depuis config
+	const useCustomBackground = config?.useCustomBackground || false;
+	const backgroundImage = useCustomBackground && config?.backgroundImage
+		? require(`../../../assets/${config.backgroundImage}`)
 		: null;
 
 	// 🎨 Thème dynamique selon le restaurant (fallback si pas de config)
-	const theme = config?.style || PREMIUM_COLORS;
+	const theme = config || PREMIUM_COLORS;
 
 	// �🎬 Entrance animations
 	useEffect(() => {
@@ -862,8 +867,8 @@ export default function JoinOrCreateTable({
 										: "Créer une table"}
 								</Text>
 							</>
-					)}
-				</LinearGradient>
+							</LinearGradient>
+ttttt)
 						</TouchableOpacity>
 					</Animated.View>
 				</Animated.View>

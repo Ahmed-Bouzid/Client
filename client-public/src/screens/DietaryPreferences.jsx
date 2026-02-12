@@ -16,7 +16,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useAllergyStore } from "../stores/useAllergyStore";
 import { useRestrictionStore } from "../stores/useRestrictionStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { PREMIUM_COLORS } from "../theme/colors";
 
 // 🎯 Allergènes par défaut (fallback si API échoue)
 const DEFAULT_ALLERGENS = [

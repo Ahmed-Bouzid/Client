@@ -12,25 +12,14 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
+import { PREMIUM_COLORS } from "../theme/colors";
+import useRestaurantConfig from "../hooks/useRestaurantConfig";
+import { useRestaurantStore } from "../stores/useRestaurantStore";
 
 const { width } = Dimensions.get("window");
 
-// 🎨 Premium Design System
-const PREMIUM_COLORS = {
-	primary: ["#667eea", "#764ba2"],
-	secondary: ["#f093fb", "#f5576c"],
-	accent: ["#4facfe", "#00f2fe"],
-	success: ["#11998e", "#38ef7d"],
-	warning: ["#f2994a", "#f2c94c"],
-	dark: ["#0f0c29", "#302b63", "#24243e"],
-	glass: "rgba(255, 255, 255, 0.15)",
-	glassBorder: "rgba(255, 255, 255, 0.25)",
-	text: "#ffffff",
-	textMuted: "rgba(255, 255, 255, 0.7)",
-};
-
 // 🎴 Premium Order Card Component
-const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity }) => {
+const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity, theme = PREMIUM_COLORS }) => {
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(30)).current;
 	const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -95,7 +84,7 @@ const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity }) => {
 					<View style={styles.productInfo}>
 						<LinearGradient
 							colors={
-								isSent ? PREMIUM_COLORS.secondary : PREMIUM_COLORS.primary
+								isSent ? theme.secondary : theme.primary
 							}
 							style={styles.productIconBg}
 							start={{ x: 0, y: 0 }}
@@ -125,7 +114,7 @@ const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity }) => {
 					{isSent ? (
 						<View style={styles.sentBadge}>
 							<LinearGradient
-								colors={PREMIUM_COLORS.success}
+								colors={theme.success}
 								style={styles.sentBadgeGradient}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 0 }}
@@ -146,7 +135,7 @@ const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity }) => {
 								onPressOut={handlePressOut}
 							>
 								<LinearGradient
-									colors={PREMIUM_COLORS.secondary}
+									colors={theme.secondary}
 									style={styles.quantityBtnGradient}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 1 }}
@@ -168,7 +157,7 @@ const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity }) => {
 								onPressOut={handlePressOut}
 							>
 								<LinearGradient
-									colors={PREMIUM_COLORS.success}
+									colors={theme.success}
 									style={styles.quantityBtnGradient}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 1 }}
@@ -191,12 +180,17 @@ const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity }) => {
 };
 
 const OrderSummary = ({
-	allOrders = [], // ← VALEUR PAR DÉFAUT
-	currentOrder = [], // ← VALEUR PAR DÉFAUT
+	allOrders = [],
+	currentOrder = [],
 	onUpdateQuantity = () => {},
 	onSubmitOrder = () => {},
 	onBackToMenu = () => {},
 }) => {
+	// 🎨 Thème dynamique depuis la BDD, fallback PREMIUM_COLORS
+	const restaurantId = useRestaurantStore((state) => state.id);
+	const { config } = useRestaurantConfig(restaurantId);
+	const theme = config?.style ? { ...PREMIUM_COLORS, ...config.style } : PREMIUM_COLORS;
+
 	// Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(30)).current;
@@ -250,7 +244,7 @@ const OrderSummary = ({
 
 	return (
 		<LinearGradient
-			colors={PREMIUM_COLORS.dark}
+			colors={theme.background || [theme.dark, theme.card]}
 			style={styles.container}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 1 }}
@@ -258,11 +252,11 @@ const OrderSummary = ({
 			{/* Background decorations */}
 			<View style={styles.bgDecor}>
 				<LinearGradient
-					colors={[...PREMIUM_COLORS.primary, "transparent"]}
+					colors={[...theme.primary, "transparent"]}
 					style={[styles.bgCircle, styles.bgCircle1]}
 				/>
 				<LinearGradient
-					colors={[...PREMIUM_COLORS.accent, "transparent"]}
+					colors={[...theme.accent, "transparent"]}
 					style={[styles.bgCircle, styles.bgCircle2]}
 				/>
 			</View>
@@ -283,7 +277,7 @@ const OrderSummary = ({
 				>
 					{/* Header Icon */}
 					<LinearGradient
-						colors={PREMIUM_COLORS.accent}
+						colors={theme.accent}
 						style={styles.headerIcon}
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 1 }}
@@ -300,7 +294,7 @@ const OrderSummary = ({
 					<View style={styles.section}>
 						<View style={styles.sectionHeader}>
 							<LinearGradient
-								colors={PREMIUM_COLORS.secondary}
+								colors={theme.secondary}
 								style={styles.sectionIconBg}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
@@ -319,6 +313,7 @@ const OrderSummary = ({
 								item={item}
 								index={index}
 								isSent={true}
+								theme={theme}
 							/>
 						))}
 
@@ -343,7 +338,7 @@ const OrderSummary = ({
 					<View style={styles.section}>
 						<View style={styles.sectionHeader}>
 							<LinearGradient
-								colors={PREMIUM_COLORS.success}
+								colors={theme.success}
 								style={styles.sectionIconBg}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
@@ -365,6 +360,7 @@ const OrderSummary = ({
 								index={index}
 								isSent={false}
 								onUpdateQuantity={onUpdateQuantity}
+								theme={theme}
 							/>
 						))}
 
@@ -389,7 +385,7 @@ const OrderSummary = ({
 				{/* 💰 Grand Total */}
 				<View style={styles.grandTotalContainer}>
 					<LinearGradient
-						colors={PREMIUM_COLORS.primary}
+						colors={theme.primary}
 						style={styles.grandTotalGradient}
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 0 }}
@@ -419,7 +415,7 @@ const OrderSummary = ({
 							activeOpacity={0.9}
 						>
 							<LinearGradient
-								colors={PREMIUM_COLORS.success}
+								colors={theme.success}
 								style={styles.actionButton}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 0 }}
@@ -437,7 +433,7 @@ const OrderSummary = ({
 						activeOpacity={0.9}
 					>
 						<LinearGradient
-							colors={PREMIUM_COLORS.accent}
+							colors={theme.accent}
 							style={styles.actionButton}
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 0 }}

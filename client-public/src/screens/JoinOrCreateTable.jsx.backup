@@ -24,26 +24,16 @@ import { clientAuthService } from "shared-api/services/clientAuthService.js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useClientTableStore } from "../stores/useClientTableStore.js";
 import { useRestaurantStore } from "../stores/useRestaurantStore.js";
-import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
 import RNUUID from "react-native-uuid";
+import { PREMIUM_COLORS } from "../theme/colors";
 
 const { width, height } = Dimensions.get("window");
 
-// 🎨 Thème général pour les restaurants standards
-const PREMIUM_COLORS = {
-	primary: ["#667eea", "#764ba2"],
-	secondary: ["#f093fb", "#f5576c"],
-	accent: ["#4facfe", "#00f2fe"],
-	success: ["#11998e", "#38ef7d"],
-	warning: ["#f2994a", "#f2c94c"],
-	dark: ["#0f0c29", "#302b63", "#24243e"],
-	orange: "#FF6B35", // Pour compatibilité
-	rouge: "#D53027",
-	dore: "#FFD700",
-};
+// 🎨 Thème Grillz
+import { GRILLZ_THEME } from "../theme/colors";
 
-// 🔥 Image de fond custom (utilisée uniquement si useCustomBackground = true)
-const GRILLZ_BG_IMAGE = require("../../../assets/grillz-flyer.jpg");
+// 🔥 Image de fond du flyer Grillz
+const GRILLZ_BG_IMAGE = require("../../../assets/grillz-flyer.jpg"); // À ajouter
 
 export default function JoinOrCreateTable({
 	tableId = null,
@@ -51,7 +41,7 @@ export default function JoinOrCreateTable({
 	onJoin = () => {},
 }) {
 	const [name, setName] = useState("");
-	const [phone, setPhone] = useState("");
+	const [phone, setPhone] = useState(""); // 📱 Nouveau champ téléphone
 	const [error, setError] = useState("");
 	const [participants, setParticipants] = useState([]);
 	const [showGuestsDropdown, setShowGuestsDropdown] = useState(false);
@@ -84,19 +74,7 @@ export default function JoinOrCreateTable({
 	);
 	const isFoodtruck = category === "foodtruck";
 
-	// 🎨 Config dynamique du restaurant (style depuis la BDD)
-	const { config, loading: configLoading } = useRestaurantConfig(restaurantId);
-
-	// 🚀 ARCHITECTURE 100% JSON-DRIVEN : Lecture des flags depuis config.style
-	const useCustomBackground = config?.style?.useCustomBackground || false;
-	const backgroundImage = useCustomBackground && config?.style?.backgroundImage
-		? require(`../../../assets/${config.style.backgroundImage}`)
-		: null;
-
-	// 🎨 Thème dynamique selon le restaurant (fallback si pas de config)
-	const theme = config?.style || PREMIUM_COLORS;
-
-	// �🎬 Entrance animations
+	// 🎬 Entrance animations
 	useEffect(() => {
 		// Main fade in
 		Animated.parallel([
@@ -271,7 +249,7 @@ export default function JoinOrCreateTable({
 
 	const handleJoin = async () => {
 		if (!name.trim()) return setError("Veuillez entrer votre nom.");
-		if (isFoodtruck && !phone.trim())
+		if (!phone.trim())
 			return setError("Veuillez entrer votre numéro de téléphone.");
 		if (!tableId) return setError("Table non identifiée.");
 
@@ -282,9 +260,7 @@ export default function JoinOrCreateTable({
 			// ⭐ Stocker tableId et pseudo
 			await AsyncStorage.setItem("pseudo", name.trim());
 			await AsyncStorage.setItem("tableId", tableId);
-			if (isFoodtruck) {
-				await AsyncStorage.setItem("clientPhone", phone.trim());
-			}
+			await AsyncStorage.setItem("clientPhone", phone.trim());
 
 			// Générer un token client simple pour les commandes
 			const token = await clientAuthService.getClientToken(
@@ -297,7 +273,7 @@ export default function JoinOrCreateTable({
 			const body = {
 				clientName: name.trim(),
 				clientId: clientId,
-				...(isFoodtruck && { clientPhone: phone.trim() }),
+				clientPhone: phone.trim(),
 				tableId: tableId,
 				restaurantId:
 					restaurantId || (await AsyncStorage.getItem("restaurantId")),
@@ -384,9 +360,7 @@ export default function JoinOrCreateTable({
 			}
 			await AsyncStorage.setItem("currentClientName", name.trim());
 			await AsyncStorage.setItem("currentClientId", clientId);
-			if (isFoodtruck) {
-				await AsyncStorage.setItem("currentClientPhone", phone.trim());
-			}
+			await AsyncStorage.setItem("currentClientPhone", phone.trim());
 			// Note: pseudo et tableId déjà stockés avant getClientToken
 
 			// ⭐ Marquer que l'utilisateur a rejoint dans cette session
@@ -413,81 +387,23 @@ export default function JoinOrCreateTable({
 
 	return (
 		<ImageBackground
-			source={backgroundImage}
+			source={GRILLZ_BG_IMAGE}
 			style={styles.background}
 			resizeMode="cover"
 		>
-			{/* � Overlay conditionnel : Custom background ou Standard */}
-			{useCustomBackground ? (
-				<>
-					{/* Overlay flou sombre pour backgrounds custom */}
-					<BlurView intensity={25} tint="dark" style={styles.blurOverlay}>
-						<LinearGradient
-							colors={[
-								"rgba(0, 0, 0, 0.7)",
-								"rgba(213, 48, 39, 0.3)",
-								"rgba(0, 0, 0, 0.8)",
-							]}
-							style={styles.gradientOverlay}
-							start={{ x: 0, y: 0 }}
-							end={{ x: 1, y: 1 }}
-						/>
-					</BlurView>
-
-					{/* 🔥 Éléments décoratifs (custom background only) */}
-					<View style={styles.flameElements}>
-						<View style={styles.flameContainer}>
-							<LinearGradient
-								colors={[theme.orange, "transparent"]}
-								style={[styles.flame, styles.flame1]}
-								start={{ x: 0, y: 1 }}
-								end={{ x: 0, y: 0 }}
-							/>
-							<LinearGradient
-								colors={[theme.rouge, "transparent"]}
-								style={[styles.flame, styles.flame2]}
-								start={{ x: 0, y: 1 }}
-								end={{ x: 0, y: 0 }}
-							/>
-							<LinearGradient
-								colors={[theme.dore, "transparent"]}
-								style={[styles.flame, styles.flame3]}
-								start={{ x: 0, y: 1 }}
-								end={{ x: 0, y: 0 }}
-							/>
-						</View>
-					</View>
-				</>
-			) : (
-				<>
-					{/* Overlay général pour restaurants standards */}
-					<BlurView intensity={30} tint="dark" style={styles.blurOverlay}>
-						<LinearGradient
-							colors={[
-								"rgba(15, 12, 41, 0.85)",
-								"rgba(48, 43, 99, 0.75)",
-								"rgba(36, 36, 62, 0.85)",
-							]}
-							style={styles.gradientOverlay}
-							start={{ x: 0, y: 0 }}
-							end={{ x: 1, y: 1 }}
-						/>
-					</BlurView>
-
-					{/* Cercles décoratifs (Standard) */}
-					<View style={styles.bgCircles}>
-						<LinearGradient
-							colors={[...theme.primary, "transparent"]}
-							style={[styles.bgCircle, styles.bgCircle1]}
-						/>
-						<LinearGradient
-							colors={[...theme.accent, "transparent"]}
-							style={[styles.bgCircle, styles.bgCircle2]}
-						/>
-					</View>
-				</>
-			)}
-
+			{/* Overlay flou sombre pour lisibilité */}
+			<BlurView intensity={25} tint="dark" style={styles.blurOverlay}>
+				<LinearGradient
+					colors={[
+						"rgba(0, 0, 0, 0.7)",
+						"rgba(213, 48, 39, 0.3)",
+						"rgba(0, 0, 0, 0.8)",
+					]}
+					style={styles.gradientOverlay}
+					start={{ x: 0, y: 0 }}
+					end={{ x: 1, y: 1 }}
+				/>
+			</BlurView>
 			<StatusBar barStyle="light-content" />
 
 			{/* 🔧 Debug Button */}
@@ -498,6 +414,31 @@ export default function JoinOrCreateTable({
 			>
 				<MaterialIcons name="delete-sweep" size={24} color="#fff" />
 			</TouchableOpacity>
+
+			{/* 🔥 Éléments décoratifs flammes */}
+			<View style={styles.flameElements}>
+				{/* Flammes animées en fond */}
+				<View style={styles.flameContainer}>
+					<LinearGradient
+						colors={[GRILLZ_THEME.orange, "transparent"]}
+						style={[styles.flame, styles.flame1]}
+						start={{ x: 0, y: 1 }}
+						end={{ x: 0, y: 0 }}
+					/>
+					<LinearGradient
+						colors={[GRILLZ_THEME.rouge, "transparent"]}
+						style={[styles.flame, styles.flame2]}
+						start={{ x: 0, y: 1 }}
+						end={{ x: 0, y: 0 }}
+					/>
+					<LinearGradient
+						colors={[GRILLZ_THEME.dore, "transparent"]}
+						style={[styles.flame, styles.flame3]}
+						start={{ x: 0, y: 1 }}
+						end={{ x: 0, y: 0 }}
+					/>
+				</View>
+			</View>
 
 			{/* Contenu principal avec gestion clavier native iOS */}
 			<ScrollView
@@ -517,155 +458,88 @@ export default function JoinOrCreateTable({
 						},
 					]}
 				>
-					{/* � Logo et Titre conditionnels : Custom ou Standard */}
-					{useCustomBackground ? (
-						<>
-							{/* 🔥 Logo Grillz avec flammes */}
-							<Animated.View
-								style={[
-									styles.grillzLogoContainer,
-									{ transform: [{ scale: tableIconScale }] },
-								]}
-							>
-								<Image
-									source={require("../../../assets/foodtruck.png")}
-									style={styles.foodtruckImageHighQuality}
-									resizeMode="contain"
-								/>
-								{!isFoodtruck && restaurantLoaded && displayTableNumber && (
-									<View style={styles.grillzTableBadge}>
-										<Text style={styles.grillzTableText}>
-											{displayTableNumber}
-										</Text>
-									</View>
-								)}
-							</Animated.View>
+					{/* 🔥 Logo Grillz avec flammes */}
+					<Animated.View
+						style={[
+							styles.grillzLogoContainer,
+							{ transform: [{ scale: tableIconScale }] },
+						]}
+					>
+						{/* Image foodtruck haute qualité sans cercle ni flou */}
+						<Image
+							source={require("../../../assets/foodtruck.png")}
+							style={styles.foodtruckImageHighQuality}
+							resizeMode="contain"
+						/>
+						{/* Badge table avec style doré - masqué pour les foodtrucks */}
 
-							{/* Titre de bienvenue Grillz stylisé */}
-							<View style={styles.grillzTitleContainer}>
-								<Text style={styles.grillzPreTitle}>Bonjour</Text>
-								<View style={styles.grillzMainTitleContainer}>
-									<Text style={styles.grillzMainTitle}>Bienvenue chez</Text>
-									<LinearGradient
-										colors={[theme.dore, theme.orange]}
-										style={styles.grillzNameGradient}
-										start={{ x: 0, y: 0 }}
-										end={{ x: 1, y: 0 }}
-									>
-										<Text style={styles.grillzName}>
-											{restaurantName || "Restaurant"}
-										</Text>
-									</LinearGradient>
-								</View>
-								<Text style={styles.grillzSubTitle}>
-									{isFoodtruck ? "Food Truck" : "Restaurant"}
-								</Text>
+						{!isFoodtruck && restaurantLoaded && displayTableNumber && (
+							<View style={styles.grillzTableBadge}>
+								<Text style={styles.grillzTableText}>{displayTableNumber}</Text>
 							</View>
+						)}
+					</Animated.View>
 
-							{/* Situation 2 : Table fermée - Rejoignez-nous */}
-							{tableAvailable === false &&
-								participants.length > 0 &&
-								participants[0] && (
-									<Text style={styles.grillzSubtitle}>
-										Rejoignez{" "}
-										<Text style={styles.grillzTableHighlight}>nos clients</Text>
-									</Text>
-								)}
-						</>
-					) : (
-						<>
-							{/* 🎨 Logo et Titre Standard */}
-							<Animated.View
-								style={[
-									styles.tableIconContainer,
-									{ transform: [{ scale: tableIconScale }] },
-								]}
+					{/* � Titre de bienvenue Grillz stylisé */}
+					<View style={styles.grillzTitleContainer}>
+						<Text style={styles.grillzPreTitle}>Bonjour</Text>
+						<View style={styles.grillzMainTitleContainer}>
+							<Text style={styles.grillzMainTitle}>Bienvenue au</Text>
+							<LinearGradient
+								colors={[GRILLZ_THEME.dore, GRILLZ_THEME.orange]}
+								style={styles.grillzNameGradient}
+								start={{ x: 0, y: 0 }}
+								end={{ x: 1, y: 0 }}
 							>
-								<LinearGradient
-									colors={theme.primary}
-									style={styles.tableIconGradient}
-									start={{ x: 0, y: 0 }}
-									end={{ x: 1, y: 1 }}
-								>
-									<MaterialIcons
-										name="table-restaurant"
-										size={48}
-										color="#fff"
-									/>
-								</LinearGradient>
-								{!isFoodtruck && restaurantLoaded && displayTableNumber && (
-									<View style={styles.tableNumberBadge}>
-										<Text style={styles.tableNumberBadgeText}>
-											{displayTableNumber}
-										</Text>
-									</View>
-								)}
-							</Animated.View>
+								<Text style={styles.grillzName}>GRILLZ</Text>
+							</LinearGradient>
+						</View>
+						<Text style={styles.grillzSubTitle}>
+							Poulet Braisé • Food Truck
+						</Text>
+					</View>
 
-							{/* Titre Standard */}
-							<Text style={styles.title}>
-								{restaurantName || "Bienvenue"} ✨
-							</Text>
-							{tableAvailable === false &&
-								participants.length > 0 &&
-								participants[0] && (
-									<Text style={styles.subtitle}>
-										Rejoignez{" "}
-										<Text style={styles.tableHighlight}>{participants[0]}</Text>{" "}
-										à table
-									</Text>
-								)}
-						</>
+					{/* Situation 1 : Table ouverte - Bienvenue */}
+					{tableAvailable === true && (
+						<Text style={styles.grillzSubtitle}>
+							Bienvenue chez{" "}
+							<Text style={styles.grillzTableHighlight}>GRILLZ</Text>
+						</Text>
 					)}
 
-					{/* 👥 Dropdown invités (conditionné selon le type de restaurant) */}
-					{!isFoodtruck &&
+					{/* Situation 2 : Table fermée - Rejoignez-nous */}
+					{tableAvailable === false &&
+						participants.length > 0 &&
+						participants[0] && (
+							<Text style={styles.grillzSubtitle}>
+								Rejoignez{" "}
+								<Text style={styles.grillzTableHighlight}>nos clients</Text>
+							</Text>
+						)}
+					{/* 👥 Dropdown invités avec thème Grillz (masqué pour foodtrucks) */}
+					{isFoodtruck &&
 						tableAvailable === false &&
 						participants.length > 0 && (
-							<View
-								style={
-									useCustomBackground
-										? styles.grillzParticipantsContainer
-										: styles.participantsContainer
-								}
-							>
+							<View style={styles.grillzParticipantsContainer}>
 								<BlurView
 									intensity={25}
 									tint="light"
-									style={
-										useCustomBackground
-											? styles.grillzParticipantsBlur
-											: styles.participantsBlur
-									}
+									style={styles.grillzParticipantsBlur}
 								>
 									<TouchableOpacity
-										style={
-											useCustomBackground
-												? styles.grillzInputContainer
-												: styles.inputContainer
-										}
+										style={styles.grillzInputContainer}
 										onPress={() => setShowGuestsDropdown(true)}
 										activeOpacity={0.8}
 									>
 										<LinearGradient
-											colors={
-												useCustomBackground ? [theme.orange, theme.rouge] : theme.primary
-											}
-											style={
-												useCustomBackground ? styles.grillzInputIcon : styles.inputIcon
-											}
+											colors={[GRILLZ_THEME.orange, GRILLZ_THEME.rouge]}
+											style={styles.grillzInputIcon}
 											start={{ x: 0, y: 0 }}
 											end={{ x: 1, y: 1 }}
 										>
 											<MaterialIcons name="group" size={22} color="#fff" />
 										</LinearGradient>
-										<Text
-											style={
-												useCustomBackground
-													? styles.grillzDropdownText
-													: styles.dropdownText
-											}
-										>
+										<Text style={styles.grillzDropdownText}>
 											{participants.length === 1
 												? `1 personne à cette table`
 												: `${participants.length} personnes à cette table`}
@@ -673,24 +547,20 @@ export default function JoinOrCreateTable({
 										<MaterialIcons
 											name="expand-more"
 											size={24}
-											color={useCustomBackground ? theme.orange : theme.primary[0]}
+											color={GRILLZ_THEME.orange}
 										/>
 									</TouchableOpacity>
 								</BlurView>
 							</View>
 						)}
 
-					{/* 📋 Formulaire avec inputs stylisés (conditionnel) */}
-					<View style={useCustomBackground ? styles.grillzFormCard : styles.formCard}>
-						<BlurView
-							intensity={30}
-							tint="light"
-							style={useCustomBackground ? styles.grillzFormBlur : styles.formBlur}
-						>
+					{/* 📋 Formulaire Grillz avec inputs stylisés */}
+					<View style={styles.grillzFormCard}>
+						<BlurView intensity={30} tint="light" style={styles.grillzFormBlur}>
 							{/* Input Nom */}
 							<Animated.View
 								style={[
-									useCustomBackground ? styles.grillzInputWrapper : styles.inputWrapper,
+									styles.grillzInputWrapper,
 									{
 										opacity: inputAnimations[0],
 										transform: [
@@ -704,166 +574,126 @@ export default function JoinOrCreateTable({
 									},
 								]}
 							>
-								<View
-									style={
-										useCustomBackground
-											? styles.grillzInputContainer
-											: styles.inputContainer
-									}
-								>
+								<View style={styles.grillzInputContainer}>
 									<LinearGradient
-										colors={
-											useCustomBackground ? [theme.orange, theme.rouge] : theme.primary
-										}
-										style={useCustomBackground ? styles.grillzInputIcon : styles.inputIcon}
+										colors={[GRILLZ_THEME.orange, GRILLZ_THEME.rouge]}
+										style={styles.grillzInputIcon}
 										start={{ x: 0, y: 0 }}
 										end={{ x: 1, y: 1 }}
 									>
 										<MaterialIcons name="person" size={22} color="#fff" />
 									</LinearGradient>
 									<TextInput
-										style={useCustomBackground ? styles.grillzInput : styles.input}
+										style={styles.grillzInput}
 										placeholder="Votre nom ou prénom"
 										value={name}
 										onChangeText={setName}
 										autoCapitalize="words"
-										placeholderTextColor={
-											useCustomBackground ? "rgba(255,255,255,0.6)" : "#999"
-										}
+										placeholderTextColor="rgba(255,255,255,0.6)"
 										editable={!loading}
 									/>
 								</View>
 							</Animated.View>
 
-							{/* Input Téléphone (foodtruck uniquement) */}
-							{isFoodtruck && (
-								<Animated.View
-									style={[
-										useCustomBackground ? styles.grillzInputWrapper : styles.inputWrapper,
-										{
-											opacity: inputAnimations[1],
-											transform: [
-												{
-													translateX: inputAnimations[1].interpolate({
-														inputRange: [0, 1],
-														outputRange: [-30, 0],
-													}),
-												},
-											],
-										},
-									]}
-								>
-									<View
-										style={
-											useCustomBackground
-												? styles.grillzInputContainer
-												: styles.inputContainer
-										}
+							{/* Input Téléphone */}
+							<Animated.View
+								style={[
+									styles.grillzInputWrapper,
+									{
+										opacity: inputAnimations[1],
+										transform: [
+											{
+												translateX: inputAnimations[1].interpolate({
+													inputRange: [0, 1],
+													outputRange: [-30, 0],
+												}),
+											},
+										],
+									},
+								]}
+							>
+								<View style={styles.grillzInputContainer}>
+									<LinearGradient
+										colors={[GRILLZ_THEME.orange, GRILLZ_THEME.rouge]}
+										style={styles.grillzInputIcon}
+										start={{ x: 0, y: 0 }}
+										end={{ x: 1, y: 1 }}
 									>
-										<LinearGradient
-											colors={
-												useCustomBackground ? [theme.orange, theme.rouge] : theme.primary
-											}
-											style={
-												useCustomBackground ? styles.grillzInputIcon : styles.inputIcon
-											}
-											start={{ x: 0, y: 0 }}
-											end={{ x: 1, y: 1 }}
-										>
-											<MaterialIcons name="phone" size={22} color="#fff" />
-										</LinearGradient>
-										<TextInput
-											style={useCustomBackground ? styles.grillzInput : styles.input}
-											placeholder="Votre numéro de téléphone"
-											value={phone}
-											onChangeText={setPhone}
-											keyboardType="phone-pad"
-											placeholderTextColor={
-												useCustomBackground ? "rgba(255,255,255,0.6)" : "#999"
-											}
-											editable={!loading}
-										/>
-									</View>
-								</Animated.View>
-							)}
+										<MaterialIcons name="phone" size={22} color="#fff" />
+									</LinearGradient>
+									<TextInput
+										style={styles.grillzInput}
+										placeholder="Votre numéro de téléphone"
+										value={phone}
+										onChangeText={setPhone}
+										keyboardType="phone-pad"
+										placeholderTextColor="rgba(255,255,255,0.6)"
+										editable={!loading}
+									/>
+								</View>
+							</Animated.View>
 						</BlurView>
 					</View>
 
-					{/* ⚠️ Message d'erreur (conditionnel) */}
+					{/* ⚠️ Message d'erreur Grillz */}
 					{error ? (
-						<View
-							style={
-								useCustomBackground ? styles.grillzErrorContainer : styles.errorContainer
-							}
-						>
+						<View style={styles.grillzErrorContainer}>
 							<LinearGradient
-								colors={
-									useCustomBackground ? [theme.rouge, "#8B0000"] : ["#ff6b6b", "#ee5a5a"]
-								}
-								style={
-									useCustomBackground ? styles.grillzErrorGradient : styles.errorGradient
-								}
+								colors={[GRILLZ_THEME.rouge, "#8B0000"]}
+								style={styles.grillzErrorGradient}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 0 }}
 							>
 								<MaterialIcons name="warning" size={22} color="#fff" />
-								<Text
-									style={useCustomBackground ? styles.grillzErrorText : styles.errorText}
-								>
-									{error}
-								</Text>
+								<Text style={styles.grillzErrorText}>{error}</Text>
 							</LinearGradient>
 						</View>
 					) : null}
 
-					{/* 🚀 Join Button (conditionnel) */}
+					{/* �🚀 Premium Join Button */}
 					<Animated.View style={{ transform: [{ scale: buttonScale }] }}>
 						<TouchableOpacity
 							onPress={handleJoin}
 							onPressIn={handlePressIn}
 							onPressOut={handlePressOut}
-							disabled={
-								!name.trim() || loading || (isFoodtruck && !phone.trim())
-							}
+							disabled={!name.trim() || loading}
 							activeOpacity={0.9}
 						>
 							<LinearGradient
 								colors={
-									!name.trim() || loading || (isFoodtruck && !phone.trim())
+									!name.trim() || loading
 										? ["#ccc", "#999"]
-									: useCustomBackground
-										? [theme.dore, theme.orange]
-										: theme.success
-							}
-							style={styles.joinButton}
-							start={{ x: 0, y: 0 }}
-							end={{ x: 1, y: 0 }}
-						>
-							{loading ? (
-								<View style={styles.loadingContainer}>
-									<Animated.View style={styles.loadingSpinner}>
-										<MaterialIcons name="refresh" size={24} color="#fff" />
-									</Animated.View>
-									<Text style={styles.joinButtonText}>Connexion...</Text>
-								</View>
-							) : (
-							<>
-								<MaterialIcons
-									name={tableId ? "login" : "add-circle"}
-									size={24}
-									color="#fff"
-								/>
+										: PREMIUM_COLORS.success
+								}
+								style={styles.joinButton}
+								start={{ x: 0, y: 0 }}
+								end={{ x: 1, y: 0 }}
+							>
+								{loading ? (
+									<View style={styles.loadingContainer}>
+										<Animated.View style={styles.loadingSpinner}>
+											<MaterialIcons name="refresh" size={24} color="#fff" />
+										</Animated.View>
+										<Text style={styles.joinButtonText}>Connexion...</Text>
+									</View>
+								) : (
+									<>
+										<MaterialIcons
+											name={tableId ? "login" : "add-circle"}
+											size={24}
+											color="#fff"
+										/>
 
-								<Text style={styles.joinButtonText}>
-									{tableId
-										? !isFoodtruck
-											? "Commencer votre commande"
-											: "Rejoindre la table"
-										: "Créer une table"}
-								</Text>
-							</>
-					)}
-				</LinearGradient>
+										<Text style={styles.joinButtonText}>
+											{tableId
+												? !isFoodtruck
+													? "Commencer votre commande"
+													: "Rejoindre la table"
+												: "Créer une table"}
+										</Text>
+									</>
+								)}
+							</LinearGradient>
 						</TouchableOpacity>
 					</Animated.View>
 				</Animated.View>
@@ -897,7 +727,7 @@ export default function JoinOrCreateTable({
 									<MaterialIcons
 										name="person"
 										size={20}
-										color={theme.orange}
+										color={GRILLZ_THEME.orange}
 										style={{ marginRight: 10 }}
 									/>
 									<Text style={styles.modalGuestText}>{item}</Text>
@@ -1230,7 +1060,6 @@ const styles = StyleSheet.create({
 	bgCircles: {
 		...StyleSheet.absoluteFillObject,
 		overflow: "hidden",
-		pointerEvents: "none",
 	},
 	bgCircle: {
 		position: "absolute",

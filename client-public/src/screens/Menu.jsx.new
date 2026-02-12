@@ -35,7 +35,7 @@ import { useReservationStatus } from "../hooks/useReservationStatus.js"; // 🚪
 import { useFeatureLevel } from "../stores/useFeatureLevelStore.js"; // 🎯 Feature Levels
 import { useRestaurantStore } from "../stores/useRestaurantStore"; // 🏪 Store restaurant
 import { GRILLZ_THEME } from "../theme/colors"; // 🔥 Thème Grillz
-import { useCustomHeaderRestaurant, getRestaurantTheme } from "../utils/restaurantHelpers"; // 🔒 Helpers isolation
+import { isGrillzRestaurant, getRestaurantTheme } from "../utils/restaurantHelpers"; // 🔒 Helpers isolation
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -617,12 +617,12 @@ export default function Menu({
 	// 🚪 NOUVEAU : Écouter la fermeture de réservation et rediriger automatiquement
 	useReservationStatus(restaurantId, reservationId, onReservationClosed);
 
-	// � ARCHITECTURE 100% JSON-DRIVEN : Lecture des flags depuis config.style
+	// 🔒 ISOLATION GRILLZ : Détection stricte du restaurant
 	const restaurantName = useRestaurantStore((state) => state.name) || "";
-	const useCustomHeader = config?.style?.useCustomHeader || false;
+	const isGrillz = isGrillzRestaurant(config, restaurantId, restaurantName);
 	
-	// 🎨 Thème dynamique selon le restaurant (fallback si pas de config)
-	const baseTheme = config?.style || PREMIUM_COLORS;
+	// 🎨 Thème dynamique selon le restaurant
+	const baseTheme = isGrillz ? GRILLZ_THEME : PREMIUM_COLORS;
 
 	const [currentStyle, setCurrentStyle] = useState(baseTheme);
 
@@ -633,8 +633,8 @@ export default function Menu({
 				"🎨 [Menu] Nouveau style reçu via WebSocket:",
 				liveStyle.style_id,
 			);
-			// 🚀 Appliquer le style depuis WebSocket
-			const updatedTheme = liveStyle.config.colors || baseTheme;
+			// 🔒 Appliquer le bon thème selon le restaurant
+			const updatedTheme = getRestaurantTheme(isGrillz, { style: liveStyle.config.colors }, GRILLZ_THEME, PREMIUM_COLORS);
 			setCurrentStyle(updatedTheme);
 
 			// Optionnel : Afficher une notification à l'utilisateur
@@ -644,14 +644,13 @@ export default function Menu({
 				[{ text: "OK" }],
 			);
 		}
-	}, [liveStyle, baseTheme]);
+	}, [liveStyle, isGrillz]);
 
 	// Mettre à jour le style quand la config initiale est chargée
 	useEffect(() => {
-		if (config?.style) {
-			setCurrentStyle(config.style);
-		}
-	}, [config]);
+		const mergedTheme = getRestaurantTheme(isGrillz, config, GRILLZ_THEME, PREMIUM_COLORS);
+		setCurrentStyle(mergedTheme);
+	}, [config, isGrillz]);
 
 	const products = useProductStore((state) => state.products);
 	const fetchProducts = useProductStore((state) => state.fetchProducts);
@@ -891,7 +890,7 @@ export default function Menu({
 			</View>
 
 			{/* 🔒 Header Conditionnel : Grillz ou Standard */}
-			{useCustomHeader ? (
+			{isGrillz ? (
 				<GrillzHeader
 					userName={userName}
 					restaurantName={restaurantName}
@@ -899,9 +898,9 @@ export default function Menu({
 					showDietaryFeature={hasAllergies || hasRestrictions}
 					theme={currentStyle}
 					styleConfig={{
-						headerIcon: config?.style?.headerIcon || "flame",
-						categoryLabel: config?.style?.categoryLabel,
-						slogan: config?.style?.slogan,
+						headerIcon: config?.headerIcon || "flame",
+						categoryLabel: config?.categoryLabel,
+						slogan: config?.slogan,
 					}}
 				/>
 			) : (

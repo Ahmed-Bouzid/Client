@@ -18,15 +18,14 @@ export const useReservationStatus = (
 	reservationId,
 	onReservationClosed,
 ) => {
-	const { on, off } = useSocketClient(restaurantId);
+	// ✅ Ne pas connecter si restaurantId est invalide
+	const shouldConnect = restaurantId && typeof restaurantId === "string";
+	const { on, off } = useSocketClient(shouldConnect ? restaurantId : null);
 	const hasRedirectedRef = useRef(false);
 
 	useEffect(() => {
-		if (!restaurantId || !reservationId) {
-			console.warn("⚠️ useReservationStatus: paramètres manquants", {
-				restaurantId,
-				reservationId,
-			});
+		if (!shouldConnect || !reservationId) {
+			// ✅ Silent return - c'est normal que reservationId soit null au début
 			return;
 		}
 
@@ -104,7 +103,7 @@ export const useReservationStatus = (
 			off("reservation", handleReservationUpdate);
 			hasRedirectedRef.current = false;
 		};
-	}, [restaurantId, reservationId, on, off, onReservationClosed]);
+	}, [shouldConnect, reservationId, on, off, onReservationClosed]);
 };
 
 export default useReservationStatus;

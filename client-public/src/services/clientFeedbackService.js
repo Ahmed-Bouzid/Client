@@ -7,11 +7,11 @@
  * - Intégration avec stores Zustand
  */
 
-import { API_CONFIG } from "../config/apiConfig";
+import { API_BASE_URL } from "../config/api";
 
 class ClientFeedbackService {
 	constructor() {
-		this.baseURL = `${API_CONFIG.BASE_URL}/client-feedback`;
+		this.baseURL = `${API_BASE_URL}/client-feedback`;
 	}
 
 	/**
@@ -24,6 +24,10 @@ class ClientFeedbackService {
 			"📝 [CLIENT-FEEDBACK-SERVICE] Soumission feedback:",
 			feedbackData,
 		);
+		console.log(
+			"📝 [CLIENT-FEEDBACK-SERVICE] URL appelée:",
+			`${this.baseURL}/submit`,
+		);
 
 		try {
 			const response = await fetch(`${this.baseURL}/submit`, {
@@ -32,6 +36,7 @@ class ClientFeedbackService {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify(feedbackData),
+				timeout: 10000, // Timeout explicite 10s
 			});
 
 			const data = await response.json();
@@ -39,6 +44,11 @@ class ClientFeedbackService {
 			console.log("✅ [CLIENT-FEEDBACK-SERVICE] Réponse API:", data);
 
 			if (!response.ok) {
+				console.error("❌ [CLIENT-FEEDBACK-SERVICE] Erreur HTTP:", {
+					status: response.status,
+					statusText: response.statusText,
+					responseData: data,
+				});
 				throw new Error(data.message || "Erreur lors de la soumission");
 			}
 
@@ -80,6 +90,7 @@ class ClientFeedbackService {
 					headers: {
 						"Content-Type": "application/json",
 					},
+					timeout: 10000, // 10 secondes
 				},
 			);
 
@@ -125,6 +136,7 @@ class ClientFeedbackService {
 					headers: {
 						"Content-Type": "application/json",
 					},
+					timeout: 10000, // 10 secondes
 				},
 			);
 
@@ -168,7 +180,7 @@ class ClientFeedbackService {
 				headers: {
 					"Content-Type": "application/json",
 				},
-
+				timeout: 10000, // 10 secondes
 			});
 
 			const data = await response.json();

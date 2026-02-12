@@ -1,0 +1,15 @@
+							<>
+								<MaterialIcons
+									name={tableId ? "login" : "add-circle"}
+									size={24}
+									color="#fff"
+								/>
+
+								<Text style={styles.joinButtonText}>
+									{tableId
+										? !isFoodtruck
+											? "Commencer votre commande"
+											: "Rejoindre la table"
+										: "Créer une table"}
+								</Text>
+							</>

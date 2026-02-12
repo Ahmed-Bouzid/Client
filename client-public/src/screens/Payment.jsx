@@ -16,7 +16,6 @@ import { BlurView } from "expo-blur";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useOrderStore } from "../stores/useOrderStore.js";
-import { PREMIUM_COLORS } from "../theme/colors";
 import { useStripe } from "@stripe/stripe-react-native";
 import logger from "../utils/secureLogger"; // ✅ Logger sécurisé
 import stripeService from "../services/stripeService";
@@ -26,11 +25,13 @@ import { useRestaurantStore } from "../stores/useRestaurantStore";
 import { useReservationStatus } from "../hooks/useReservationStatus"; // 🚪 Écoute fermeture réservation
 import FeedbackScreen from "../components/FeedbackScreen"; // 🌟 Feedback & Avis Google
 import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 API Feedback
+import { PREMIUM_COLORS } from "../theme/colors";
+import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
 
 const { width, height } = Dimensions.get("window");
 
 // 🎴 Premium Payment Item Card
-const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle }) => {
+const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle, theme = PREMIUM_COLORS }) => {
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(20)).current;
 	const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -107,7 +108,7 @@ const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle }) => {
 					<View style={styles.checkboxWrapper}>
 						{isPaid ? (
 							<LinearGradient
-								colors={PREMIUM_COLORS.success}
+								colors={theme.success}
 								style={styles.checkboxChecked}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
@@ -116,7 +117,7 @@ const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle }) => {
 							</LinearGradient>
 						) : isSelected ? (
 							<LinearGradient
-								colors={PREMIUM_COLORS.primary}
+								colors={theme.primary}
 								style={styles.checkboxChecked}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
@@ -162,7 +163,7 @@ const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle }) => {
 						) : (
 							<LinearGradient
 								colors={
-									isSelected ? PREMIUM_COLORS.primary : ["#e9ecef", "#dee2e6"]
+									isSelected ? theme.primary : ["#e9ecef", "#dee2e6"]
 								}
 								style={styles.priceBadge}
 								start={{ x: 0, y: 0 }}
@@ -219,6 +220,10 @@ export default function Payment({
 	// 🚪 Écouter la fermeture de réservation et rediriger automatiquement
 	const restaurantId = useRestaurantStore((state) => state.id);
 	useReservationStatus(restaurantId, reservationId, onReservationClosed);
+
+	// 🎨 Thème dynamique depuis la BDD, fallback PREMIUM_COLORS
+	const { config } = useRestaurantConfig(restaurantId);
+	const theme = config?.style ? { ...PREMIUM_COLORS, ...config.style } : PREMIUM_COLORS;
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -338,10 +343,47 @@ export default function Payment({
 
 	// ✅ Initialiser la sélection avec les articles non payés
 	useEffect(() => {
-		console.log("💳 Payment.jsx - allOrders reçus:", allOrders?.length || 0);
 		console.log(
-			"💳 Payment.jsx - Détail allOrders:",
-			JSON.stringify(allOrders?.slice(0, 3), null, 2),
+			"\n🔍🔍🔍 ========== PAYMENT.JSX - ANALYSE ALLORDERS ========== 🔍🔍🔍",
+		);
+		console.log("📦 Props reçues:", {
+			reservationId,
+			tableId,
+			tableNumber,
+			userName,
+			clientId,
+			allOrdersLength: allOrders?.length || 0,
+		});
+		console.log(
+			"📋 TOUS LES ORDERS (allOrders):",
+			JSON.stringify(allOrders, null, 2),
+		);
+
+		// Grouper par orderId pour voir s'il y a plusieurs commandes
+		const ordersByOrderId = {};
+		allOrders?.forEach((item) => {
+			const oid = item.orderId || "unknown";
+			if (!ordersByOrderId[oid]) ordersByOrderId[oid] = [];
+			ordersByOrderId[oid].push(item);
+		});
+		console.log(
+			"📊 Groupé par orderId:",
+			Object.keys(ordersByOrderId).length,
+			"commandes distinctes",
+		);
+		Object.entries(ordersByOrderId).forEach(([oid, items]) => {
+			const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+			console.log(
+				`  - Order ${oid}: ${items.length} items, total: ${total.toFixed(2)}€`,
+			);
+			items.forEach((item) => {
+				console.log(
+					`    * ${item.name} x${item.quantity} = ${(item.price * item.quantity).toFixed(2)}€`,
+				);
+			});
+		});
+		console.log(
+			"🔍🔍🔍 ====================================================== 🔍🔍🔍\n",
 		);
 
 		if (allOrders && allOrders.length > 0) {
@@ -580,23 +622,34 @@ export default function Payment({
 		// 🌟 Préparer les données pour le feedback
 		const restaurantStore = useRestaurantStore.getState();
 
+		console.log("🌟 [PAYMENT] Préparation feedbackData:");
+		console.log("  - restaurantId:", restaurantId);
+		console.log("  - restaurantStore.id:", restaurantStore.id);
+		console.log("  - clientId:", clientId);
+		console.log("  - userName:", userName);
+		console.log("  - tableId:", tableId);
+		console.log("  - reservationId:", reservationId);
+
 		setTimeout(() => {
-			// Préparer les données feedback
-			setFeedbackData({
+			// Préparer les données feedback avec valeurs par défaut sûres
+			const feedbackPayload = {
 				restaurantData: {
-					id: restaurantId || restaurantStore.id,
+					id: restaurantId || restaurantStore.id || "695e4300adde654b80f6911a", // Fallback vers ID par défaut
 					name: restaurantStore.name || "Restaurant",
 					googleUrl: restaurantStore.googleUrl || null,
 					googlePlaceId: restaurantStore.googlePlaceId || null,
 				},
 				customerData: {
-					clientId: clientId,
-					clientName: userName,
-					tableId: tableId,
-					tableNumber: tableNumber,
-					reservationId: reservationId,
+					clientId: clientId || "anonymous-" + Date.now(),
+					clientName: userName || "Client",
+					tableId: tableId || "686af692bb4cba684ff3b757", // Table par défaut
+					tableNumber: tableNumber || "1",
+					reservationId: reservationId || null,
 				},
-			});
+			};
+
+			console.log("🌟 [PAYMENT] FeedbackData final:", feedbackPayload);
+			setFeedbackData(feedbackPayload);
 
 			// Afficher le feedback au lieu de fermer directement
 			setShowFeedback(true);
@@ -654,9 +707,17 @@ export default function Payment({
 
 		try {
 			// 1. Filtrer les articles sélectionnés
+			console.log("\n💰💰💰 ========== CALCUL PAIEMENT ========== 💰💰💰");
+			console.log("🔢 selectedItems (IDs):", Array.from(selectedItems));
 			const selectedOrders = allOrders.filter((item) =>
 				selectedItems.has(getItemId(item)),
 			);
+			console.log("✅ selectedOrders filtrés:", selectedOrders.length, "items");
+			selectedOrders.forEach((item) => {
+				console.log(
+					`  - ${item.name} (${getItemId(item)}): ${item.price}€ x ${item.quantity} = ${(item.price * item.quantity).toFixed(2)}€`,
+				);
+			});
 
 			// 2. Calculer le montant payé
 			const amountPaid = selectedOrders.reduce(
@@ -665,7 +726,8 @@ export default function Payment({
 					(parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1),
 				0,
 			);
-
+			console.log("💵 MONTANT TOTAL À PAYER:", amountPaid.toFixed(2), "€");
+			console.log("💰💰💰 ================================== 💰💰💰\n");
 			logger.debug("Calcul montant paiement", {
 				totalItems: paidItems.length,
 				amount: "[CENSORED]",
@@ -864,10 +926,10 @@ export default function Payment({
 	// 🚨 Si pas de commandes à afficher
 	if (!allOrders || allOrders.length === 0) {
 		return (
-			<LinearGradient colors={PREMIUM_COLORS.dark} style={styles.container}>
+			<LinearGradient colors={theme.background || [theme.dark, theme.card]} style={styles.container}>
 				<View style={styles.errorContainer}>
 					<LinearGradient
-						colors={PREMIUM_COLORS.danger}
+						colors={theme.danger}
 						style={styles.errorIconBg}
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 1 }}
@@ -881,7 +943,7 @@ export default function Payment({
 					</Text>
 					<TouchableOpacity onPress={() => onBack?.()} activeOpacity={0.8}>
 						<LinearGradient
-							colors={PREMIUM_COLORS.primary}
+							colors={theme.primary}
 							style={styles.errorBackButton}
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 0 }}
@@ -927,19 +989,9 @@ export default function Payment({
 		}).start();
 	};
 
-	// 🔍 Debug : État de la sélection
-	console.log("🔍 État Payment:", {
-		availableItems: availableItems.length,
-		selectedItems: selectedItems.size,
-		selectedOrders: selectedOrders.length,
-		isProcessing,
-		isLoading,
-		total: (total || 0).toFixed(2),
-	});
-
 	return (
 		<LinearGradient
-			colors={PREMIUM_COLORS.dark}
+			colors={theme.background || [theme.dark, theme.card]}
 			style={styles.container}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 1 }}
@@ -947,11 +999,11 @@ export default function Payment({
 			{/* Background decorations */}
 			<View style={styles.bgDecor}>
 				<LinearGradient
-					colors={[...PREMIUM_COLORS.primary, "transparent"]}
+					colors={[...theme.primary, "transparent"]}
 					style={[styles.bgCircle, styles.bgCircle1]}
 				/>
 				<LinearGradient
-					colors={[...PREMIUM_COLORS.success, "transparent"]}
+					colors={[...theme.success, "transparent"]}
 					style={[styles.bgCircle, styles.bgCircle2]}
 				/>
 			</View>
@@ -972,7 +1024,7 @@ export default function Payment({
 					]}
 				>
 					<LinearGradient
-						colors={PREMIUM_COLORS.success}
+						colors={theme.success}
 						style={styles.headerIcon}
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 1 }}
@@ -991,7 +1043,7 @@ export default function Payment({
 								style={styles.quickSelectButton}
 							>
 								<LinearGradient
-									colors={PREMIUM_COLORS.secondary}
+									colors={theme.secondary}
 									style={styles.quickSelectGradient}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 0 }}
@@ -1007,7 +1059,7 @@ export default function Payment({
 								style={styles.quickSelectButton}
 							>
 								<LinearGradient
-									colors={PREMIUM_COLORS.accent}
+									colors={theme.accent}
 									style={styles.quickSelectGradient}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 0 }}
@@ -1038,7 +1090,7 @@ export default function Payment({
 					<View style={styles.sectionHeader}>
 						<View style={styles.sectionTitleRow}>
 							<LinearGradient
-								colors={PREMIUM_COLORS.primary}
+								colors={theme.primary}
 								style={styles.sectionIconBg}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
@@ -1054,8 +1106,8 @@ export default function Payment({
 								<LinearGradient
 									colors={
 										allSelected
-											? PREMIUM_COLORS.secondary
-											: PREMIUM_COLORS.primary
+											? theme.secondary
+											: theme.primary
 									}
 									style={styles.selectAllGradient}
 									start={{ x: 0, y: 0 }}
@@ -1078,7 +1130,7 @@ export default function Payment({
 					{availableItems.length === 0 ? (
 						<View style={styles.emptyState}>
 							<LinearGradient
-								colors={PREMIUM_COLORS.success}
+								colors={theme.success}
 								style={styles.emptyStateIcon}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
@@ -1100,7 +1152,7 @@ export default function Payment({
 								activeOpacity={0.8}
 							>
 								<LinearGradient
-									colors={PREMIUM_COLORS.accent}
+									colors={theme.accent}
 									style={styles.emptyStateButton}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 0 }}
@@ -1129,6 +1181,7 @@ export default function Payment({
 										isSelected={isSelected}
 										isPaid={false}
 										onToggle={() => toggleItem(item)}
+										theme={theme}
 									/>
 								);
 							})}
@@ -1140,7 +1193,7 @@ export default function Payment({
 						<View style={styles.paidSection}>
 							<View style={styles.paidSectionHeader}>
 								<LinearGradient
-									colors={PREMIUM_COLORS.success}
+									colors={theme.success}
 									style={styles.sectionIconBg}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 1 }}
@@ -1159,6 +1212,7 @@ export default function Payment({
 										index={index}
 										isSelected={false}
 										isPaid={true}
+										theme={theme}
 									/>
 								))}
 							</View>
@@ -1170,7 +1224,7 @@ export default function Payment({
 				{availableItems.length > 0 && (
 					<View style={styles.totalSection}>
 						<LinearGradient
-							colors={PREMIUM_COLORS.primary}
+							colors={theme.primary}
 							style={styles.totalGradient}
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 0 }}
@@ -1246,7 +1300,7 @@ export default function Payment({
 									colors={
 										isProcessing || selectedItems.size === 0
 											? ["#ccc", "#999"]
-											: PREMIUM_COLORS.success
+											: theme.success
 									}
 									style={styles.payButton}
 									start={{ x: 0, y: 0 }}
@@ -1308,7 +1362,7 @@ export default function Payment({
 						activeOpacity={0.9}
 					>
 						<LinearGradient
-							colors={PREMIUM_COLORS.accent}
+							colors={theme.accent}
 							style={styles.backButton}
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 0 }}

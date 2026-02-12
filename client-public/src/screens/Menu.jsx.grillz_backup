@@ -34,29 +34,14 @@ import { useStyleUpdates } from "../hooks/useSocketClient.js"; // ⭐ NOUVEAU : 
 import { useReservationStatus } from "../hooks/useReservationStatus.js"; // 🚪 Écoute fermeture réservation
 import { useFeatureLevel } from "../stores/useFeatureLevelStore.js"; // 🎯 Feature Levels
 import { useRestaurantStore } from "../stores/useRestaurantStore"; // 🏪 Store restaurant
-import { GRILLZ_THEME } from "../theme/colors"; // 🔥 Thème Grillz
-import { useCustomHeaderRestaurant, getRestaurantTheme } from "../utils/restaurantHelpers"; // 🔒 Helpers isolation
+import { PREMIUM_COLORS, GRILLZ_THEME } from "../theme/colors"; // Thème par défaut + couleurs statiques StyleSheet
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const BUTTON_SMALL = 60;
-const BUTTON_EXPANDED = SCREEN_WIDTH - 40 - 60 * 3 - 8 * 3;
+const BUTTON_EXPANDED = 140; // 🎯 Largeur fixe pour éviter l'écrasement
 
-// ⚠️ LEGACY: Garder comme fallback si la config échoue
-const PREMIUM_COLORS = {
-	primary: ["#667eea", "#764ba2"],
-	secondary: ["#f093fb", "#f5576c"],
-	accent: ["#4facfe", "#00f2fe"],
-	success: ["#11998e", "#38ef7d"],
-	warning: ["#f2994a", "#f2c94c"],
-	dark: ["#0f0c29", "#302b63", "#24243e"],
-	glass: "rgba(255, 255, 255, 0.15)",
-	glassBorder: "rgba(255, 255, 255, 0.25)",
-	text: "#ffffff",
-	textMuted: "rgba(255, 255, 255, 0.7)",
-};
-
-// 🔥 Composant Header Grillz personnalisé (utilisé uniquement pour Le Grillz)
+// 🔥 Composant Header personnalisé (dynamique via config BDD)
 const GrillzHeader = ({
 	userName,
 	restaurantName,
@@ -100,13 +85,13 @@ const GrillzHeader = ({
 							? `👋 ${userName}`
 							: `👋 Bienvenue${restaurantName ? ` au ${restaurantName}` : ""}`}
 					</Text>
-					{styleConfig.categoryLabel && (
+					{styleConfig.categoryLabel ? (
 						<View style={styles.grillzHalalBadge}>
 							<Text style={styles.grillzHalalText}>
 								{styleConfig.categoryLabel}
 							</Text>
 						</View>
-					)}
+					) : null}
 					{/* Bouton allergènes/restrictions - visible seulement si activé */}
 					{showDietaryFeature && (
 						<TouchableOpacity
@@ -127,6 +112,8 @@ const GrillzHeader = ({
 		</View>
 	);
 };
+
+// Bouton Catégorie Style Général (Premium)
 
 // 🎨 Composant Card Produit Premium avec animations
 const PremiumProductCard = ({
@@ -304,38 +291,43 @@ const PremiumProductCard = ({
 };
 
 // 🔍 Barre de recherche Premium
-const PremiumSearchBar = ({ value, onChangeText, onClear }) => {
+const PremiumSearchBar = ({
+	value,
+	onChangeText,
+	onClear,
+	theme = GRILLZ_THEME,
+}) => {
 	const [isFocused, setIsFocused] = useState(false);
 
 	return (
 		<View
 			style={[
-				styles.premiumSearchContainer,
+				styles.grillzSearchContainer,
 				{
 					borderColor: isFocused
-						? "rgba(102, 126, 234, 0.5)"
-						: "rgba(0,0,0,0.08)",
+						? "rgba(255, 107, 53, 0.5)"
+						: "rgba(255, 215, 0, 0.2)",
 				},
 			]}
 		>
 			<LinearGradient
 				colors={
 					isFocused
-						? ["rgba(102,126,234,0.1)", "rgba(118,75,162,0.05)"]
-						: ["#fff", "#fff"]
+						? ["rgba(255, 107, 53, 0.1)", "rgba(215, 48, 39, 0.05)"]
+						: [theme.elevated, theme.card]
 				}
-				style={styles.premiumSearchGradient}
+				style={styles.grillzSearchGradient}
 			>
-				<MaterialIcons
+				<Ionicons
 					name="search"
 					size={22}
-					color={isFocused ? "#667eea" : "#999"}
+					color={isFocused ? "#FF6B35" : "#FFD700"}
 					style={styles.searchIcon}
 				/>
 				<TextInput
-					style={styles.premiumSearchInput}
-					placeholder="Rechercher un délice..."
-					placeholderTextColor="#999"
+					style={styles.grillzSearchInput}
+					placeholder="Rechercher un plat..."
+					placeholderTextColor="#B0B0B0"
 					value={value}
 					onChangeText={onChangeText}
 					onFocus={() => setIsFocused(true)}
@@ -343,8 +335,8 @@ const PremiumSearchBar = ({ value, onChangeText, onClear }) => {
 					returnKeyType="search"
 				/>
 				{value.length > 0 && (
-					<TouchableOpacity onPress={onClear} style={styles.clearButton}>
-						<View style={styles.clearButtonInner}>
+					<TouchableOpacity onPress={onClear} style={styles.grillzClearButton}>
+						<View style={styles.grillzClearButtonInner}>
 							<MaterialIcons name="close" size={16} color="#fff" />
 						</View>
 					</TouchableOpacity>
@@ -355,7 +347,12 @@ const PremiumSearchBar = ({ value, onChangeText, onClear }) => {
 };
 
 // 🛒 Panier flottant Premium
-const PremiumFloatingCart = ({ itemCount, total, onPress }) => {
+const PremiumFloatingCart = ({
+	itemCount,
+	total,
+	onPress,
+	theme = GRILLZ_THEME,
+}) => {
 	const bounceAnim = useRef(new Animated.Value(0)).current;
 	const scaleAnim = useRef(new Animated.Value(0)).current;
 
@@ -403,9 +400,9 @@ const PremiumFloatingCart = ({ itemCount, total, onPress }) => {
 				},
 			]}
 		>
-			<BlurView intensity={80} tint="light" style={styles.premiumCartBlur}>
+			<BlurView intensity={80} tint="dark" style={styles.premiumCartBlur}>
 				<LinearGradient
-					colors={["rgba(255,255,255,0.9)", "rgba(255,255,255,0.95)"]}
+					colors={["rgba(26, 26, 26, 0.9)", "rgba(42, 42, 42, 0.95)"]}
 					style={styles.premiumCartGradient}
 				>
 					<View style={styles.premiumCartInfo}>
@@ -420,11 +417,12 @@ const PremiumFloatingCart = ({ itemCount, total, onPress }) => {
 
 					<TouchableOpacity onPress={onPress} activeOpacity={0.9}>
 						<LinearGradient
-							colors={["#667eea", "#764ba2"]}
+							colors={theme.primary}
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 1 }}
 							style={styles.premiumCartButton}
 						>
+							<Ionicons name="flame" size={18} color="#fff" />
 							<Text style={styles.premiumCartButtonText}>Commander</Text>
 							<MaterialIcons name="arrow-forward" size={18} color="#fff" />
 						</LinearGradient>
@@ -603,6 +601,9 @@ export default function Menu({
 	// 🎯 Feature Levels : Récupérer les fonctionnalités disponibles selon la catégorie
 	const { hasAllergies, hasRestrictions, isMinimum, level } = useFeatureLevel();
 
+	// 🏪 Récupérer les infos du restaurant (nom, catégorie)
+	const { name: restaurantName, fetchRestaurantInfo } = useRestaurantStore();
+
 	// ✨ NOUVEAU : Charger la config dynamique (VERSION SIMPLIFIÉE)
 	const {
 		config,
@@ -610,21 +611,29 @@ export default function Menu({
 		error: configError,
 	} = useRestaurantConfig(restaurantId);
 
-	// ⭐ NOUVEAU : Écouter les changements de style en temps réel via WebSocket
-	const { style: liveStyle, isConnected: socketConnected } =
-		useStyleUpdates(restaurantId);
+	// 🏪 Charger les infos du restaurant si restaurantId change
+	useEffect(() => {
+		if (restaurantId) {
+			fetchRestaurantInfo(restaurantId);
+		}
+	}, [restaurantId, fetchRestaurantInfo]);
 
-	// 🚪 NOUVEAU : Écouter la fermeture de réservation et rediriger automatiquement
-	useReservationStatus(restaurantId, reservationId, onReservationClosed);
+	// ⭐ NOUVEAU : Écouter les changements de style en temps réel via WebSocket (seulement si restaurantId existe)
+	const { style: liveStyle, isConnected: socketConnected } = useStyleUpdates(
+		restaurantId || null,
+	);
 
-	// � ARCHITECTURE 100% JSON-DRIVEN : Lecture des flags depuis config.style
-	const restaurantName = useRestaurantStore((state) => state.name) || "";
-	const useCustomHeader = config?.style?.useCustomHeader || false;
-	
-	// 🎨 Thème dynamique selon le restaurant (fallback si pas de config)
-	const baseTheme = config?.style || PREMIUM_COLORS;
+	// 🚪 NOUVEAU : Écouter la fermeture de réservation et rediriger automatiquement (seulement si reservationId existe)
+	useReservationStatus(
+		reservationId && restaurantId ? restaurantId : null,
+		reservationId || null,
+		reservationId && restaurantId ? onReservationClosed : () => {},
+	);
 
-	const [currentStyle, setCurrentStyle] = useState(baseTheme);
+	// 🎨 Fusionner config.style avec GRILLZ_THEME comme fallback pour les clés manquantes
+	const [currentStyle, setCurrentStyle] = useState(
+		config?.style ? { ...GRILLZ_THEME, ...config.style } : GRILLZ_THEME,
+	);
 
 	// Mettre à jour le style quand un nouveau style est appliqué en temps réel
 	useEffect(() => {
@@ -633,9 +642,11 @@ export default function Menu({
 				"🎨 [Menu] Nouveau style reçu via WebSocket:",
 				liveStyle.style_id,
 			);
-			// 🚀 Appliquer le style depuis WebSocket
-			const updatedTheme = liveStyle.config.colors || baseTheme;
-			setCurrentStyle(updatedTheme);
+			const mergedStyle = {
+				...GRILLZ_THEME,
+				...(liveStyle.config.colors || liveStyle.config),
+			};
+			setCurrentStyle(mergedStyle);
 
 			// Optionnel : Afficher une notification à l'utilisateur
 			Alert.alert(
@@ -644,12 +655,12 @@ export default function Menu({
 				[{ text: "OK" }],
 			);
 		}
-	}, [liveStyle, baseTheme]);
+	}, [liveStyle]);
 
 	// Mettre à jour le style quand la config initiale est chargée
 	useEffect(() => {
 		if (config?.style) {
-			setCurrentStyle(config.style);
+			setCurrentStyle({ ...GRILLZ_THEME, ...config.style });
 		}
 	}, [config]);
 
@@ -710,11 +721,32 @@ export default function Menu({
 			const legacy = legacyCategories.find((l) => l.id === catName);
 			if (legacy) return legacy;
 
-			// Sinon, créer une config générique
+			// Mapping personnalisé Grillz
+			const lowerName = catName.toLowerCase();
+			let emoji = "🍽️";
+			if (lowerName.includes("poulet"))
+				emoji = "🍗"; // Poulet rôti
+			else if (lowerName.includes("accompagnement"))
+				emoji = "🍟"; // Frites
+			else if (lowerName.includes("sauce"))
+				emoji = "🥣"; // Sauce
+			else if (lowerName.includes("formule"))
+				emoji = "🍱"; // Plateau/menu
+			else if (
+				lowerName.includes("boisson") ||
+				lowerName.includes("drink") ||
+				lowerName.includes("jus") ||
+				lowerName.includes("eau") ||
+				lowerName.includes("soda")
+			)
+				emoji = "🥤"; // Boisson
+			else if (lowerName.includes("dessert")) emoji = "🍰";
+			// fallback générique
+
 			return {
 				id: catName,
 				title: catName.charAt(0).toUpperCase() + catName.slice(1),
-				emoji: "🍽️",
+				emoji,
 				gradient: ["#667eea", "#764ba2"],
 				icon: "restaurant",
 			};
@@ -737,6 +769,45 @@ export default function Menu({
 			: mappedProductCategories.length > 0
 				? mappedProductCategories
 				: legacyCategories;
+
+	// 🎨 ALGORITHME ADAPTATIF : Calcule le layout optimal selon le nombre de catégories
+	const getCategoriesLayout = (categoriesCount) => {
+		if (categoriesCount <= 4) {
+			// 4 catégories ou moins : affichage classique en ligne unique
+			return {
+				itemsPerRow: categoriesCount,
+				rows: 1,
+				justifyContent: "center",
+				layout: "single-row",
+			};
+		} else if (categoriesCount === 8) {
+			// 8 catégories : 4 par ligne sur 2 lignes
+			return {
+				itemsPerRow: 4,
+				rows: 2,
+				justifyContent: "space-between",
+				layout: "grid",
+			};
+		} else if (categoriesCount === 9) {
+			// 9 catégories : 3 par ligne sur 3 lignes
+			return {
+				itemsPerRow: 3,
+				rows: 3,
+				justifyContent: "center",
+				layout: "grid",
+			};
+		} else {
+			// Autres cas : grille 3 par ligne
+			return {
+				itemsPerRow: 3,
+				rows: Math.ceil(categoriesCount / 3),
+				justifyContent: "space-between",
+				layout: "grid",
+			};
+		}
+	};
+
+	const categoriesLayout = getCategoriesLayout(categories.length);
 
 	// Add a mapping function to handle category display
 	const mapCategoryDisplay = (categoryId) => {
@@ -870,84 +941,32 @@ export default function Menu({
 
 	return (
 		<LinearGradient
-			colors={COLORS?.dark || PREMIUM_COLORS.dark}
+			colors={COLORS.background || [COLORS.dark, COLORS.card]}
 			style={styles.container}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 1 }}
 		>
-			{/* Décorations premium */}
+			{/* Décorations dynamiques */}
 			<View style={styles.bgDecor} pointerEvents="none">
 				<LinearGradient
-					colors={[
-						...(COLORS?.primary || PREMIUM_COLORS.primary),
-						"transparent",
-					]}
+					colors={[...COLORS.primary, "transparent"]}
 					style={[styles.bgCircle, styles.bgCircle1]}
 				/>
 				<LinearGradient
-					colors={[...(COLORS?.accent || PREMIUM_COLORS.accent), "transparent"]}
+					colors={[...(COLORS.ember || COLORS.primary), "transparent"]}
 					style={[styles.bgCircle, styles.bgCircle2]}
 				/>
 			</View>
 
-			{/* 🔒 Header Conditionnel : Grillz ou Standard */}
-			{useCustomHeader ? (
-				<GrillzHeader
-					userName={userName}
-					restaurantName={restaurantName}
-					onOpenDietary={() => setShowDietaryModal(true)}
-					showDietaryFeature={hasAllergies || hasRestrictions}
-					theme={currentStyle}
-					styleConfig={{
-						headerIcon: config?.style?.headerIcon || "flame",
-						categoryLabel: config?.style?.categoryLabel,
-						slogan: config?.style?.slogan,
-					}}
-				/>
-			) : (
-				<View style={styles.premiumHeader}>
-					<View style={styles.headerRow}>
-						<TouchableOpacity
-							onPress={() => setShowDietaryModal(true)}
-							style={{ position: "relative" }}
-							activeOpacity={0.7}
-						>
-							<LinearGradient
-								colors={COLORS?.accent || PREMIUM_COLORS.accent}
-								style={styles.headerIcon}
-								start={{ x: 0, y: 0 }}
-								end={{ x: 1, y: 1 }}
-							>
-								<MaterialIcons name="restaurant-menu" size={32} color="#fff" />
-							</LinearGradient>
-							{/* Badge "+" */}
-							<View
-								style={{
-									position: "absolute",
-									top: -4,
-									right: -4,
-									backgroundColor: "#ff512f",
-									width: 20,
-									height: 20,
-									borderRadius: 10,
-									alignItems: "center",
-									justifyContent: "center",
-									borderWidth: 2,
-									borderColor: "#fff",
-								}}
-							>
-								<Ionicons name="add" size={14} color="#fff" />
-							</View>
-						</TouchableOpacity>
-						<View style={{ flex: 1, alignItems: "center" }}>
-							<Text style={styles.welcomeTitle}>
-								{userName ? `Bonjour ${userName}` : "Bienvenue"} ✨
-							</Text>
-						</View>
-					</View>
-					<Text style={styles.subtitle}>Découvrez notre carte</Text>
-				</View>
-			)}
+			{/* 🔥 Header personnalisé (dynamique via config BDD) */}
+			<GrillzHeader
+				userName={userName}
+				restaurantName={restaurantName}
+				onOpenDietary={() => setShowDietaryModal(true)}
+				showDietaryFeature={hasAllergies || hasRestrictions}
+				theme={COLORS}
+				styleConfig={config?.style || {}}
+			/>
 
 			{/* 🔍 Barre de recherche Premium */}
 			<PremiumSearchBar
@@ -957,23 +976,30 @@ export default function Menu({
 					if (text.trim()) setSelectedCategory(null);
 				}}
 				onClear={() => setSearchQuery("")}
+				theme={COLORS}
 			/>
 
-			{/* ⭐ Barre de catégories animées style gradient-menu (masquée si recherche active) */}
+			{/* ⭐ Zone fixe pour les boutons de catégories */}
 			{!searchQuery.trim() && (
-				<View style={styles.categoriesBar}>
-					{categories.map((cat) => {
-						const isSelected = selectedCategory?.id === cat.id;
-						return (
-							<AnimatedCategoryButton
-								key={cat.id}
-								category={cat}
-								isSelected={isSelected}
-								otherSelected={selectedCategory && !isSelected}
-								onPress={() => setSelectedCategory(isSelected ? null : cat)}
-							/>
-						);
-					})}
+				<View style={styles.categoriesFixedZone}>
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						contentContainerStyle={styles.horizontalCategoriesContainer}
+					>
+						{categories.map((cat) => {
+							const isSelected = selectedCategory?.id === cat.id;
+							return (
+								<AnimatedCategoryButton
+									key={cat.id}
+									category={cat}
+									isSelected={isSelected}
+									otherSelected={selectedCategory && !isSelected}
+									onPress={() => setSelectedCategory(isSelected ? null : cat)}
+								/>
+							);
+						})}
+					</ScrollView>
 				</View>
 			)}
 
@@ -1066,6 +1092,7 @@ export default function Menu({
 				itemCount={totalArticles}
 				total={cartTotal}
 				onPress={() => onNavigateToOrders?.()}
+				theme={COLORS}
 			/>
 
 			{/* Bouton Payer si commande active */}
@@ -1132,11 +1159,13 @@ export default function Menu({
 				</Modal>
 			)}
 
-			{/* Modal Préférences Alimentaires */}
-			<DietaryPreferences
-				visible={showDietaryModal}
-				onClose={() => setShowDietaryModal(false)}
-			/>
+			{/* Modal Préférences Alimentaires - masqué pour foodtrucks */}
+			{(hasAllergies || hasRestrictions) && (
+				<DietaryPreferences
+					visible={showDietaryModal}
+					onClose={() => setShowDietaryModal(false)}
+				/>
+			)}
 
 			{/* 💬 Messagerie Client-Serveur : visible uniquement si reservationId fourni */}
 			{reservationId && clientId && (
@@ -1321,6 +1350,37 @@ const styles = StyleSheet.create({
 		marginBottom: 20,
 		paddingHorizontal: 5,
 	},
+	// ⭐ Layout en grille pour 8, 9 catégories
+	categoriesGrid: {
+		flexDirection: "column",
+		flexWrap: "nowrap",
+		alignItems: "center",
+		paddingHorizontal: 0,
+		gap: 6,
+	},
+	categoryRow: {
+		flexDirection: "row",
+		gap: 8,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	// ⭐ Scroll horizontal pour tous les boutons
+	horizontalCategoriesBar: {
+		marginBottom: 10,
+	},
+	// ⭐ Zone fixe pour les boutons
+	categoriesFixedZone: {
+		height: 80,
+		marginHorizontal: -20,
+		marginBottom: 10,
+		justifyContent: "center",
+	},
+	horizontalCategoriesContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 8,
+		paddingHorizontal: 5,
+	},
 	// 🎨 Bouton animé style gradient-menu
 	animatedButton: {
 		borderRadius: 30,
@@ -1355,6 +1415,8 @@ const styles = StyleSheet.create({
 		letterSpacing: 1.5,
 		textTransform: "uppercase",
 		position: "absolute",
+		textAlign: "center",
+		width: "100%",
 	},
 	// Anciens styles gardés pour compatibilité
 	categoryPillWrapper: {
@@ -1989,14 +2051,14 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 		borderRadius: 20,
 		borderWidth: 1,
-		borderColor: "rgba(0,0,0,0.05)",
+		borderColor: "rgba(255, 215, 0, 0.2)",
 	},
 	premiumCartInfo: {
 		flexDirection: "row",
 		alignItems: "center",
 	},
 	premiumCartBadge: {
-		backgroundColor: "#667eea",
+		backgroundColor: "#FFD700",
 		width: 32,
 		height: 32,
 		borderRadius: 16,
@@ -2005,20 +2067,20 @@ const styles = StyleSheet.create({
 		marginRight: 12,
 	},
 	premiumCartBadgeText: {
-		color: "#fff",
+		color: "#1a1a1a",
 		fontWeight: "800",
 		fontSize: 14,
 	},
 	premiumCartTextContainer: {},
 	premiumCartLabel: {
 		fontSize: 12,
-		color: "#666",
+		color: "#B0B0B0",
 		fontWeight: "500",
 	},
 	premiumCartTotal: {
 		fontSize: 18,
 		fontWeight: "800",
-		color: "#1a1a2e",
+		color: "#FFF8F0",
 	},
 	premiumCartButton: {
 		flexDirection: "row",
@@ -2044,7 +2106,7 @@ const styles = StyleSheet.create({
 		gap: 8,
 	},
 
-	// 🔥 ===== STYLES GRILLZ (utilisés uniquement pour Le Grillz) =====
+	// 🔥 ===== STYLES GRILLZ HEADER =====
 	grillzHeader: {
 		marginBottom: 20,
 	},
@@ -2131,5 +2193,84 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		marginTop: 10,
 		fontStyle: "italic",
+	},
+
+	// 🔥 ===== STYLES BOUTONS CATÉGORIES GRILLZ =====
+	grillzCategoryContainer: {
+		marginRight: 12,
+	},
+	categoryButton: {
+		borderRadius: 18,
+		overflow: "hidden",
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.13,
+		shadowRadius: 8,
+		elevation: 6,
+		minWidth: 90,
+	},
+	categoryButtonSelected: {
+		shadowColor: PREMIUM_COLORS.primary[0],
+		shadowOpacity: 0.25,
+		elevation: 10,
+	},
+	categoryButtonGradient: {
+		paddingHorizontal: 18,
+		paddingVertical: 14,
+		alignItems: "center",
+		borderRadius: 18,
+		minWidth: 90,
+	},
+	categoryEmoji: {
+		fontSize: 26,
+		marginBottom: 4,
+	},
+	categoryButtonText: {
+		fontSize: 13,
+		fontWeight: "600",
+		color: PREMIUM_COLORS.textMuted,
+		textAlign: "center",
+	},
+	categoryButtonTextSelected: {
+		color: PREMIUM_COLORS.text,
+		fontWeight: "700",
+	},
+
+	// 🔥 ===== STYLES BARRE RECHERCHE GRILLZ =====
+	grillzSearchContainer: {
+		marginHorizontal: 16,
+		marginVertical: 16,
+		borderRadius: 16,
+		borderWidth: 2,
+		overflow: "hidden",
+		shadowColor: "#FF6B35",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
+		elevation: 2,
+	},
+	grillzSearchGradient: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingHorizontal: 16,
+		paddingVertical: 12,
+	},
+	grillzSearchInput: {
+		flex: 1,
+		fontSize: 16,
+		color: "#FFF8F0",
+		marginLeft: 8,
+		fontWeight: "500",
+	},
+	grillzClearButton: {
+		marginLeft: 8,
+	},
+	grillzClearButtonInner: {
+		backgroundColor: "#FF6B35",
+		borderRadius: 12,
+		width: 24,
+		height: 24,
+		justifyContent: "center",
+		alignItems: "center",
 	},
 });

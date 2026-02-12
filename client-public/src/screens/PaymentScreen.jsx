@@ -32,7 +32,6 @@ import ReceiptTicket from "../components/ReceiptTicket";
  */
 
 // 🎨 Thème BBQ
-import { PREMIUM_COLORS } from "../theme/colors";
 
 export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 	const [loading, setLoading] = useState(false);

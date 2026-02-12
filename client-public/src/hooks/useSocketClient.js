@@ -180,16 +180,24 @@ export const useSocketClient = (
  */
 export const useSocketEvent = (eventName, restaurantId, tableId = null) => {
 	const [eventData, setEventData] = useState(null);
-	const { on, off } = useSocketClient(restaurantId, tableId);
+
+	// ✅ Ne pas connecter si restaurantId est invalide
+	const shouldConnect = restaurantId && typeof restaurantId === "string";
+	const { on, off } = useSocketClient(
+		shouldConnect ? restaurantId : null,
+		tableId,
+	);
 
 	useEffect(() => {
+		if (!shouldConnect) return;
+
 		const handleEvent = (payload) => {
 			setEventData(payload);
 		};
 
 		on(eventName, handleEvent);
 		return () => off(eventName, handleEvent);
-	}, [eventName, on, off]);
+	}, [eventName, on, off, shouldConnect]);
 
 	return eventData;
 };
@@ -199,9 +207,14 @@ export const useSocketEvent = (eventName, restaurantId, tableId = null) => {
  */
 export const useMenuUpdates = (restaurantId) => {
 	const [menuData, setMenuData] = useState(null);
-	const { on, off } = useSocketClient(restaurantId);
+
+	// ✅ Ne pas connecter si restaurantId est invalide
+	const shouldConnect = restaurantId && typeof restaurantId === "string";
+	const { on, off } = useSocketClient(shouldConnect ? restaurantId : null);
 
 	useEffect(() => {
+		if (!shouldConnect) return;
+
 		const handleMenuUpdate = (payload) => {
 			console.log("🍽️ Menu mis à jour:", payload);
 			setMenuData(payload);
@@ -209,7 +222,7 @@ export const useMenuUpdates = (restaurantId) => {
 
 		on("menu_updated", handleMenuUpdate);
 		return () => off("menu_updated", handleMenuUpdate);
-	}, [on, off]);
+	}, [on, off, shouldConnect]);
 
 	return menuData;
 };
@@ -219,9 +232,16 @@ export const useMenuUpdates = (restaurantId) => {
  */
 export const useStyleUpdates = (restaurantId) => {
 	const [styleData, setStyleData] = useState(null);
-	const { on, off, isConnected } = useSocketClient(restaurantId);
+
+	// ✅ Ne pas connecter si restaurantId est invalide
+	const shouldConnect = restaurantId && typeof restaurantId === "string";
+	const { on, off, isConnected } = useSocketClient(
+		shouldConnect ? restaurantId : null,
+	);
 
 	useEffect(() => {
+		if (!shouldConnect) return;
+
 		const handleStyleUpdate = (payload) => {
 			console.log("🎨 Style mis à jour:", payload);
 			setStyleData(payload);
@@ -229,9 +249,9 @@ export const useStyleUpdates = (restaurantId) => {
 
 		on("style_applied", handleStyleUpdate);
 		return () => off("style_applied", handleStyleUpdate);
-	}, [on, off]);
+	}, [on, off, shouldConnect]);
 
-	return { style: styleData, isConnected };
+	return { style: styleData, isConnected: shouldConnect ? isConnected : false };
 };
 
 /**
@@ -239,9 +259,17 @@ export const useStyleUpdates = (restaurantId) => {
  */
 export const useOrderUpdates = (restaurantId, tableId = null) => {
 	const [orders, setOrders] = useState([]);
-	const { on, off } = useSocketClient(restaurantId, tableId);
+
+	// ✅ Ne pas connecter si restaurantId est invalide
+	const shouldConnect = restaurantId && typeof restaurantId === "string";
+	const { on, off } = useSocketClient(
+		shouldConnect ? restaurantId : null,
+		tableId,
+	);
 
 	useEffect(() => {
+		if (!shouldConnect) return;
+
 		const handleOrderEvent = (payload) => {
 			console.log("📦 Commande:", payload.type);
 
@@ -262,7 +290,7 @@ export const useOrderUpdates = (restaurantId, tableId = null) => {
 
 		on("order", handleOrderEvent);
 		return () => off("order", handleOrderEvent);
-	}, [on, off]);
+	}, [on, off, shouldConnect]);
 
 	return orders;
 };

@@ -39,9 +39,13 @@ export const useRestaurantStore = create((set, get) => ({
 			set({
 				category,
 				name: data.name,
-			googlePlaceId: data.googlePlaceId || null,
-			googleUrl: data.googleUrl || null,
-			set({ category: "restaurant", name: null }); // Fallback restaurant normal
+				googlePlaceId: data.googlePlaceId || null,
+				googleUrl: data.googleUrl || null,
+			});
+			return true;
+		} catch (error) {
+			console.error("❌ [RESTAURANT] Erreur fetchRestaurantInfo:", error);
+			set({ category: "restaurant", name: null });
 			// Fallback : niveau complet
 			useFeatureLevelStore.getState().init("restaurant");
 			return false;
