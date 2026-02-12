@@ -67,14 +67,14 @@ const GrillzHeader = ({
 		<View style={styles.grillzHeader}>
 			{/* Background avec effet flammes */}
 			<LinearGradient
-				colors={theme.primary}
+				colors={theme?.primary || PREMIUM_COLORS.primary}
 				style={styles.grillzHeaderBg}
 				start={{ x: 0, y: 0 }}
 				end={{ x: 1, y: 1 }}
 			>
 				{/* Logo restaurant */}
 				<View style={styles.grillzLogoContainer}>
-					<LinearGradient colors={theme.gold} style={styles.grillzLogo}>
+					<LinearGradient colors={theme?.gold || ["#ffd700", "#ffed4e"]} style={styles.grillzLogo}>
 						<Ionicons
 							name={styleConfig.headerIcon || "flame"}
 							size={28}
@@ -690,6 +690,14 @@ export default function Menu({
 	// ✨ NOUVEAU : Extraire les couleurs et catégories de la config
 	const COLORS = currentStyle; // Utiliser le style en temps réel
 
+	// 🛡️ Helper : Garantir qu'on retourne toujours un array valide pour LinearGradient
+	const getGradient = (colorKey) => {
+		const value = COLORS?.[colorKey];
+		return Array.isArray(value) && value.length > 0
+			? value
+			: PREMIUM_COLORS[colorKey] || ["#667eea", "#764ba2"];
+	};
+
 	// 🎯 Générer automatiquement les catégories depuis les produits disponibles
 	const productCategories = useMemo(() => {
 		const uniqueCategories = new Set();
@@ -868,7 +876,7 @@ export default function Menu({
 
 	return (
 		<LinearGradient
-			colors={COLORS?.dark || PREMIUM_COLORS.dark}
+			colors={getGradient('dark')}
 			style={styles.container}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 1 }}
@@ -877,13 +885,13 @@ export default function Menu({
 			<View style={styles.bgDecor} pointerEvents="none">
 				<LinearGradient
 					colors={[
-						...(COLORS?.primary || PREMIUM_COLORS.primary),
+						...getGradient('primary'),
 						"transparent",
 					]}
 					style={[styles.bgCircle, styles.bgCircle1]}
 				/>
 				<LinearGradient
-					colors={[...(COLORS?.accent || PREMIUM_COLORS.accent), "transparent"]}
+					colors={[...getGradient('accent'), "transparent"]}
 					style={[styles.bgCircle, styles.bgCircle2]}
 				/>
 			</View>
@@ -911,7 +919,7 @@ export default function Menu({
 							activeOpacity={0.7}
 						>
 							<LinearGradient
-								colors={COLORS?.accent || PREMIUM_COLORS.accent}
+								colors={getGradient('accent')}
 								style={styles.headerIcon}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
