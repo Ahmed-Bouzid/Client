@@ -615,14 +615,14 @@ export default function Menu({
 	// 🚪 NOUVEAU : Écouter la fermeture de réservation et rediriger automatiquement
 	useReservationStatus(restaurantId, reservationId, onReservationClosed);
 
-	// � ARCHITECTURE 100% JSON-DRIVEN : Lecture des flags depuis config.style
+	// 🚀 ARCHITECTURE 100% JSON-DRIVEN : Lecture des flags depuis config.style
 	const restaurantName = useRestaurantStore((state) => state.name) || "";
 	const useCustomHeader = config?.style?.useCustomHeader || false;
 
 	// 🎨 Thème dynamique selon le restaurant (fallback si pas de config)
 	const baseTheme = config?.style || PREMIUM_COLORS;
 
-	const [currentStyle, setCurrentStyle] = useState(baseTheme);
+	const [currentStyle, setCurrentStyle] = useState(PREMIUM_COLORS);
 
 	// Mettre à jour le style quand un nouveau style est appliqué en temps réel
 	useEffect(() => {
@@ -631,9 +631,8 @@ export default function Menu({
 				"🎨 [Menu] Nouveau style reçu via WebSocket:",
 				liveStyle.style_id,
 			);
-			// 🚀 Appliquer le style depuis WebSocket
-			const updatedTheme = liveStyle.config.colors || baseTheme;
-			setCurrentStyle(updatedTheme);
+			// 🚀 Appliquer le style depuis WebSocket (liveStyle.config contient déjà les couleurs)
+			setCurrentStyle(liveStyle.config);
 
 			// Optionnel : Afficher une notification à l'utilisateur
 			Alert.alert(
@@ -642,7 +641,7 @@ export default function Menu({
 				[{ text: "OK" }],
 			);
 		}
-	}, [liveStyle, baseTheme]);
+	}, [liveStyle]);
 
 	// Mettre à jour le style quand la config initiale est chargée
 	useEffect(() => {
