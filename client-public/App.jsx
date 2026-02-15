@@ -326,6 +326,9 @@ export default function App() {
 			setUserName("");
 			setClientId(null);
 
+			// 🔧 Petit délai pour laisser Payment se démontrer proprement
+			await new Promise(resolve => setTimeout(resolve, 100));
+
 			// On redirige vers join (écran de départ)
 			setStep("join");
 

@@ -79,6 +79,9 @@ export default function JoinOrCreateTable({
 		new Animated.Value(0),
 	]).current;
 
+	// 📜 Ref pour le ScrollView
+	const scrollViewRef = useRef(null);
+
 	const { restaurantId } = useClientTableStore();
 	const restaurantName = useRestaurantStore((state) => state.name);
 	const category = useRestaurantStore((state) => state.category);
@@ -143,6 +146,16 @@ export default function JoinOrCreateTable({
 			}).start();
 		});
 	}, []);
+
+	// 🔄 Reset scroll et layout quand le composant redevient actif (après retour de Payment)
+	useEffect(() => {
+		// Reset scroll position au top
+		if (scrollViewRef.current) {
+			setTimeout(() => {
+				scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+			}, 50);
+		}
+	}, [orders.length, hasJoinedTable]); // Se déclenche quand on revient (orders change après paiement)
 
 	// 🎨 Button press animation
 	const handlePressIn = () => {
@@ -505,6 +518,7 @@ export default function JoinOrCreateTable({
 
 			{/* Contenu principal avec gestion clavier native iOS */}
 			<ScrollView
+				ref={scrollViewRef}
 				style={styles.scrollContainer}
 				contentContainerStyle={styles.scrollContent}
 				automaticallyAdjustKeyboardInsets={true}
