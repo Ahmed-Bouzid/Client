@@ -711,16 +711,73 @@ export default function Menu({
 
 	// 🎨 Mapper les catégories avec leurs configs (emoji, gradient, etc.)
 	const mappedProductCategories = useMemo(() => {
+		// 🎯 Fonction helper pour déterminer l'emoji selon le nom de catégorie
+		const getEmojiByCategory = (name) => {
+			const lowerName = name.toLowerCase();
+			if (lowerName.includes("entree") || lowerName.includes("entrée"))
+				return "🥗";
+			if (lowerName.includes("plat") || lowerName.includes("principal"))
+				return "🍽️";
+			if (
+				lowerName.includes("dessert") ||
+				lowerName.includes("sucré") ||
+				lowerName.includes("tiramisu")
+			)
+				return "🍰";
+			if (
+				lowerName.includes("café") ||
+				lowerName.includes("coffee") ||
+				lowerName.includes("thé") ||
+				lowerName.includes("tea")
+			)
+				return "☕";
+			if (
+				lowerName.includes("burger") ||
+				lowerName.includes("sandwich") ||
+				lowerName.includes("salé")
+			)
+				return "🍔";
+			if (lowerName.includes("pizza")) return "🍕";
+			if (lowerName.includes("salade")) return "🥗";
+			if (lowerName.includes("pâtes") || lowerName.includes("pasta"))
+				return "🍝";
+			if (lowerName.includes("mocktail") || lowerName.includes("cocktail"))
+				return "🍹";
+			if (
+				lowerName.includes("boisson") ||
+				lowerName.includes("drink") ||
+				lowerName.includes("soda") ||
+				lowerName.includes("jus")
+			)
+				return "🥤";
+			if (
+				lowerName.includes("poulet") ||
+				lowerName.includes("viande") ||
+				lowerName.includes("meat")
+			)
+				return "🍗";
+			if (lowerName.includes("poisson") || lowerName.includes("fish"))
+				return "🐟";
+			if (lowerName.includes("végé") || lowerName.includes("vegan"))
+				return "🥬";
+			if (
+				lowerName.includes("accompagnement") ||
+				lowerName.includes("side")
+			)
+				return "⭐";
+			return "🍽️"; // Défaut
+		};
+
 		return productCategories.map((catName) => {
 			// Chercher d'abord dans legacyCategories
 			const legacy = legacyCategories.find((l) => l.id === catName);
 			if (legacy) return legacy;
 
-			// Sinon, créer une config générique
+			// Sinon, créer une config avec emoji automatique
 			return {
 				id: catName,
 				title: catName.charAt(0).toUpperCase() + catName.slice(1),
-				emoji: "🍽️",
+				emoji: getEmojiByCategory(catName),
 				gradient: ["#667eea", "#764ba2"],
 				icon: "restaurant",
 			};
