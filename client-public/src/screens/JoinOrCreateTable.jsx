@@ -82,8 +82,8 @@ export default function JoinOrCreateTable({
 	// 📜 Ref pour le ScrollView
 	const scrollViewRef = useRef(null);
 	
-	// 🔄 Key pour forcer unmount/remount du ScrollView (simule un reload)
-	const [scrollKey, setScrollKey] = useState(0);
+	// 🔄 Key pour forcer unmount/remount COMPLET de la page (simule un reload)
+	const [componentKey, setComponentKey] = useState(0);
 
 	const { restaurantId } = useClientTableStore();
 	const restaurantName = useRestaurantStore((state) => state.name);
@@ -150,12 +150,13 @@ export default function JoinOrCreateTable({
 		});
 	}, []);
 
-	// 🔄 SIMULE UN RELOAD : Force unmount/remount du ScrollView au retour de paiement
-	// ⚡ Solution au bug "bande grise" : la redirection garde le ScrollView en cache,
-	//    mais un reload le recrée de zéro. On simule ce comportement avec une key.
+	// 🔄 SIMULE UN RELOAD COMPLET : Force unmount/remount de TOUTE la page
+	// ⚡ Solution au bug "bande grise" : la redirection garde les composants en cache
+	//    (LinearGradient, StatusBar, BlurView, etc.). Un reload les recrée de zéro.
+	//    On applique la key au container root pour forcer un remount total.
 	useEffect(() => {
-		// Incrémenter la key → ScrollView détruit et recréé = état propre
-		setScrollKey(prev => prev + 1);
+		// Incrémenter la key → TOUT le composant détruit et recréé = état 100% propre
+		setComponentKey(prev => prev + 1);
 	}, [orders.length, hasJoinedTable]); // Se déclenche quand on revient (orders change après paiement)
 
 	// 🎨 Button press animation
@@ -431,6 +432,7 @@ export default function JoinOrCreateTable({
 
 	return (
 		<ImageBackground
+			key={componentKey} // 🔄 Change à chaque retour → force remount TOTAL
 			source={backgroundImage}
 			style={styles.background}
 			resizeMode="cover"
@@ -519,7 +521,6 @@ export default function JoinOrCreateTable({
 
 			{/* Contenu principal avec gestion clavier native iOS */}
 			<ScrollView
-				key={scrollKey} // 🔄 Change à chaque retour → force unmount/remount
 				ref={scrollViewRef}
 				style={styles.scrollContainer}
 				contentContainerStyle={styles.scrollContent}
