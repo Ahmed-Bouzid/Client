@@ -81,7 +81,7 @@ export default function JoinOrCreateTable({
 
 	// 📜 Ref pour le ScrollView
 	const scrollViewRef = useRef(null);
-	
+
 	// 🔄 Key pour forcer unmount/remount COMPLET de la page (simule un reload)
 	const [componentKey, setComponentKey] = useState(0);
 
@@ -156,7 +156,7 @@ export default function JoinOrCreateTable({
 	//    On applique la key au container root pour forcer un remount total.
 	useEffect(() => {
 		// Incrémenter la key → TOUT le composant détruit et recréé = état 100% propre
-		setComponentKey(prev => prev + 1);
+		setComponentKey((prev) => prev + 1);
 	}, [orders.length, hasJoinedTable]); // Se déclenche quand on revient (orders change après paiement)
 
 	// 🎨 Button press animation
@@ -508,7 +508,11 @@ export default function JoinOrCreateTable({
 				</>
 			)}
 
-			<StatusBar barStyle="light-content" />
+			<StatusBar 
+				barStyle="light-content" 
+				translucent={false}
+				backgroundColor="transparent"
+			/>
 
 			{/* 🔧 Debug Button */}
 			<TouchableOpacity
