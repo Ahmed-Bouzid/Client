@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { API_CONFIG } from "shared-api/config/apiConfig.js";
+import useSocketClient from "../hooks/useSocketClient.js"; // ⚡ WebSocket pour orders
 import {
 	View,
 	Text,
@@ -149,6 +150,30 @@ export default function JoinOrCreateTable({
 			}).start();
 		});
 	}, []);
+
+	// ⚡ WebSocket: Écouter les mises à jour d'orders (paiement) en temps réel
+	const { on, off } = useSocketClient(restaurantId, tableId);
+
+	useEffect(() => {
+		if (!restaurantId || !tableId) return;
+
+		const handleOrderUpdate = (payload) => {
+			console.log("📦 [JoinOrCreateTable] Order WebSocket:", payload.type);
+			
+			if (payload.type === "order_updated" && payload.data) {
+				// Mettre à jour la commande dans le state local
+				setOrders((prevOrders) => 
+					prevOrders.map((order) => 
+						order._id === payload.data._id ? payload.data : order
+					)
+				);
+				console.log("✅ [JoinOrCreateTable] Order mis à jour:", payload.data._id, "paid:", payload.data.paid);
+			}
+		};
+
+		on("order", handleOrderUpdate);
+		return () => off("order", handleOrderUpdate);
+	}, [restaurantId, tableId, on, off]);
 
 	// 🔄 SIMULE UN RELOAD COMPLET : Force unmount/remount de TOUTE la page
 	// ⚡ Solution au bug "bande grise" : la redirection garde les composants en cache
@@ -508,8 +533,8 @@ export default function JoinOrCreateTable({
 				</>
 			)}
 
-			<StatusBar 
-				barStyle="light-content" 
+			<StatusBar
+				barStyle="light-content"
 				translucent={false}
 				backgroundColor="transparent"
 			/>
