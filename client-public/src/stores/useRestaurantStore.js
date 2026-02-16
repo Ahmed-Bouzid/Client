@@ -32,9 +32,6 @@ export const useRestaurantStore = create((set, get) => ({
 			}
 
 			const data = await response.json();
-			console.log("✅ [RESTAURANT] Info récupérée:", data);
-		console.log("🔍 [DEBUG] Restaurant NAME:", data.name);
-		console.log("🔍 [DEBUG] Restaurant ID demandé:", restaurantId);
 
 		const category = data.category || "restaurant";
 
@@ -43,11 +40,6 @@ export const useRestaurantStore = create((set, get) => ({
 			name: data.name,
 			googlePlaceId: data.googlePlaceId || null,
 			googleUrl: data.googleUrl || null,
-		});
-		
-		console.log("✅ [RESTAURANT] Store mis à jour avec:", { 
-			name: data.name, 
-			category 
 		});
 		
 			return true;

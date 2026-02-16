@@ -215,13 +215,10 @@ export default function JoinOrCreateTable({
 			if (!tableId) return;
 			try {
 				const urlGuests = `${API_CONFIG.BASE_URL}/client-tables/${tableId}/guests`;
-				console.log("[FETCH] Guests URL:", urlGuests);
 				const resGuests = await fetch(urlGuests);
-				console.log("[FETCH] Guests status:", resGuests.status);
 				let data;
 				if (resGuests.ok) {
 					const text = await resGuests.text();
-					console.log("[FETCH] Guests body:", text);
 					try {
 						data = JSON.parse(text);
 					} catch (e) {
@@ -284,7 +281,6 @@ export default function JoinOrCreateTable({
 	// 🏪 Charger les infos restaurant au montage
 	useEffect(() => {
 		if (restaurantId) {
-			console.log("[DEBUG] Restaurant ID:", restaurantId);
 			fetchRestaurantInfo(restaurantId).then(() => {
 				setRestaurantLoaded(true);
 			});

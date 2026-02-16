@@ -178,9 +178,7 @@ const joinRooms = (socket, restaurantId, tableId) => {
 
 	// Rejoindre la room du restaurant
 	socket.emit("join-restaurant", { restaurantId }, (ack) => {
-		if (ack?.success) {
-			console.log(`✅ Rejoint room restaurant-${restaurantId}`);
-		} else {
+		if (!ack?.success) {
 			console.error(`❌ Échec join restaurant-${restaurantId}:`, ack?.error);
 		}
 	});
@@ -188,9 +186,7 @@ const joinRooms = (socket, restaurantId, tableId) => {
 	// Rejoindre la room de la table si spécifiée
 	if (tableId) {
 		socket.emit("join-table", { restaurantId, tableId }, (ack) => {
-			if (ack?.success) {
-				console.log(`✅ Rejoint room table-${restaurantId}-${tableId}`);
-			} else {
+			if (!ack?.success) {
 				console.error(`❌ Échec join table-${tableId}:`, ack?.error);
 			}
 		});
@@ -211,9 +207,7 @@ export const joinReservation = (reservationId) => {
 	console.log(`🔌 Rejoindre room: reservation-${reservationId}`);
 
 	socketInstance.emit("join-reservation", { reservationId }, (ack) => {
-		if (ack?.success) {
-			console.log(`✅ Rejoint room reservation-${reservationId}`);
-		} else {
+		if (!ack?.success) {
 			console.error(`❌ Échec join reservation-${reservationId}:`, ack?.error);
 		}
 	});

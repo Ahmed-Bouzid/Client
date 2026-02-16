@@ -72,13 +72,6 @@ export default function useRestaurantConfig(restaurantId) {
 					menuLayout,
 				});
 
-				// 🔍 DEBUG : Afficher les premières couleurs
-				console.log("🎨 [useRestaurantConfig] Couleurs reçues:", {
-					primary: style.config?.primary,
-					background: style.config?.background,
-					text: style.config?.text,
-					orange: style.config?.orange,
-				});
 
 				setConfig(normalizedConfig);
 				setLoading(false);
