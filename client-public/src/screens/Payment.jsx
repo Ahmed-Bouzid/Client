@@ -31,7 +31,14 @@ import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
 const { width, height } = Dimensions.get("window");
 
 // 🎴 Premium Payment Item Card
-const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle, theme = PREMIUM_COLORS }) => {
+const PremiumPaymentItem = ({
+	item,
+	index,
+	isSelected,
+	isPaid,
+	onToggle,
+	theme = PREMIUM_COLORS,
+}) => {
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(20)).current;
 	const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -72,14 +79,6 @@ const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle, theme =
 
 	const itemTotal =
 		(parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1);
-	console.log("🔍 DEBUG PremiumPaymentItem:", {
-		name: item?.name,
-		price: item?.price,
-		quantity: item?.quantity,
-		itemTotal,
-		type: typeof itemTotal,
-		isNaN: isNaN(itemTotal),
-	});
 
 	return (
 		<Animated.View
@@ -162,9 +161,7 @@ const PremiumPaymentItem = ({ item, index, isSelected, isPaid, onToggle, theme =
 							</View>
 						) : (
 							<LinearGradient
-								colors={
-									isSelected ? theme.primary : ["#e9ecef", "#dee2e6"]
-								}
+								colors={isSelected ? theme.primary : ["#e9ecef", "#dee2e6"]}
 								style={styles.priceBadge}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 0 }}
@@ -223,7 +220,9 @@ export default function Payment({
 
 	// 🎨 Thème dynamique depuis la BDD, fallback PREMIUM_COLORS
 	const { config } = useRestaurantConfig(restaurantId);
-	const theme = config?.style ? { ...PREMIUM_COLORS, ...config.style } : PREMIUM_COLORS;
+	const theme = config?.style
+		? { ...PREMIUM_COLORS, ...config.style }
+		: PREMIUM_COLORS;
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -343,49 +342,6 @@ export default function Payment({
 
 	// ✅ Initialiser la sélection avec les articles non payés
 	useEffect(() => {
-		console.log(
-			"\n🔍🔍🔍 ========== PAYMENT.JSX - ANALYSE ALLORDERS ========== 🔍🔍🔍",
-		);
-		console.log("📦 Props reçues:", {
-			reservationId,
-			tableId,
-			tableNumber,
-			userName,
-			clientId,
-			allOrdersLength: allOrders?.length || 0,
-		});
-		console.log(
-			"📋 TOUS LES ORDERS (allOrders):",
-			JSON.stringify(allOrders, null, 2),
-		);
-
-		// Grouper par orderId pour voir s'il y a plusieurs commandes
-		const ordersByOrderId = {};
-		allOrders?.forEach((item) => {
-			const oid = item.orderId || "unknown";
-			if (!ordersByOrderId[oid]) ordersByOrderId[oid] = [];
-			ordersByOrderId[oid].push(item);
-		});
-		console.log(
-			"📊 Groupé par orderId:",
-			Object.keys(ordersByOrderId).length,
-			"commandes distinctes",
-		);
-		Object.entries(ordersByOrderId).forEach(([oid, items]) => {
-			const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
-			console.log(
-				`  - Order ${oid}: ${items.length} items, total: ${total.toFixed(2)}€`,
-			);
-			items.forEach((item) => {
-				console.log(
-					`    * ${item.name} x${item.quantity} = ${(item.price * item.quantity).toFixed(2)}€`,
-				);
-			});
-		});
-		console.log(
-			"🔍🔍🔍 ====================================================== 🔍🔍🔍\n",
-		);
-
 		if (allOrders && allOrders.length > 0) {
 			const nonPaidItems = allOrders.filter(
 				(item) => !paidItems.has(getItemId(item)),
@@ -622,14 +578,6 @@ export default function Payment({
 		// 🌟 Préparer les données pour le feedback
 		const restaurantStore = useRestaurantStore.getState();
 
-		console.log("🌟 [PAYMENT] Préparation feedbackData:");
-		console.log("  - restaurantId:", restaurantId);
-		console.log("  - restaurantStore.id:", restaurantStore.id);
-		console.log("  - clientId:", clientId);
-		console.log("  - userName:", userName);
-		console.log("  - tableId:", tableId);
-		console.log("  - reservationId:", reservationId);
-
 		setTimeout(() => {
 			// Préparer les données feedback avec valeurs par défaut sûres
 			const feedbackPayload = {
@@ -648,7 +596,6 @@ export default function Payment({
 				},
 			};
 
-			console.log("🌟 [PAYMENT] FeedbackData final:", feedbackPayload);
 			setFeedbackData(feedbackPayload);
 
 			// Afficher le feedback au lieu de fermer directement
@@ -707,17 +654,9 @@ export default function Payment({
 
 		try {
 			// 1. Filtrer les articles sélectionnés
-			console.log("\n💰💰💰 ========== CALCUL PAIEMENT ========== 💰💰💰");
-			console.log("🔢 selectedItems (IDs):", Array.from(selectedItems));
 			const selectedOrders = allOrders.filter((item) =>
 				selectedItems.has(getItemId(item)),
 			);
-			console.log("✅ selectedOrders filtrés:", selectedOrders.length, "items");
-			selectedOrders.forEach((item) => {
-				console.log(
-					`  - ${item.name} (${getItemId(item)}): ${item.price}€ x ${item.quantity} = ${(item.price * item.quantity).toFixed(2)}€`,
-				);
-			});
 
 			// 2. Calculer le montant payé
 			const amountPaid = selectedOrders.reduce(
@@ -726,8 +665,6 @@ export default function Payment({
 					(parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1),
 				0,
 			);
-			console.log("💵 MONTANT TOTAL À PAYER:", amountPaid.toFixed(2), "€");
-			console.log("💰💰💰 ================================== 💰💰💰\n");
 			logger.debug("Calcul montant paiement", {
 				totalItems: paidItems.length,
 				amount: "[CENSORED]",
@@ -926,7 +863,10 @@ export default function Payment({
 	// 🚨 Si pas de commandes à afficher
 	if (!allOrders || allOrders.length === 0) {
 		return (
-			<LinearGradient colors={theme.background || [theme.dark, theme.card]} style={styles.container}>
+			<LinearGradient
+				colors={theme.background || [theme.dark, theme.card]}
+				style={styles.container}
+			>
 				<View style={styles.errorContainer}>
 					<LinearGradient
 						colors={theme.danger}
@@ -1104,11 +1044,7 @@ export default function Payment({
 						{availableItems.length > 0 && (
 							<TouchableOpacity onPress={toggleAll} style={styles.selectAllBtn}>
 								<LinearGradient
-									colors={
-										allSelected
-											? theme.secondary
-											: theme.primary
-									}
+									colors={allSelected ? theme.secondary : theme.primary}
 									style={styles.selectAllGradient}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 0 }}

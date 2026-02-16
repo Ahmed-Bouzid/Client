@@ -251,38 +251,9 @@ export default function App() {
 
 		try {
 			// ⭐ CHARGER LES COMMANDES DEPUIS L'API AVANT DE NAVIGUER
-			console.log(
-				"\n🚀🚀🚀 ========== APP.JSX - NAVIGATION PAYMENT ========== 🚀🚀🚀",
-			);
-			console.log("📋 Données session:", {
-				reservationId,
-				tableId,
-				tableNumber,
-				userName,
-				clientId,
-			});
-			console.log(
-				"🔍 Chargement des commandes pour reservation:",
-				reservationId,
-			);
-			console.log("🔑 Avec clientId:", clientId, "(filtrage foodtruck)");
 			await useOrderStore
 				.getState()
 				.fetchOrdersByReservation(reservationId, clientId);
-
-			// Vérifier ce qui a été chargé
-			const loadedOrders = useOrderStore.getState().allOrders;
-			console.log(
-				"✅ Commandes chargées depuis store:",
-				loadedOrders?.length || 0,
-			);
-			console.log(
-				"📦 Détail allOrders avant passage à Payment:",
-				JSON.stringify(loadedOrders, null, 2),
-			);
-			console.log(
-				"🚀🚀🚀 ===================================================== 🚀🚀🚀\n",
-			);
 
 			// Passer à l'écran de paiement
 			setStep("payment");

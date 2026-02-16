@@ -180,48 +180,13 @@ export default function JoinOrCreateTable({
 		return () => off("order", handleOrderUpdate);
 	}, [restaurantId, tableId, on, off]);
 
-	// � DEBUG: Logger les dimensions et layout au mount et aux changements
-	useEffect(() => {
-		const dims = Dimensions.get("window");
-		const screen = Dimensions.get("screen");
-		console.log(
-			"🐛 [LAYOUT DEBUG] Component mounted/updated:",
-			"\n  📐 Window:",
-			dims.width,
-			"x",
-			dims.height,
-			"\n  📐 Screen:",
-			screen.width,
-			"x",
-			screen.height,
-			"\n  📱 StatusBar height (iOS):",
-			Platform.OS === "ios" ? StatusBar.currentHeight || "N/A" : StatusBar.currentHeight,
-			"\n  🔑 ComponentKey:",
-			componentKey,
-			"\n  📦 Orders:",
-			orders.length,
-			"\n  ✅ HasJoined:",
-			hasJoinedTable,
-		);
-	}, [componentKey, orders.length, hasJoinedTable]);
-
 	// 🔄 SIMULE UN RELOAD COMPLET : Force unmount/remount de TOUTE la page
 	// ⚡ Solution au bug "bande grise" : la redirection garde les composants en cache
 	//    (LinearGradient, StatusBar, BlurView, etc.). Un reload les recrée de zéro.
 	//    On applique la key au container root pour forcer un remount total.
 	useEffect(() => {
-		console.log(
-			"🔄 [REMOUNT TRIGGER] Avant key increment:",
-			"orders.length=",
-			orders.length,
-			"hasJoinedTable=",
-			hasJoinedTable,
-		);
 		// Incrémenter la key → TOUT le composant détruit et recréé = état 100% propre
-		setComponentKey((prev) => {
-			console.log("🔑 [REMOUNT] Incrementing key:", prev, "→", prev + 1);
-			return prev + 1;
-		});
+		setComponentKey((prev) => prev + 1);
 	}, [orders.length, hasJoinedTable]); // Se déclenche quand on revient (orders change après paiement)
 
 	// 🎨 Button press animation
@@ -495,66 +460,12 @@ export default function JoinOrCreateTable({
 		}
 	};
 
-	// 🐛 Handler pour tracker les changements de layout
-	const handleRootLayout = (event) => {
-		const { x, y, width, height } = event.nativeEvent.layout;
-		console.log(
-			"🐛 [ROOT LAYOUT] Container position changed:",
-			"\n  📍 X:",
-			x,
-			"Y:",
-			y,
-			"(⚠️ Si Y > 0, il y a un décalage!)",
-			"\n  📐 Size:",
-			width,
-			"x",
-			height,
-			"\n  🔑 Key:",
-			componentKey,
-		);
-	};
-
-	// 🐛 Handler pour tracker le ScrollView
-	const handleScrollViewLayout = (event) => {
-		const { x, y, width, height } = event.nativeEvent.layout;
-		console.log(
-			"🐛 [SCROLLVIEW LAYOUT] Position:",
-			"\n  📍 X:",
-			x,
-			"Y:",
-			y,
-			"(⚠️ Si Y > 0 sans raison, le ScrollView est décalé!)",
-			"\n  📐 Size:",
-			width,
-			"x",
-			height,
-		);
-	};
-
-	// 🐛 Log StatusBar config (une seule fois au mount)
-	useEffect(() => {
-		console.log(
-			"🐛 [STATUSBAR] Config initiale:",
-			"\n  ⚪ Translucent:",
-			false,
-			"(iOS ignore cette prop)",
-			"\n  🎨 Background:",
-			"transparent",
-			"\n  📱 CurrentHeight:",
-			StatusBar.currentHeight,
-			"(null sur iOS, height en px sur Android)",
-			"\n  🔑 Platform:",
-			Platform.OS,
-		);
-	}, []);
-
 	return (
 		<ImageBackground
 			key={componentKey} // 🔄 Change à chaque retour → force remount TOTAL
 			source={backgroundImage}
 			style={styles.background}
 			resizeMode="cover"
-			onLayout={handleRootLayout} // 🐛 Track layout changes
 		>
 			{/* � Overlay conditionnel : Custom background ou Standard */}
 			{useCustomBackground ? (
@@ -651,7 +562,6 @@ export default function JoinOrCreateTable({
 				keyboardDismissMode="interactive"
 				keyboardShouldPersistTaps="handled"
 				showsVerticalScrollIndicator={false}
-				onLayout={handleScrollViewLayout} // 🐛 Track ScrollView position
 			>
 				<Animated.View
 					style={[
