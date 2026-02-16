@@ -58,7 +58,9 @@ export default function useRestaurantConfig(restaurantId) {
 				// Structure unifiée
 				const normalizedConfig = {
 					restaurant_id: restaurantId,
-					style: style.config,
+					style: style.config, // ⚠️ Les couleurs BBQ sont dans style.config
+					styleKey: style.key, // Ajout pour debug
+					styleName: style.name, // Ajout pour debug
 					categories: categories || [],
 					menuLayout: menuLayout || "grid",
 				};
@@ -68,6 +70,14 @@ export default function useRestaurantConfig(restaurantId) {
 					styleName: style.name,
 					categoriesCount: categories?.length || 0,
 					menuLayout,
+				});
+				
+				// 🔍 DEBUG : Afficher les premières couleurs
+				console.log("🎨 [useRestaurantConfig] Couleurs reçues:", {
+					primary: style.config?.primary,
+					background: style.config?.background,
+					text: style.config?.text,
+					orange: style.config?.orange,
 				});
 
 				setConfig(normalizedConfig);

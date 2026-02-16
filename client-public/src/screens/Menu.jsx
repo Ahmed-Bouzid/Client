@@ -74,7 +74,10 @@ const GrillzHeader = ({
 			>
 				{/* Logo restaurant */}
 				<View style={styles.grillzLogoContainer}>
-					<LinearGradient colors={theme?.gold || ["#ffd700", "#ffed4e"]} style={styles.grillzLogo}>
+					<LinearGradient
+						colors={theme?.gold || ["#ffd700", "#ffed4e"]}
+						style={styles.grillzLogo}
+					>
 						<Ionicons
 							name={styleConfig.headerIcon || "flame"}
 							size={28}
@@ -117,11 +120,6 @@ const GrillzHeader = ({
 					)}
 				</View>
 			</LinearGradient>
-
-			{/* Slogan */}
-			<Text style={styles.grillzSlogan}>
-				{styleConfig.slogan || `🔥 ${restaurantName || "Bienvenue"}`}
-			</Text>
 		</View>
 	);
 };
@@ -647,7 +645,17 @@ export default function Menu({
 	useEffect(() => {
 		if (config?.style) {
 			// Merger avec PREMIUM_COLORS pour garantir toutes les propriétés
-			setCurrentStyle({ ...PREMIUM_COLORS, ...config.style });
+			const mergedStyle = { ...PREMIUM_COLORS, ...config.style };
+			setCurrentStyle(mergedStyle);
+
+			// 🔍 DEBUG : Afficher les couleurs chargées pour Le Grillz
+			console.log("🎨 [MENU] Style appliqué:", {
+				styleKey: config?.styleKey || "unknown",
+				primary: mergedStyle.primary,
+				background: mergedStyle.background,
+				text: mergedStyle.text,
+				orange: mergedStyle.orange,
+			});
 		}
 	}, [config]);
 
@@ -760,11 +768,11 @@ export default function Menu({
 				return "🐟";
 			if (lowerName.includes("végé") || lowerName.includes("vegan"))
 				return "🥬";
-			if (
-				lowerName.includes("accompagnement") ||
-				lowerName.includes("side")
-			)
+			if (lowerName.includes("accompagnement") || lowerName.includes("side"))
 				return "⭐";
+			if (lowerName.includes("sauce")) return "🫙";
+			if (lowerName.includes("formule") || lowerName.includes("menu"))
+				return "🍱";
 			return "🍽️"; // Défaut
 		};
 
@@ -933,7 +941,7 @@ export default function Menu({
 
 	return (
 		<LinearGradient
-			colors={getGradient('dark')}
+			colors={getGradient("dark")}
 			style={styles.container}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 1 }}
@@ -941,14 +949,11 @@ export default function Menu({
 			{/* Décorations premium */}
 			<View style={styles.bgDecor} pointerEvents="none">
 				<LinearGradient
-					colors={[
-						...getGradient('primary'),
-						"transparent",
-					]}
+					colors={[...getGradient("primary"), "transparent"]}
 					style={[styles.bgCircle, styles.bgCircle1]}
 				/>
 				<LinearGradient
-					colors={[...getGradient('accent'), "transparent"]}
+					colors={[...getGradient("accent"), "transparent"]}
 					style={[styles.bgCircle, styles.bgCircle2]}
 				/>
 			</View>
@@ -976,7 +981,7 @@ export default function Menu({
 							activeOpacity={0.7}
 						>
 							<LinearGradient
-								colors={getGradient('accent')}
+								colors={getGradient("accent")}
 								style={styles.headerIcon}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
@@ -1022,21 +1027,27 @@ export default function Menu({
 				onClear={() => setSearchQuery("")}
 			/>
 
-			{/* ⭐ Barre de catégories animées style gradient-menu (masquée si recherche active) */}
+			{/* ⭐ Zone fixe pour les boutons de catégories avec scroll horizontal */}
 			{!searchQuery.trim() && (
-				<View style={styles.categoriesBar}>
-					{categories.map((cat) => {
-						const isSelected = selectedCategory?.id === cat.id;
-						return (
-							<AnimatedCategoryButton
-								key={cat.id}
-								category={cat}
-								isSelected={isSelected}
-								otherSelected={selectedCategory && !isSelected}
-								onPress={() => setSelectedCategory(isSelected ? null : cat)}
-							/>
-						);
-					})}
+				<View style={styles.categoriesFixedZone}>
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						contentContainerStyle={styles.horizontalCategoriesContainer}
+					>
+						{categories.map((cat) => {
+							const isSelected = selectedCategory?.id === cat.id;
+							return (
+								<AnimatedCategoryButton
+									key={cat.id}
+									category={cat}
+									isSelected={isSelected}
+									otherSelected={selectedCategory && !isSelected}
+									onPress={() => setSelectedCategory(isSelected ? null : cat)}
+								/>
+							);
+						})}
+					</ScrollView>
 				</View>
 			)}
 
@@ -1374,15 +1385,19 @@ const styles = StyleSheet.create({
 		fontSize: 14,
 		color: "#999",
 	},
-	// ⭐ Barre de catégories animées
-	categoriesBar: {
-		flexDirection: "row",
-		flexWrap: "wrap",
+	// ⭐ Zone fixe pour les boutons de catégories
+	categoriesFixedZone: {
+		height: 80,
+		marginHorizontal: -20,
+		marginBottom: 10,
 		justifyContent: "center",
+	},
+	// ⭐ Container scroll horizontal pour les boutons
+	horizontalCategoriesContainer: {
+		flexDirection: "row",
 		alignItems: "center",
 		gap: 8,
-		marginBottom: 20,
-		paddingHorizontal: 5,
+		paddingHorizontal: 25,
 	},
 	// 🎨 Bouton animé style gradient-menu
 	animatedButton: {
