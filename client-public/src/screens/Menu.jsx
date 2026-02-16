@@ -941,7 +941,7 @@ export default function Menu({
 
 	return (
 		<LinearGradient
-			colors={getGradient("dark")}
+			colors={getGradient("background")}
 			style={styles.container}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 1 }}
