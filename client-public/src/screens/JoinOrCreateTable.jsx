@@ -1114,7 +1114,12 @@ const styles = StyleSheet.create({
 	background: {
 		flex: 1,
 		width: "100%",
-		height: "100%",
+		height: Dimensions.get("screen").height, // 🔥 Force hauteur écran complet (pas "window" qui exclut StatusBar)
+		position: "absolute", // 🔥 Position absolue pour ignorer SafeAreaView padding
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
 	},
 	blurOverlay: {
 		...StyleSheet.absoluteFillObject,
