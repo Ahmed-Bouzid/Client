@@ -81,6 +81,9 @@ export default function JoinOrCreateTable({
 
 	// 📜 Ref pour le ScrollView
 	const scrollViewRef = useRef(null);
+	
+	// 🔄 Key pour forcer unmount/remount du ScrollView (simule un reload)
+	const [scrollKey, setScrollKey] = useState(0);
 
 	const { restaurantId } = useClientTableStore();
 	const restaurantName = useRestaurantStore((state) => state.name);
@@ -147,14 +150,12 @@ export default function JoinOrCreateTable({
 		});
 	}, []);
 
-	// 🔄 Reset scroll et layout quand le composant redevient actif (après retour de Payment)
+	// 🔄 SIMULE UN RELOAD : Force unmount/remount du ScrollView au retour de paiement
+	// ⚡ Solution au bug "bande grise" : la redirection garde le ScrollView en cache,
+	//    mais un reload le recrée de zéro. On simule ce comportement avec une key.
 	useEffect(() => {
-		// Reset scroll position au top
-		if (scrollViewRef.current) {
-			setTimeout(() => {
-				scrollViewRef.current?.scrollTo({ y: 0, animated: false });
-			}, 50);
-		}
+		// Incrémenter la key → ScrollView détruit et recréé = état propre
+		setScrollKey(prev => prev + 1);
 	}, [orders.length, hasJoinedTable]); // Se déclenche quand on revient (orders change après paiement)
 
 	// 🎨 Button press animation
@@ -518,6 +519,7 @@ export default function JoinOrCreateTable({
 
 			{/* Contenu principal avec gestion clavier native iOS */}
 			<ScrollView
+				key={scrollKey} // 🔄 Change à chaque retour → force unmount/remount
 				ref={scrollViewRef}
 				style={styles.scrollContainer}
 				contentContainerStyle={styles.scrollContent}
