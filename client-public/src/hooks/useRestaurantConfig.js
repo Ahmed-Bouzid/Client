@@ -71,7 +71,7 @@ export default function useRestaurantConfig(restaurantId) {
 					categoriesCount: categories?.length || 0,
 					menuLayout,
 				});
-				
+
 				// 🔍 DEBUG : Afficher les premières couleurs
 				console.log("🎨 [useRestaurantConfig] Couleurs reçues:", {
 					primary: style.config?.primary,
