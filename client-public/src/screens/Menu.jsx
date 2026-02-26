@@ -1669,15 +1669,15 @@ export default function Menu({
 			onRequestClose={closeOptionsModal}
 		>
 			<View style={styles.modalOverlay}>
-				<View style={[styles.modalContent, { maxHeight: "85%" }]}>
+				<View style={[styles.modalContent, { maxHeight: "95%", width: "95%" }]}>
 					<View style={styles.modalHeaderOptions}>
 						<Text
 							style={[
 								styles.modalTitle,
-								{ color: "#333", flex: 1 },
+								{ color: "#333", flex: 1, fontSize: 14 },
 							]}
 						>
-							Options pour {currentProductForOptions?.name}
+							Options
 						</Text>
 						<TouchableOpacity
 							onPress={closeOptionsModal}
@@ -2497,7 +2497,7 @@ const styles = StyleSheet.create({
 		marginBottom: 12,
 	},
 	optionGroupTitle: {
-		fontSize: 14,
+		fontSize: 12,
 		fontWeight: "700",
 		marginBottom: 6,
 	},
@@ -2553,7 +2553,7 @@ const styles = StyleSheet.create({
 		paddingVertical: 16,
 	},
 	optionGroupContainer: {
-		marginBottom: 24,
+		marginBottom: 16,
 	},
 	optionsGrid: {
 		flexDirection: "row",
@@ -2563,14 +2563,14 @@ const styles = StyleSheet.create({
 	},
 	optionGridItem: {
 		width: "31%",
-		aspectRatio: 1,
-		borderRadius: 12,
+		minHeight: 75,
+		borderRadius: 8,
 		backgroundColor: "#f5f5f5",
 		borderWidth: 2,
 		borderColor: "#e0e0e0",
 		justifyContent: "center",
 		alignItems: "center",
-		padding: 8,
+		padding: 5,
 	},
 	optionGridItemSelected: {
 		backgroundColor: "#e8f5e9",
@@ -2578,17 +2578,17 @@ const styles = StyleSheet.create({
 		borderWidth: 3,
 	},
 	optionGridCheckmark: {
-		fontSize: 24,
-		marginBottom: 4,
+		fontSize: 14,
+		marginBottom: 2,
 	},
 	optionGridName: {
-		fontSize: 13,
+		fontSize: 10,
 		fontWeight: "600",
 		textAlign: "center",
-		marginBottom: 4,
+		marginBottom: 1,
 	},
 	optionGridPrice: {
-		fontSize: 12,
+		fontSize: 9,
 		fontWeight: "700",
 	},
 	modalButtons: {
