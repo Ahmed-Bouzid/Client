@@ -41,6 +41,50 @@ const SCREEN_HEIGHT = Dimensions.get("window").height;
 const BUTTON_SMALL = 60;
 const BUTTON_EXPANDED = SCREEN_WIDTH - 40 - 60 * 3 - 8 * 3;
 
+// 🎯 Assure une couleur de description lisible, meme si le theme met du blanc
+const getSafeDescColor = (theme) => {
+	const candidate =
+		theme?.textSecondary || theme?.textMuted || theme?.text || null;
+	if (!candidate || typeof candidate !== "string") {
+		return DEFAULT_THEME.textSecondary;
+	}
+	const lower = candidate.toLowerCase();
+
+	// Vérifier les formats de blanc simples
+	if (lower === "#fff" || lower === "#ffffff" || lower === "white") {
+		return DEFAULT_THEME.textSecondary;
+	}
+
+	// Vérifier rgba() et rgb() avec des valeurs blanches
+	const rgbaMatch = lower.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+	if (rgbaMatch) {
+		const r = parseInt(rgbaMatch[1]);
+		const g = parseInt(rgbaMatch[2]);
+		const b = parseInt(rgbaMatch[3]);
+		// Si les 3 composantes sont > 200 → c'est du blanc/très clair
+		if (r > 200 && g > 200 && b > 200) {
+			return DEFAULT_THEME.text; // Gris foncé
+		}
+	}
+
+	// Si la couleur est trop claire (hex), forcer un gris foncé
+	if (lower.startsWith("#")) {
+		const hex = lower.replace("#", "");
+		if (hex.length === 3 || hex.length === 6) {
+			const to255 = (value) =>
+				parseInt(value.length === 1 ? value + value : value, 16);
+			const r = to255(hex.length === 3 ? hex[0] : hex.slice(0, 2));
+			const g = to255(hex.length === 3 ? hex[1] : hex.slice(2, 4));
+			const b = to255(hex.length === 3 ? hex[2] : hex.slice(4, 6));
+			const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+			if (luminance > 0.8) {
+				return DEFAULT_THEME.text;
+			}
+		}
+	}
+	return candidate;
+};
+
 // 🔥 Composant Header Grillz personnalisé (utilisé uniquement pour Le Grillz)
 const GrillzHeader = ({
 	userName,
@@ -234,6 +278,17 @@ const PremiumProductCard = ({
 	}, []);
 
 	const quantity = cart[item._id] || 0;
+	const descColor = getSafeDescColor(theme);
+
+	useEffect(() => {
+		console.log("🧾 [Menu] Item description", {
+			id: item?._id,
+			name: item?.name,
+			description: item?.description,
+			descLength: item?.description ? item.description.length : 0,
+			descColor,
+		});
+	}, [item?._id, descColor]);
 
 	return (
 		<Animated.View
@@ -273,10 +328,7 @@ const PremiumProductCard = ({
 						{item.name}
 					</Text>
 					<Text
-						style={[
-							styles.premiumProductDesc,
-							{ color: theme?.textSecondary || DEFAULT_THEME.textSecondary },
-						]}
+						style={[styles.premiumProductDesc, { color: descColor }]}
 						numberOfLines={2}
 					>
 						{item.description || "Une création savoureuse de notre chef"}
@@ -784,13 +836,40 @@ export default function Menu({
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [showDietaryModal, setShowDietaryModal] = useState(false);
-	
+
 	// 🎯 Gestion des options de menu
 	const [optionsModalVisible, setOptionsModalVisible] = useState(false);
-	const [currentProductForOptions, setCurrentProductForOptions] = useState(null);
-	const [productOptions, setProductOptions] = useState([]);
-	const [selectedOptions, setSelectedOptions] = useState([]);
+	const [currentProductForOptions, setCurrentProductForOptions] =
+		useState(null);
+	const [optionGroups, setOptionGroups] = useState([]);
+	const [selectedOptions, setSelectedOptions] = useState({});
 	const [loadingOptions, setLoadingOptions] = useState(false);
+
+	useEffect(() => {
+		console.log("🧩 [Menu] Options modal state", {
+			visible: optionsModalVisible,
+			product: currentProductForOptions?.name,
+			groups: optionGroups.map((group) => ({
+				id: group.id,
+				name: group.name,
+				choices: group.choices?.length || 0,
+			})),
+			selected: Object.keys(selectedOptions),
+		});
+	}, [
+		optionsModalVisible,
+		optionGroups,
+		selectedOptions,
+		currentProductForOptions,
+	]);
+
+	useEffect(() => {
+		console.log("🪟 [Menu] Product modal state", {
+			visible: modalVisible,
+			item: selectedItem?.name,
+			description: selectedItem?.description,
+		});
+	}, [modalVisible, selectedItem]);
 
 	// ⚠️ LEGACY : Catégories hardcodées comme fallback
 	const legacyCategories = [
@@ -849,7 +928,7 @@ export default function Menu({
 			if (lowerName.includes("entree") || lowerName.includes("entrée"))
 				return "🥗";
 			if (lowerName.includes("plat") || lowerName.includes("principal"))
-				return "�";
+				return "🍖";
 			if (
 				lowerName.includes("dessert") ||
 				lowerName.includes("sucré") ||
@@ -882,6 +961,31 @@ export default function Menu({
 				lowerName.includes("jus")
 			)
 				return "🥤";
+			if (lowerName.includes("vin") || lowerName.includes("vins")) return "🍷";
+			if (lowerName.includes("biere") || lowerName.includes("bière"))
+				return "🍺";
+			if (
+				lowerName.includes("aperitif") ||
+				lowerName.includes("apéritif") ||
+				lowerName.includes("apero")
+			)
+				return "🥂";
+			if (
+				lowerName.includes("digestif") ||
+				lowerName.includes("spirit") ||
+				lowerName.includes("alcool") ||
+				lowerName.includes("rhum") ||
+				lowerName.includes("vodka") ||
+				lowerName.includes("whisky") ||
+				lowerName.includes("gin")
+			)
+				return "🥃";
+			if (
+				lowerName.includes("eau") ||
+				lowerName.includes("plate") ||
+				lowerName.includes("gazeuse")
+			)
+				return "💧";
 			if (
 				lowerName.includes("poulet") ||
 				lowerName.includes("viande") ||
@@ -899,15 +1003,13 @@ export default function Menu({
 				return "🍱";
 			if (lowerName.includes("chausson") || lowerName.includes("viennoiserie"))
 				return "🥐";
-			if (lowerName.includes("feu") || lowerName.includes("grill"))
-				return "🔥";
+			if (lowerName.includes("feu") || lowerName.includes("grill")) return "🔥";
 			if (lowerName.includes("fromage") || lowerName.includes("cheese"))
 				return "🧀";
 			if (lowerName.includes("pain") || lowerName.includes("bread"))
 				return "🥖";
 			if (lowerName.includes("fruit")) return "🍓";
-			if (lowerName.includes("glace") || lowerName.includes("ice"))
-				return "🍦";
+			if (lowerName.includes("glace") || lowerName.includes("ice")) return "🍦";
 			// Défaut plus neutre qu'une assiette
 			return "🍴";
 		};
@@ -960,14 +1062,14 @@ export default function Menu({
 	};
 
 	// ============ FONCTIONS ============
-	
+
 	// 🎯 Fonction pour récupérer les options d'un produit
 	const fetchProductOptions = async (productId) => {
 		try {
 			setLoadingOptions(true);
 			const token = await AsyncStorage.getItem("clientToken");
 			const { API_CONFIG } = require("../config/apiConfig.js");
-			
+
 			const response = await fetch(
 				`${API_CONFIG.BASE_URL}/products/${productId}/options`,
 				{
@@ -975,7 +1077,7 @@ export default function Menu({
 						"Content-Type": "application/json",
 						Authorization: `Bearer ${token}`,
 					},
-				}
+				},
 			);
 
 			if (!response.ok) {
@@ -993,50 +1095,138 @@ export default function Menu({
 		}
 	};
 
+	// 🎯 Normaliser les options (menus/formules ou options produit)
+	const normalizeOptionGroups = (item, fetchedOptions) => {
+		console.log("🧪 [Menu] normalizeOptionGroups input", {
+			item: item?.name,
+			hasItemOptions: Array.isArray(item?.options),
+			itemOptionsCount: Array.isArray(item?.options) ? item.options.length : 0,
+			fetchedOptionsCount: Array.isArray(fetchedOptions)
+				? fetchedOptions.length
+				: 0,
+		});
+		if (Array.isArray(item?.options) && item.options.length > 0) {
+			console.log("✅ [Menu] Options from item.options", {
+				item: item?.name,
+				groups: item.options.length,
+			});
+			return item.options
+				.filter((group) => group && group.available !== false)
+				.map((group, groupIndex) => {
+					const choices = Array.isArray(group.choices) ? group.choices : [];
+					return {
+						id: group.id || `group-${groupIndex}`,
+						name: group.name || `Choix ${groupIndex + 1}`,
+						maxPrice: group.maxPrice ?? null,
+						choices: choices.map((choice, choiceIndex) => ({
+							id: choice.id || `choice-${groupIndex}-${choiceIndex}`,
+							name: choice.name,
+							price: choice.price || 0,
+						})),
+					};
+				});
+		}
+
+		if (Array.isArray(fetchedOptions) && fetchedOptions.length > 0) {
+			console.log("✅ [Menu] Options from fetchedOptions", {
+				item: item?.name,
+				options: fetchedOptions.length,
+			});
+			return [
+				{
+					id: "options",
+					name: "Options",
+					choices: fetchedOptions.map((option) => ({
+						id: option._id,
+						name: option.name,
+						price: option.price || 0,
+					})),
+				},
+			];
+		}
+
+		return [];
+	};
+
 	const handleIncrease = async (item) => {
 		// 🎯 Vérifier si le produit a des options (notamment pour les menus/formules)
 		const options = await fetchProductOptions(item._id);
-		
-		if (options.length > 0) {
+		const groups = normalizeOptionGroups(item, options);
+		console.log("🧩 [Menu] handleIncrease", {
+			item: item?.name,
+			optionsFetched: Array.isArray(options) ? options.length : 0,
+			groups: groups.length,
+		});
+
+		if (groups.length > 0) {
 			// Ouvrir la modale d'options
+			console.log("🪟 [Menu] Open options modal", {
+				item: item?.name,
+				groups: groups.length,
+			});
 			setCurrentProductForOptions(item);
-			setProductOptions(options);
-			setSelectedOptions([]);
+			setOptionGroups(groups);
+			setSelectedOptions({});
 			setOptionsModalVisible(true);
 		} else {
 			// Ajout direct sans options
+			console.log("➕ [Menu] Add without options", {
+				item: item?.name,
+			});
 			onAdd?.(item);
 		}
 	};
-	
+
+	const closeOptionsModal = () => {
+		setOptionsModalVisible(false);
+		setSelectedOptions({});
+		setOptionGroups([]);
+		setCurrentProductForOptions(null);
+	};
+
 	// Validation des options sélectionnées
 	const handleValidateOptions = () => {
 		if (!currentProductForOptions) return;
-		
+
+		const missingGroup = optionGroups.find(
+			(group) => (group.choices || []).length > 0 && !selectedOptions[group.id],
+		);
+		if (missingGroup) {
+			Alert.alert(
+				"Choix requis",
+				`Veuillez choisir une option pour "${missingGroup.name}".`,
+			);
+			return;
+		}
+
+		const selectedChoices = optionGroups
+			.map((group) => selectedOptions[group.id])
+			.filter(Boolean);
+
+		const optionsTotal = selectedChoices.reduce(
+			(sum, choice) => sum + (choice.price || 0),
+			0,
+		);
+
 		// Ajouter au panier avec les options
 		const itemWithOptions = {
 			...currentProductForOptions,
-			selectedOptions: selectedOptions,
+			selectedOptions: selectedChoices,
+			optionsTotal,
 			// Prix final = prix du produit + somme des prix des options
-			finalPrice: currentProductForOptions.price + selectedOptions.reduce((sum, opt) => sum + (opt.price || 0), 0)
+			finalPrice: (currentProductForOptions.price || 0) + optionsTotal,
 		};
-		
+
 		onAdd?.(itemWithOptions);
-		setOptionsModalVisible(false);
-		setSelectedOptions([]);
-		setCurrentProductForOptions(null);
+		closeOptionsModal();
 	};
-	
+
 	// Toggle sélection d'une option
-	const toggleOption = (option) => {
-		setSelectedOptions((prev) => {
-			const exists = prev.find((opt) => opt._id === option._id);
-			if (exists) {
-				return prev.filter((opt) => opt._id !== option._id);
-			} else {
-				return [...prev, option];
-			}
-		});
+	const toggleOption = (groupId, choice) => {
+		setSelectedOptions((prev) => ({
+			...prev,
+			[groupId]: choice,
+		}));
 	};
 
 	const handleDecrease = async (item) => {
@@ -1068,6 +1258,13 @@ export default function Menu({
 	};
 
 	const openModal = (item) => {
+		console.log("🪟 [Menu] Open product modal", {
+			id: item?._id,
+			name: item?.name,
+			description: item?.description,
+			price: item?.price,
+			category: item?.category,
+		});
 		setSelectedItem(item);
 		setModalVisible(true);
 	};
@@ -1425,7 +1622,7 @@ export default function Menu({
 							<Text
 								style={[
 									styles.modalDescription,
-									{ color: currentStyle?.textMuted || DEFAULT_THEME.textMuted },
+									{ color: getSafeDescColor(currentStyle) },
 								]}
 							>
 								{selectedItem.description || "Sans description"}
@@ -1467,83 +1664,96 @@ export default function Menu({
 				transparent
 				visible={optionsModalVisible}
 				animationType="slide"
-				onRequestClose={() => setOptionsModalVisible(false)}
+				onRequestClose={closeOptionsModal}
 			>
 				<View style={styles.modalOverlay}>
 					<View style={[styles.modalContent, { maxHeight: "70%" }]}>
 						<Text
 							style={[
 								styles.modalTitle,
-								{ color: currentStyle?.text || DEFAULT_THEME.text },
+								{ color: "#333" },
 							]}
 						>
 							Options pour {currentProductForOptions?.name}
 						</Text>
-						
+
 						<ScrollView
 							style={{ maxHeight: 300 }}
 							showsVerticalScrollIndicator={false}
 						>
 							{loadingOptions ? (
-								<ActivityIndicator size="small" color={DEFAULT_THEME.primary[0]} />
-							) : productOptions.length === 0 ? (
+								<ActivityIndicator
+									size="small"
+									color={DEFAULT_THEME.primary[0]}
+								/>
+							) : optionGroups.length === 0 ? (
 								<Text
 									style={[
 										styles.modalDescription,
-										{ color: currentStyle?.textSecondary || DEFAULT_THEME.textSecondary },
+										{ color: getSafeDescColor(currentStyle) },
 									]}
 								>
 									Aucune option disponible
 								</Text>
 							) : (
-								productOptions.map((option) => {
-									const isSelected = selectedOptions.some((opt) => opt._id === option._id);
-									return (
-										<TouchableOpacity
-											key={option._id}
+								optionGroups.map((group) => (
+									<View key={group.id} style={styles.optionGroup}>
+										<Text
 											style={[
-												styles.optionItem,
-												isSelected && styles.optionItemSelected,
+												styles.optionGroupTitle,
+												{ color: "#222" },
 											]}
-											onPress={() => toggleOption(option)}
-											activeOpacity={0.7}
 										>
-											<View style={styles.optionLeft}>
-												<Text style={styles.optionRadio}>
-													{isSelected ? "✅" : "⚪"}
-												</Text>
-												<Text
+											{group.name}
+										</Text>
+										{(group.choices || []).map((choice) => {
+											const isSelected =
+												selectedOptions[group.id]?.id === choice.id;
+											return (
+												<TouchableOpacity
+													key={choice.id}
 													style={[
-														styles.optionName,
-														{ color: currentStyle?.text || DEFAULT_THEME.text },
+														styles.optionItem,
+														isSelected && styles.optionItemSelected,
 													]}
+													onPress={() => toggleOption(group.id, choice)}
+													activeOpacity={0.7}
 												>
-													{option.name}
-												</Text>
-											</View>
-											{option.price > 0 && (
-												<Text
-													style={[
-														styles.optionPrice,
-														{ color: currentStyle?.textAccent || DEFAULT_THEME.textAccent },
-													]}
-												>
-													+{option.price.toFixed(2)}€
-												</Text>
-											)}
-										</TouchableOpacity>
-									);
-								})
+													<View style={styles.optionLeft}>
+														<Text style={styles.optionRadio}>
+															{isSelected ? "✅" : "⚪"}
+														</Text>
+														<Text
+															style={[
+																styles.optionName,
+																{ color: "#333" },
+															]}
+														>
+															{choice.name}
+														</Text>
+													</View>
+													{choice.price > 0 && (
+														<Text
+															style={[
+																styles.optionPrice,
+																{ color: "#4CAF50" },
+															]}
+														>
+															+{choice.price.toFixed(2)}€
+														</Text>
+													)}
+												</TouchableOpacity>
+											);
+										})}
+									</View>
+								))
 							)}
 						</ScrollView>
 
 						<View style={styles.modalButtons}>
 							<Pressable
 								style={[styles.modalButton, styles.modalCancelButton]}
-								onPress={() => {
-									setOptionsModalVisible(false);
-									setSelectedOptions([]);
-								}}
+								onPress={closeOptionsModal}
 							>
 								<Text style={styles.modalCloseText}>Annuler</Text>
 							</Pressable>
@@ -1552,7 +1762,9 @@ export default function Menu({
 								onPress={handleValidateOptions}
 							>
 								<Text style={styles.modalCloseText}>
-									Ajouter {selectedOptions.length > 0 && `(${selectedOptions.length})`}
+									Ajouter{" "}
+									{Object.keys(selectedOptions).length > 0 &&
+										`(${Object.keys(selectedOptions).length})`}
 								</Text>
 							</Pressable>
 						</View>
@@ -2268,8 +2480,16 @@ const styles = StyleSheet.create({
 		fontWeight: "bold",
 		fontSize: 16,
 	},
-	
+
 	// Styles options produit (menus/formules)
+	optionGroup: {
+		marginBottom: 12,
+	},
+	optionGroupTitle: {
+		fontSize: 14,
+		fontWeight: "700",
+		marginBottom: 6,
+	},
 	optionItem: {
 		flexDirection: "row",
 		justifyContent: "space-between",
@@ -2277,13 +2497,13 @@ const styles = StyleSheet.create({
 		paddingVertical: 12,
 		paddingHorizontal: 15,
 		borderRadius: 10,
-		backgroundColor: "rgba(255,255,255,0.05)",
+		backgroundColor: "#f5f5f5",
 		marginBottom: 8,
 		borderWidth: 2,
-		borderColor: "transparent",
+		borderColor: "#e0e0e0",
 	},
 	optionItemSelected: {
-		backgroundColor: "rgba(76,175,80,0.15)",
+		backgroundColor: "#e8f5e9",
 		borderColor: "#4CAF50",
 	},
 	optionLeft: {
