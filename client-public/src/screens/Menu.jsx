@@ -1659,53 +1659,62 @@ export default function Menu({
 				</Modal>
 			)}
 
-			{/* 🎯 Modal Options Produit (pour menus/formules) */}
-			<Modal
-				transparent
-				visible={optionsModalVisible}
-				animationType="slide"
-				onRequestClose={closeOptionsModal}
-			>
-				<View style={styles.modalOverlay}>
-					<View style={[styles.modalContent, { maxHeight: "70%" }]}>
+{/* 🎯 Modal Options Produit (pour menus/formules) - Grille 3 colonnes */}
+		<Modal
+			transparent
+			visible={optionsModalVisible}
+			animationType="slide"
+			onRequestClose={closeOptionsModal}
+		>
+			<View style={styles.modalOverlay}>
+				<View style={[styles.modalContent, { maxHeight: "85%" }]}>
+					<View style={styles.modalHeaderOptions}>
 						<Text
 							style={[
 								styles.modalTitle,
-								{ color: "#333" },
+								{ color: "#333", flex: 1 },
 							]}
 						>
 							Options pour {currentProductForOptions?.name}
 						</Text>
-
-						<ScrollView
-							style={{ maxHeight: 300 }}
-							showsVerticalScrollIndicator={false}
+						<TouchableOpacity
+							onPress={closeOptionsModal}
+							style={styles.modalCloseIcon}
 						>
-							{loadingOptions ? (
-								<ActivityIndicator
-									size="small"
-									color={DEFAULT_THEME.primary[0]}
-								/>
-							) : optionGroups.length === 0 ? (
-								<Text
-									style={[
-										styles.modalDescription,
-										{ color: getSafeDescColor(currentStyle) },
-									]}
-								>
-									Aucune option disponible
-								</Text>
-							) : (
-								optionGroups.map((group) => (
-									<View key={group.id} style={styles.optionGroup}>
-										<Text
-											style={[
-												styles.optionGroupTitle,
-												{ color: "#222" },
-											]}
-										>
-											{group.name}
-										</Text>
+							<Ionicons name="close-circle" size={32} color="#333" />
+						</TouchableOpacity>
+					</View>
+
+					<ScrollView
+						style={styles.optionsScrollContainer}
+						showsVerticalScrollIndicator={false}
+					>
+						{loadingOptions ? (
+							<ActivityIndicator
+								size="small"
+								color={DEFAULT_THEME.primary[0]}
+							/>
+						) : optionGroups.length === 0 ? (
+							<Text
+								style={[
+									styles.modalDescription,
+									{ color: getSafeDescColor(currentStyle) },
+								]}
+							>
+								Aucune option disponible
+							</Text>
+						) : (
+							optionGroups.map((group) => (
+								<View key={group.id} style={styles.optionGroupContainer}>
+									<Text
+										style={[
+											styles.optionGroupTitle,
+											{ color: "#222" },
+										]}
+									>
+										{group.name}
+									</Text>
+									<View style={styles.optionsGrid}>
 										{(group.choices || []).map((choice) => {
 											const isSelected =
 												selectedOptions[group.id]?.id === choice.id;
@@ -1713,42 +1722,42 @@ export default function Menu({
 												<TouchableOpacity
 													key={choice.id}
 													style={[
-														styles.optionItem,
-														isSelected && styles.optionItemSelected,
+														styles.optionGridItem,
+														isSelected && styles.optionGridItemSelected,
 													]}
 													onPress={() => toggleOption(group.id, choice)}
 													activeOpacity={0.7}
 												>
-													<View style={styles.optionLeft}>
-														<Text style={styles.optionRadio}>
-															{isSelected ? "✅" : "⚪"}
-														</Text>
+													<Text style={styles.optionGridCheckmark}>
+														{isSelected ? "✅" : "⭕"}
+													</Text>
+													<Text
+														style={[
+															styles.optionGridName,
+															{ color: "#333" },
+														]}
+														numberOfLines={2}
+													>
+														{choice.name}
+													</Text>
+													{choice.priceAdjustment > 0 && (
 														<Text
 															style={[
-																styles.optionName,
-																{ color: "#333" },
-															]}
-														>
-															{choice.name}
-														</Text>
-													</View>
-													{choice.price > 0 && (
-														<Text
-															style={[
-																styles.optionPrice,
+																styles.optionGridPrice,
 																{ color: "#4CAF50" },
 															]}
 														>
-															+{choice.price.toFixed(2)}€
+															+{choice.priceAdjustment.toFixed(2)}€
 														</Text>
 													)}
 												</TouchableOpacity>
 											);
 										})}
 									</View>
-								))
-							)}
-						</ScrollView>
+								</View>
+							))
+						)}
+					</ScrollView>
 
 						<View style={styles.modalButtons}>
 							<Pressable
@@ -2523,6 +2532,62 @@ const styles = StyleSheet.create({
 	optionPrice: {
 		fontSize: 14,
 		fontWeight: "600",
+	},
+
+	// Nouveaux styles grille 3 colonnes
+	modalHeaderOptions: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		paddingBottom: 16,
+		borderBottomWidth: 1,
+		borderBottomColor: "#e0e0e0",
+	},
+	modalCloseIcon: {
+		padding: 8,
+	},
+	optionsScrollContainer: {
+		flex: 1,
+		paddingVertical: 16,
+	},
+	optionGroupContainer: {
+		marginBottom: 24,
+	},
+	optionsGrid: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 12,
+		justifyContent: "space-between",
+	},
+	optionGridItem: {
+		width: "31%",
+		aspectRatio: 1,
+		borderRadius: 12,
+		backgroundColor: "#f5f5f5",
+		borderWidth: 2,
+		borderColor: "#e0e0e0",
+		justifyContent: "center",
+		alignItems: "center",
+		padding: 8,
+	},
+	optionGridItemSelected: {
+		backgroundColor: "#e8f5e9",
+		borderColor: "#4CAF50",
+		borderWidth: 3,
+	},
+	optionGridCheckmark: {
+		fontSize: 24,
+		marginBottom: 4,
+	},
+	optionGridName: {
+		fontSize: 13,
+		fontWeight: "600",
+		textAlign: "center",
+		marginBottom: 4,
+	},
+	optionGridPrice: {
+		fontSize: 12,
+		fontWeight: "700",
 	},
 	modalButtons: {
 		flexDirection: "row",
