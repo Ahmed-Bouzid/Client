@@ -1118,11 +1118,13 @@ export default function Menu({
 						id: group.id || `group-${groupIndex}`,
 						name: group.name || `Choix ${groupIndex + 1}`,
 						maxPrice: group.maxPrice ?? null,
-						choices: choices.map((choice, choiceIndex) => ({
-							id: choice.id || `choice-${groupIndex}-${choiceIndex}`,
-							name: choice.name,
-							price: choice.price || 0,
-						})),
+						choices: choices
+							.filter((choice) => choice && choice.available !== false)
+							.map((choice, choiceIndex) => ({
+								id: choice.id || `choice-${groupIndex}-${choiceIndex}`,
+								name: choice.name,
+								price: choice.priceAdjustment || choice.price || 0, // ✅ Support priceAdjustment ET price
+							})),
 					};
 				});
 		}
@@ -1150,11 +1152,11 @@ export default function Menu({
 
 	const handleIncrease = async (item) => {
 		// 🎯 Vérifier si le produit a des options (notamment pour les menus/formules)
-		const options = await fetchProductOptions(item._id);
-		const groups = normalizeOptionGroups(item, options);
+		// Utiliser directement item.options si disponible, sinon fetch
+		const groups = normalizeOptionGroups(item, null);
 		console.log("🧩 [Menu] handleIncrease", {
 			item: item?.name,
-			optionsFetched: Array.isArray(options) ? options.length : 0,
+			hasItemOptions: Array.isArray(item?.options),
 			groups: groups.length,
 		});
 
