@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { API_CONFIG } from "shared-api/config/apiConfig.js";
 
 /**
  * Hook pour charger la configuration dynamique d'un restaurant (style + menu)
- * VERSION SIMPLIFIÉE : pas de cache, appel direct à l'API
+ * 🎯 AVEC CACHE : ne refetch pas si déjà chargé pour cet ID
  *
  * @param {string} restaurantId - ID du restaurant
  * @returns {object} - { config, loading, error, refetch }
@@ -12,6 +12,10 @@ export default function useRestaurantConfig(restaurantId) {
 	const [config, setConfig] = useState(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState(null);
+	
+	// 🎯 Cache : mémoriser le dernier ID fetch pour éviter les appels répétés
+	const lastFetchedId = useRef(null);
+	const isFetchingRef = useRef(false);
 
 	useEffect(() => {
 		// Si pas de restaurantId, ne rien faire
@@ -21,8 +25,21 @@ export default function useRestaurantConfig(restaurantId) {
 			setConfig(null);
 			return;
 		}
+		
+		// ✅ Cache : si déjà chargé pour cet ID, ne pas refetch
+		if (lastFetchedId.current === restaurantId && config) {
+			console.log("♻️ [useRestaurantConfig] Config déjà en cache");
+			return;
+		}
+		
+		// 🚦 Éviter les appels concurrents
+		if (isFetchingRef.current) {
+			console.log("⏳ [useRestaurantConfig] Fetch déjà en cours...");
+			return;
+		}
 
 		let isCancelled = false;
+		isFetchingRef.current = true;
 
 		const fetchConfig = async () => {
 			try {
@@ -70,16 +87,22 @@ export default function useRestaurantConfig(restaurantId) {
 					styleName: style.name,
 					categoriesCount: categories?.length || 0,
 					menuLayout,
+					headerIcon: style.config?.headerIcon,
+					useCustomHeader: style.config?.useCustomHeader,
+					useCustomBackground: style.config?.useCustomBackground,
+					backgroundImageUrl: style.config?.backgroundImageUrl,
 				});
-
 
 				setConfig(normalizedConfig);
 				setLoading(false);
+				lastFetchedId.current = restaurantId; // 🎯 Marquer comme fetch
+				isFetchingRef.current = false;
 			} catch (err) {
 				if (isCancelled) return;
 				console.error("[useRestaurantConfig] Erreur:", err);
 				setError(err.message || "Erreur de chargement");
 				setLoading(false);
+				isFetchingRef.current = false;
 			}
 		};
 
@@ -87,15 +110,18 @@ export default function useRestaurantConfig(restaurantId) {
 
 		return () => {
 			isCancelled = true;
+			isFetchingRef.current = false;
 		};
-	}, [restaurantId]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [restaurantId]); // ⚠️ Seulement restaurantId, pas config
 
 	return {
 		config,
 		loading,
 		error,
 		refetch: () => {
-			// Force un re-fetch en réinitialisant les states
+			// 🔄 Force un re-fetch en réinitialisant le cache
+			lastFetchedId.current = null;
 			setConfig(null);
 			setLoading(true);
 		},

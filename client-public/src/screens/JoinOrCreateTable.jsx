@@ -26,22 +26,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useClientTableStore } from "../stores/useClientTableStore.js";
 import { useRestaurantStore } from "../stores/useRestaurantStore.js";
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
+import { buildSafeTheme, DEFAULT_THEME } from "../theme/defaultTheme";
 import RNUUID from "react-native-uuid";
 
 const { width, height } = Dimensions.get("window");
-
-// 🎨 Thème général pour les restaurants standards
-const PREMIUM_COLORS = {
-	primary: ["#667eea", "#764ba2"],
-	secondary: ["#f093fb", "#f5576c"],
-	accent: ["#4facfe", "#00f2fe"],
-	success: ["#11998e", "#38ef7d"],
-	warning: ["#f2994a", "#f2c94c"],
-	dark: ["#0f0c29", "#302b63", "#24243e"],
-	orange: "#FF6B35", // Pour compatibilité
-	rouge: "#D53027",
-	dore: "#FFD700",
-};
 
 // 🎨 Mapping statique des images de fond custom (Metro ne supporte pas require() dynamique)
 const CUSTOM_BACKGROUNDS = {
@@ -94,18 +82,41 @@ export default function JoinOrCreateTable({
 	);
 	const isFoodtruck = category === "foodtruck";
 
+	console.log("🚚 [JoinOrCreateTable] Debug category:", {
+		category,
+		isFoodtruck,
+		restaurantName,
+		restaurantId,
+	});
+
 	// 🎨 Config dynamique du restaurant (style depuis la BDD)
 	const { config, loading: configLoading } = useRestaurantConfig(restaurantId);
 
 	// 🚀 ARCHITECTURE 100% JSON-DRIVEN : Lecture des flags depuis config.style
 	const useCustomBackground = config?.style?.useCustomBackground || false;
-	const backgroundImage =
-		useCustomBackground && config?.style?.backgroundImage
-			? CUSTOM_BACKGROUNDS[config.style.backgroundImage] || null
-			: null;
 
-	// 🎨 Thème dynamique selon le restaurant (fallback si pas de config)
-	const theme = config?.style || PREMIUM_COLORS;
+	// 🖼️ Image de fond : priorité à l'URL Cloudinary, sinon assets locaux
+	const backgroundImageUrl = config?.style?.backgroundImageUrl;
+	const backgroundImage = useCustomBackground
+		? backgroundImageUrl
+			? { uri: backgroundImageUrl } // URL Cloudinary
+			: config?.style?.backgroundImage
+				? CUSTOM_BACKGROUNDS[config.style.backgroundImage] || null // Asset local
+				: null
+		: null;
+
+	// 🎨 Thème dynamique selon le restaurant — fallback neutre si config absente
+	const theme = buildSafeTheme(config?.style, config?.styleKey);
+
+	console.log("🎨🇮🇹 [JoinOrCreateTable] Theme Debug:", {
+		styleKey: config?.styleKey,
+		hasPrimary: !!theme?.primary,
+		primaryColors: theme?.primary,
+		useCustomBackground,
+		useCustomHeader: config?.style?.useCustomHeader,
+		backgroundImageUrl,
+		hasBackgroundImage: !!backgroundImage,
+	});
 
 	// �🎬 Entrance animations
 	useEffect(() => {
@@ -285,7 +296,9 @@ export default function JoinOrCreateTable({
 				setRestaurantLoaded(true);
 			});
 		}
-	}, [restaurantId, fetchRestaurantInfo]);
+		// ⚠️ NE PAS mettre fetchRestaurantInfo dans les deps (cause boucle infinie)
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [restaurantId]);
 
 	// Table icon scale interpolation
 	const tableIconScale = tableIconAnim.interpolate({
@@ -456,12 +469,16 @@ export default function JoinOrCreateTable({
 		}
 	};
 
+	// 🔑 Forcer re-render complet quand le thème change
+	const renderKey = `${componentKey}-${config?.styleKey || "default"}`;
+
 	return (
 		<ImageBackground
-			key={componentKey} // 🔄 Change à chaque retour → force remount TOTAL
+			key={renderKey} // 🔄 Change quand thème change → force remount avec bonnes couleurs
 			source={backgroundImage}
 			style={styles.background}
 			resizeMode="cover"
+			imageStyle={useCustomBackground ? { opacity: 0.3 } : undefined}
 		>
 			{/* � Overlay conditionnel : Custom background ou Standard */}
 			{useCustomBackground ? (
@@ -469,11 +486,19 @@ export default function JoinOrCreateTable({
 					{/* Overlay flou sombre pour backgrounds custom */}
 					<BlurView intensity={25} tint="dark" style={styles.blurOverlay}>
 						<LinearGradient
-							colors={[
-								"rgba(0, 0, 0, 0.7)",
-								"rgba(213, 48, 39, 0.3)",
-								"rgba(0, 0, 0, 0.8)",
-							]}
+							colors={
+								config?.styleKey === "italia"
+									? [
+											"rgba(0, 0, 0, 0.7)",
+											"rgba(0, 146, 70, 0.25)", // Vert italien transparent
+											"rgba(0, 0, 0, 0.8)",
+										]
+									: [
+											"rgba(0, 0, 0, 0.7)",
+											"rgba(213, 48, 39, 0.3)", // Rouge BBQ
+											"rgba(0, 0, 0, 0.8)",
+										]
+							}
 							style={styles.gradientOverlay}
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 1 }}
@@ -571,7 +596,7 @@ export default function JoinOrCreateTable({
 					{/* � Logo et Titre conditionnels : Custom ou Standard */}
 					{useCustomBackground ? (
 						<>
-							{/* 🔥 Logo Grillz avec flammes */}
+							{/* 🇮🇹 Logo conditionnel : Italia ou Grillz */}
 							<Animated.View
 								style={[
 									styles.grillzLogoContainer,
@@ -579,7 +604,11 @@ export default function JoinOrCreateTable({
 								]}
 							>
 								<Image
-									source={require("../../../assets/foodtruck.png")}
+									source={
+										config?.styleKey === "italia"
+											? require("../../../assets/italiashop.png")
+											: require("../../../assets/foodtruck.png")
+									}
 									style={styles.foodtruckImageHighQuality}
 									resizeMode="contain"
 								/>
@@ -592,13 +621,19 @@ export default function JoinOrCreateTable({
 								)}
 							</Animated.View>
 
-							{/* Titre de bienvenue Grillz stylisé */}
+							{/* Titre de bienvenue stylisé */}
 							<View style={styles.grillzTitleContainer}>
 								<Text style={styles.grillzPreTitle}>Bonjour</Text>
 								<View style={styles.grillzMainTitleContainer}>
 									<Text style={styles.grillzMainTitle}>Bienvenue chez</Text>
 									<LinearGradient
-										colors={[theme.dore, theme.orange]}
+										colors={
+											config?.styleKey === "italia"
+												? Array.isArray(theme.gold)
+													? theme.gold
+													: ["#F1BF00", "#DAA520"]
+												: [theme.dore || "#FF8C00", theme.orange || "#FF6F00"]
+										}
 										style={styles.grillzNameGradient}
 										start={{ x: 0, y: 0 }}
 										end={{ x: 1, y: 0 }}
@@ -1386,7 +1421,7 @@ const styles = StyleSheet.create({
 	tableNumberBadgeText: {
 		fontSize: 18,
 		fontWeight: "bold",
-		color: "#667eea",
+		color: DEFAULT_THEME.primary[0],
 	},
 	title: {
 		fontSize: 36,

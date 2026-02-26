@@ -34,25 +34,12 @@ import { useStyleUpdates } from "../hooks/useSocketClient.js"; // ⭐ NOUVEAU : 
 import { useReservationStatus } from "../hooks/useReservationStatus.js"; // 🚪 Écoute fermeture réservation
 import { useFeatureLevel } from "../stores/useFeatureLevelStore.js"; // 🎯 Feature Levels
 import { useRestaurantStore } from "../stores/useRestaurantStore"; // 🏪 Store restaurant
+import { buildSafeTheme, DEFAULT_THEME } from "../theme/defaultTheme"; // 🎨 Thème centralisé
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const BUTTON_SMALL = 60;
 const BUTTON_EXPANDED = SCREEN_WIDTH - 40 - 60 * 3 - 8 * 3;
-
-// ⚠️ LEGACY: Garder comme fallback si la config échoue
-const PREMIUM_COLORS = {
-	primary: ["#667eea", "#764ba2"],
-	secondary: ["#f093fb", "#f5576c"],
-	accent: ["#4facfe", "#00f2fe"],
-	success: ["#11998e", "#38ef7d"],
-	warning: ["#f2994a", "#f2c94c"],
-	dark: ["#0f0c29", "#302b63", "#24243e"],
-	glass: "rgba(255, 255, 255, 0.15)",
-	glassBorder: "rgba(255, 255, 255, 0.25)",
-	text: "#ffffff",
-	textMuted: "rgba(255, 255, 255, 0.7)",
-};
 
 // 🔥 Composant Header Grillz personnalisé (utilisé uniquement pour Le Grillz)
 const GrillzHeader = ({
@@ -67,7 +54,9 @@ const GrillzHeader = ({
 		<View style={styles.grillzHeader}>
 			{/* Background avec effet flammes */}
 			<LinearGradient
-				colors={theme?.primary || PREMIUM_COLORS.primary}
+				colors={
+					Array.isArray(theme?.primary) ? theme.primary : DEFAULT_THEME.primary
+				}
 				style={styles.grillzHeaderBg}
 				start={{ x: 0, y: 0 }}
 				end={{ x: 1, y: 1 }}
@@ -75,7 +64,9 @@ const GrillzHeader = ({
 				{/* Logo restaurant */}
 				<View style={styles.grillzLogoContainer}>
 					<LinearGradient
-						colors={theme?.gold || ["#ffd700", "#ffed4e"]}
+						colors={
+							Array.isArray(theme?.gold) ? theme.gold : ["#ffd700", "#ffed4e"]
+						}
 						style={styles.grillzLogo}
 					>
 						<Ionicons
@@ -124,6 +115,82 @@ const GrillzHeader = ({
 	);
 };
 
+// 🇮🇹 Composant Header Italia personnalisé (utilisé uniquement pour Lacucinadinini)
+const ItaliaHeader = ({
+	userName,
+	restaurantName,
+	onOpenDietary,
+	showDietaryFeature = true,
+	theme,
+	styleConfig = {},
+}) => {
+	console.log("🇮🇹 [ItaliaHeader] RENDER avec:", {
+		restaurantName,
+		headerIcon: styleConfig.headerIcon,
+		categoryLabel: styleConfig.categoryLabel,
+		slogan: styleConfig.slogan,
+	});
+
+	return (
+		<View style={styles.italiaHeader}>
+			{/* Drapeau Italien en arrière-plan */}
+			<View style={styles.italiaFlagBg}>
+				<View style={[styles.italiaFlag, { backgroundColor: "#009246" }]} />
+				<View style={[styles.italiaFlag, { backgroundColor: "#FFFFFF" }]} />
+				<View style={[styles.italiaFlag, { backgroundColor: "#CE2B37" }]} />
+			</View>
+
+			{/* Contenu header */}
+			<View style={styles.italiaHeaderContent}>
+				{/* Logo avec pizza/pasta icon */}
+				<View style={styles.italiaLogoContainer}>
+					<LinearGradient
+						colors={
+							Array.isArray(theme?.gold) ? theme.gold : ["#F1BF00", "#DAA520"]
+						}
+						style={styles.italiaLogo}
+					>
+						<Ionicons
+							name={styleConfig.headerIcon || "pizza"}
+							size={32}
+							color="#2C1810"
+						/>
+					</LinearGradient>
+					<View style={styles.italiaBrandText}>
+						<Text style={styles.italiaTitle}>
+							{restaurantName || "Ristorante"}
+						</Text>
+						<Text style={styles.italiaSubtitle}>
+							{styleConfig.categoryLabel || "CUCINA ITALIANA"}
+						</Text>
+					</View>
+				</View>
+
+				{/* Utilisateur */}
+				<View style={styles.italiaUserSection}>
+					<Text style={styles.italiaUserText}>
+						{userName ? `Ciao ${userName}! 🇮🇹` : "Benvenuto! 🇮🇹"}
+					</Text>
+					{showDietaryFeature && (
+						<TouchableOpacity
+							style={styles.italiaDietaryButton}
+							onPress={onOpenDietary}
+							activeOpacity={0.8}
+						>
+							<Ionicons name="medical" size={18} color="#009246" />
+						</TouchableOpacity>
+					)}
+				</View>
+			</View>
+
+			{/* Slogan italien */}
+			{styleConfig.slogan && (
+				<Text style={styles.italiaSlogan}>{styleConfig.slogan}</Text>
+			)}
+		</View>
+	);
+};
+
 // 🎨 Composant Card Produit Premium avec animations
 const PremiumProductCard = ({
 	item,
@@ -134,6 +201,7 @@ const PremiumProductCard = ({
 	index,
 	categoryGradient,
 	showAllergens = true, // 🎯 Contrôle l'affichage des allergènes selon le niveau
+	theme, // 🎨 Thème dynamique pour les couleurs de texte
 }) => {
 	const { productContainsUserAllergen } = useAllergyStore();
 	const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -179,7 +247,11 @@ const PremiumProductCard = ({
 		>
 			{/* Gradient accent line */}
 			<LinearGradient
-				colors={categoryGradient || ["#667eea", "#764ba2"]}
+				colors={
+					Array.isArray(categoryGradient)
+						? categoryGradient
+						: DEFAULT_THEME.primary
+				}
 				start={{ x: 0, y: 0 }}
 				end={{ x: 1, y: 0 }}
 				style={styles.cardAccentLine}
@@ -192,8 +264,21 @@ const PremiumProductCard = ({
 			>
 				{/* Info section */}
 				<View style={styles.premiumCardInfo}>
-					<Text style={styles.premiumProductName}>{item.name}</Text>
-					<Text style={styles.premiumProductDesc} numberOfLines={2}>
+					<Text
+						style={[
+							styles.premiumProductName,
+							{ color: theme?.text || DEFAULT_THEME.text },
+						]}
+					>
+						{item.name}
+					</Text>
+					<Text
+						style={[
+							styles.premiumProductDesc,
+							{ color: theme?.textSecondary || DEFAULT_THEME.textSecondary },
+						]}
+						numberOfLines={2}
+					>
 						{item.description || "Une création savoureuse de notre chef"}
 					</Text>
 
@@ -201,7 +286,14 @@ const PremiumProductCard = ({
 					<View style={styles.premiumTagsRow}>
 						{item.vegan && (
 							<View style={styles.premiumTag}>
-								<Text style={styles.premiumTagText}>🌱 Vegan</Text>
+								<Text
+									style={[
+										styles.premiumTagText,
+										{ color: theme?.text || DEFAULT_THEME.text },
+									]}
+								>
+									🌱 Vegan
+								</Text>
 							</View>
 						)}
 						{item.glutenFree && (
@@ -246,12 +338,23 @@ const PremiumProductCard = ({
 				<View style={styles.premiumCardActions}>
 					{/* Price with gradient */}
 					<LinearGradient
-						colors={categoryGradient || ["#667eea", "#764ba2"]}
+						colors={
+							Array.isArray(categoryGradient)
+								? categoryGradient
+								: DEFAULT_THEME.primary
+						}
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 1 }}
 						style={styles.premiumPriceBadge}
 					>
-						<Text style={styles.premiumPriceText}>{item.price}€</Text>
+						<Text
+							style={[
+								styles.premiumPriceText,
+								{ color: theme?.text || DEFAULT_THEME.text },
+							]}
+						>
+							{item.price}€
+						</Text>
 					</LinearGradient>
 
 					{/* Quantity controls */}
@@ -274,7 +377,12 @@ const PremiumProductCard = ({
 							<Text
 								style={[
 									styles.premiumCounterValue,
-									quantity > 0 && styles.premiumCounterValueActive,
+									{
+										color:
+											quantity > 0
+												? theme?.text || DEFAULT_THEME.text
+												: theme?.textMuted || DEFAULT_THEME.textMuted,
+									},
 								]}
 							>
 								{quantity}
@@ -286,7 +394,11 @@ const PremiumProductCard = ({
 							onPress={() => onIncrease(item)}
 						>
 							<LinearGradient
-								colors={categoryGradient || ["#667eea", "#764ba2"]}
+								colors={
+									Array.isArray(categoryGradient)
+										? categoryGradient
+										: DEFAULT_THEME.primary
+								}
 								style={styles.premiumCounterGradient}
 							>
 								<Text style={styles.premiumCounterText}>+</Text>
@@ -309,7 +421,7 @@ const PremiumSearchBar = ({ value, onChangeText, onClear }) => {
 				styles.premiumSearchContainer,
 				{
 					borderColor: isFocused
-						? "rgba(102, 126, 234, 0.5)"
+						? DEFAULT_THEME.glassBorder
 						: "rgba(0,0,0,0.08)",
 				},
 			]}
@@ -317,7 +429,7 @@ const PremiumSearchBar = ({ value, onChangeText, onClear }) => {
 			<LinearGradient
 				colors={
 					isFocused
-						? ["rgba(102,126,234,0.1)", "rgba(118,75,162,0.05)"]
+						? [DEFAULT_THEME.glass, "rgba(74,144,217,0.03)"]
 						: ["#fff", "#fff"]
 				}
 				style={styles.premiumSearchGradient}
@@ -325,7 +437,7 @@ const PremiumSearchBar = ({ value, onChangeText, onClear }) => {
 				<MaterialIcons
 					name="search"
 					size={22}
-					color={isFocused ? "#667eea" : "#999"}
+					color={isFocused ? DEFAULT_THEME.textAccent : "#999"}
 					style={styles.searchIcon}
 				/>
 				<TextInput
@@ -416,7 +528,7 @@ const PremiumFloatingCart = ({ itemCount, total, onPress }) => {
 
 					<TouchableOpacity onPress={onPress} activeOpacity={0.9}>
 						<LinearGradient
-							colors={["#667eea", "#764ba2"]}
+							colors={DEFAULT_THEME.primary}
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 1 }}
 							style={styles.premiumCartButton}
@@ -515,7 +627,7 @@ const AnimatedCategoryButton = ({
 				<LinearGradient
 					colors={
 						isSelected
-							? category.gradient || ["#667eea", "#764ba2"]
+							? category.gradient || DEFAULT_THEME.primary
 							: ["#fff", "#fff"]
 					}
 					start={{ x: 0, y: 0 }}
@@ -530,7 +642,8 @@ const AnimatedCategoryButton = ({
 						{
 							opacity: glowOpacity,
 							backgroundColor:
-								(category.gradient && category.gradient[0]) || "#667eea",
+								(category.gradient && category.gradient[0]) ||
+								DEFAULT_THEME.primary[0],
 						},
 					]}
 				/>
@@ -617,10 +730,10 @@ export default function Menu({
 	const restaurantName = useRestaurantStore((state) => state.name) || "";
 	const useCustomHeader = config?.style?.useCustomHeader || false;
 
-	// 🎨 Thème dynamique selon le restaurant (fallback si pas de config)
-	const baseTheme = config?.style || PREMIUM_COLORS;
+	// 🎨 Thème dynamique selon le restaurant (fallback sur DEFAULT_THEME neutre si pas de config)
+	const baseTheme = buildSafeTheme(config?.style, config?.styleKey);
 
-	const [currentStyle, setCurrentStyle] = useState(PREMIUM_COLORS);
+	const [currentStyle, setCurrentStyle] = useState(DEFAULT_THEME);
 
 	// Mettre à jour le style quand un nouveau style est appliqué en temps réel
 	useEffect(() => {
@@ -629,8 +742,8 @@ export default function Menu({
 				"🎨 [Menu] Nouveau style reçu via WebSocket:",
 				liveStyle.style_id,
 			);
-			// 🚀 Appliquer le style depuis WebSocket (merger avec PREMIUM_COLORS pour fallback)
-			setCurrentStyle({ ...PREMIUM_COLORS, ...liveStyle.config });
+			// 🚀 Appliquer le style depuis WebSocket (merger avec DEFAULT_THEME pour fallback complet)
+			setCurrentStyle(buildSafeTheme(liveStyle.config, config?.styleKey));
 
 			// Optionnel : Afficher une notification à l'utilisateur
 			Alert.alert(
@@ -644,17 +757,19 @@ export default function Menu({
 	// Mettre à jour le style quand la config initiale est chargée
 	useEffect(() => {
 		if (config?.style) {
-			// Merger avec PREMIUM_COLORS pour garantir toutes les propriétés
-			const mergedStyle = { ...PREMIUM_COLORS, ...config.style };
+			// Merger avec DEFAULT_THEME pour garantir toutes les propriétés
+			const mergedStyle = buildSafeTheme(config.style, config?.styleKey);
 			setCurrentStyle(mergedStyle);
 
-			// 🔍 DEBUG : Afficher les couleurs chargées pour Le Grillz
-			console.log("🎨 [MENU] Style appliqué:", {
-				styleKey: config?.styleKey || "unknown",
+			// 🔍 DEBUG : Afficher la config chargée
+			console.log("🎨 [MENU] Config chargée:", {
+				styleKey: config?.styleKey,
+				styleName: config?.styleName,
+				useCustomHeader: config?.style?.useCustomHeader,
+				useCustomBackground: config?.style?.useCustomBackground,
+				backgroundImageUrl: config?.style?.backgroundImageUrl,
 				primary: mergedStyle.primary,
-				background: mergedStyle.background,
-				text: mergedStyle.text,
-				orange: mergedStyle.orange,
+				restaurantId,
 			});
 		}
 	}, [config]);
@@ -669,6 +784,13 @@ export default function Menu({
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [showDietaryModal, setShowDietaryModal] = useState(false);
+	
+	// 🎯 Gestion des options de menu
+	const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+	const [currentProductForOptions, setCurrentProductForOptions] = useState(null);
+	const [productOptions, setProductOptions] = useState([]);
+	const [selectedOptions, setSelectedOptions] = useState([]);
+	const [loadingOptions, setLoadingOptions] = useState(false);
 
 	// ⚠️ LEGACY : Catégories hardcodées comme fallback
 	const legacyCategories = [
@@ -703,7 +825,9 @@ export default function Menu({
 		const value = COLORS?.[colorKey];
 		return Array.isArray(value) && value.length > 0
 			? value
-			: PREMIUM_COLORS[colorKey] || ["#667eea", "#764ba2"];
+			: DEFAULT_THEME[colorKey] && Array.isArray(DEFAULT_THEME[colorKey])
+				? DEFAULT_THEME[colorKey]
+				: DEFAULT_THEME.primary;
 	};
 
 	// 🎯 Générer automatiquement les catégories depuis les produits disponibles
@@ -725,7 +849,7 @@ export default function Menu({
 			if (lowerName.includes("entree") || lowerName.includes("entrée"))
 				return "🥗";
 			if (lowerName.includes("plat") || lowerName.includes("principal"))
-				return "🍽️";
+				return "�";
 			if (
 				lowerName.includes("dessert") ||
 				lowerName.includes("sucré") ||
@@ -769,11 +893,23 @@ export default function Menu({
 			if (lowerName.includes("végé") || lowerName.includes("vegan"))
 				return "🥬";
 			if (lowerName.includes("accompagnement") || lowerName.includes("side"))
-				return "⭐";
+				return "🍟";
 			if (lowerName.includes("sauce")) return "🫙";
 			if (lowerName.includes("formule") || lowerName.includes("menu"))
 				return "🍱";
-			return "🍽️"; // Défaut
+			if (lowerName.includes("chausson") || lowerName.includes("viennoiserie"))
+				return "🥐";
+			if (lowerName.includes("feu") || lowerName.includes("grill"))
+				return "🔥";
+			if (lowerName.includes("fromage") || lowerName.includes("cheese"))
+				return "🧀";
+			if (lowerName.includes("pain") || lowerName.includes("bread"))
+				return "🥖";
+			if (lowerName.includes("fruit")) return "🍓";
+			if (lowerName.includes("glace") || lowerName.includes("ice"))
+				return "🍦";
+			// Défaut plus neutre qu'une assiette
+			return "🍴";
 		};
 
 		return productCategories.map((catName) => {
@@ -786,7 +922,7 @@ export default function Menu({
 				id: catName,
 				title: catName.charAt(0).toUpperCase() + catName.slice(1),
 				emoji: getEmojiByCategory(catName),
-				gradient: ["#667eea", "#764ba2"],
+				gradient: DEFAULT_THEME.primary,
 				icon: "restaurant",
 			};
 		});
@@ -824,9 +960,83 @@ export default function Menu({
 	};
 
 	// ============ FONCTIONS ============
+	
+	// 🎯 Fonction pour récupérer les options d'un produit
+	const fetchProductOptions = async (productId) => {
+		try {
+			setLoadingOptions(true);
+			const token = await AsyncStorage.getItem("clientToken");
+			const { API_CONFIG } = require("../config/apiConfig.js");
+			
+			const response = await fetch(
+				`${API_CONFIG.BASE_URL}/products/${productId}/options`,
+				{
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${token}`,
+					},
+				}
+			);
+
+			if (!response.ok) {
+				console.log("⚠️ Pas d'options pour ce produit ou erreur API");
+				return [];
+			}
+
+			const data = await response.json();
+			return Array.isArray(data) ? data : [];
+		} catch (error) {
+			console.error("❌ Erreur fetch options:", error);
+			return [];
+		} finally {
+			setLoadingOptions(false);
+		}
+	};
+
 	const handleIncrease = async (item) => {
-		// onAdd gère déjà l'ajout au panier ET à la commande
-		onAdd?.(item);
+		// 🎯 Vérifier si le produit a des options (notamment pour les menus/formules)
+		const options = await fetchProductOptions(item._id);
+		
+		if (options.length > 0) {
+			// Ouvrir la modale d'options
+			setCurrentProductForOptions(item);
+			setProductOptions(options);
+			setSelectedOptions([]);
+			setOptionsModalVisible(true);
+		} else {
+			// Ajout direct sans options
+			onAdd?.(item);
+		}
+	};
+	
+	// Validation des options sélectionnées
+	const handleValidateOptions = () => {
+		if (!currentProductForOptions) return;
+		
+		// Ajouter au panier avec les options
+		const itemWithOptions = {
+			...currentProductForOptions,
+			selectedOptions: selectedOptions,
+			// Prix final = prix du produit + somme des prix des options
+			finalPrice: currentProductForOptions.price + selectedOptions.reduce((sum, opt) => sum + (opt.price || 0), 0)
+		};
+		
+		onAdd?.(itemWithOptions);
+		setOptionsModalVisible(false);
+		setSelectedOptions([]);
+		setCurrentProductForOptions(null);
+	};
+	
+	// Toggle sélection d'une option
+	const toggleOption = (option) => {
+		setSelectedOptions((prev) => {
+			const exists = prev.find((opt) => opt._id === option._id);
+			if (exists) {
+				return prev.filter((opt) => opt._id !== option._id);
+			} else {
+				return [...prev, option];
+			}
+		});
 	};
 
 	const handleDecrease = async (item) => {
@@ -918,7 +1128,7 @@ export default function Menu({
 	if (configLoading) {
 		return (
 			<LinearGradient
-				colors={["#0f0c29", "#302b63", "#24243e"]}
+				colors={DEFAULT_THEME.dark}
 				style={styles.container}
 				start={{ x: 0, y: 0 }}
 				end={{ x: 1, y: 1 }}
@@ -930,8 +1140,14 @@ export default function Menu({
 						alignItems: "center",
 					}}
 				>
-					<ActivityIndicator size="large" color="#667eea" />
-					<Text style={{ color: "#ffffff", marginTop: 16, fontSize: 16 }}>
+					<ActivityIndicator size="large" color={DEFAULT_THEME.primary[0]} />
+					<Text
+						style={{
+							color: DEFAULT_THEME.textInverse,
+							marginTop: 16,
+							fontSize: 16,
+						}}
+					>
 						Chargement de la configuration...
 					</Text>
 				</View>
@@ -939,14 +1155,27 @@ export default function Menu({
 		);
 	}
 
+	// 🖼️ Image de fond : DÉSACTIVÉE dans Menu (seulement dans JoinOrCreateTable)
+	const shouldShowBackgroundImage = false; // ❌ Jamais d'image de fond dans Menu
+
+	// 🐛 Debug theme selection
+	console.log("🎨🔍 [Menu] Theme:", config?.styleKey);
+
+	// 🌟 Couleur de fond spécifique pour Italia : blanc pur au lieu de crème
+	const backgroundGradient =
+		config?.styleKey === "italia"
+			? ["#FFFFFF", "#FFFFFF"] // Blanc pur pour Italia
+			: getGradient("background");
+
+	// 🎨 Rendu final SANS image de fond (toujours LinearGradient uniquement)
 	return (
 		<LinearGradient
-			colors={getGradient("background")}
+			colors={backgroundGradient}
 			style={styles.container}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 1 }}
 		>
-			{/* Décorations premium */}
+			{/* Décorations premium (cercles en arrière-plan) */}
 			<View style={styles.bgDecor} pointerEvents="none">
 				<LinearGradient
 					colors={[...getGradient("primary"), "transparent"]}
@@ -958,8 +1187,21 @@ export default function Menu({
 				/>
 			</View>
 
-			{/* 🔒 Header Conditionnel : Grillz ou Standard */}
-			{useCustomHeader ? (
+			{/* 🔒 Header Conditionnel : Italia, Grillz ou Standard */}
+			{config?.styleKey === "italia" ? (
+				<ItaliaHeader
+					userName={userName}
+					restaurantName={restaurantName}
+					onOpenDietary={() => setShowDietaryModal(true)}
+					showDietaryFeature={hasAllergies || hasRestrictions}
+					theme={currentStyle}
+					styleConfig={{
+						headerIcon: config?.style?.headerIcon || "pizza",
+						categoryLabel: config?.style?.categoryLabel || "CUCINA ITALIANA",
+						slogan: config?.style?.slogan || "Autentica cucina italiana",
+					}}
+				/>
+			) : useCustomHeader ? (
 				<GrillzHeader
 					userName={userName}
 					restaurantName={restaurantName}
@@ -1070,6 +1312,7 @@ export default function Menu({
 								index={index}
 								categoryGradient={productCategory?.gradient}
 								showAllergens={hasAllergies}
+								theme={currentStyle}
 							/>
 						);
 					}}
@@ -1108,6 +1351,7 @@ export default function Menu({
 							index={index}
 							categoryGradient={selectedCategory?.gradient}
 							showAllergens={hasAllergies}
+							theme={currentStyle}
 						/>
 					)}
 					contentContainerStyle={styles.premiumListContainer}
@@ -1150,7 +1394,7 @@ export default function Menu({
 					activeOpacity={0.9}
 				>
 					<LinearGradient
-						colors={["#667eea", "#764ba2"]}
+						colors={getGradient("primary")}
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 1 }}
 						style={styles.payButtonGradient}
@@ -1170,8 +1414,20 @@ export default function Menu({
 				>
 					<View style={styles.modalOverlay}>
 						<View style={styles.modalContent}>
-							<Text style={styles.modalTitle}>{selectedItem.name}</Text>
-							<Text style={styles.modalDescription}>
+							<Text
+								style={[
+									styles.modalTitle,
+									{ color: currentStyle?.text || DEFAULT_THEME.text },
+								]}
+							>
+								{selectedItem.name}
+							</Text>
+							<Text
+								style={[
+									styles.modalDescription,
+									{ color: currentStyle?.textMuted || DEFAULT_THEME.textMuted },
+								]}
+							>
 								{selectedItem.description || "Sans description"}
 							</Text>
 							<View style={styles.modalTags}>
@@ -1205,6 +1461,104 @@ export default function Menu({
 					</View>
 				</Modal>
 			)}
+
+			{/* 🎯 Modal Options Produit (pour menus/formules) */}
+			<Modal
+				transparent
+				visible={optionsModalVisible}
+				animationType="slide"
+				onRequestClose={() => setOptionsModalVisible(false)}
+			>
+				<View style={styles.modalOverlay}>
+					<View style={[styles.modalContent, { maxHeight: "70%" }]}>
+						<Text
+							style={[
+								styles.modalTitle,
+								{ color: currentStyle?.text || DEFAULT_THEME.text },
+							]}
+						>
+							Options pour {currentProductForOptions?.name}
+						</Text>
+						
+						<ScrollView
+							style={{ maxHeight: 300 }}
+							showsVerticalScrollIndicator={false}
+						>
+							{loadingOptions ? (
+								<ActivityIndicator size="small" color={DEFAULT_THEME.primary[0]} />
+							) : productOptions.length === 0 ? (
+								<Text
+									style={[
+										styles.modalDescription,
+										{ color: currentStyle?.textSecondary || DEFAULT_THEME.textSecondary },
+									]}
+								>
+									Aucune option disponible
+								</Text>
+							) : (
+								productOptions.map((option) => {
+									const isSelected = selectedOptions.some((opt) => opt._id === option._id);
+									return (
+										<TouchableOpacity
+											key={option._id}
+											style={[
+												styles.optionItem,
+												isSelected && styles.optionItemSelected,
+											]}
+											onPress={() => toggleOption(option)}
+											activeOpacity={0.7}
+										>
+											<View style={styles.optionLeft}>
+												<Text style={styles.optionRadio}>
+													{isSelected ? "✅" : "⚪"}
+												</Text>
+												<Text
+													style={[
+														styles.optionName,
+														{ color: currentStyle?.text || DEFAULT_THEME.text },
+													]}
+												>
+													{option.name}
+												</Text>
+											</View>
+											{option.price > 0 && (
+												<Text
+													style={[
+														styles.optionPrice,
+														{ color: currentStyle?.textAccent || DEFAULT_THEME.textAccent },
+													]}
+												>
+													+{option.price.toFixed(2)}€
+												</Text>
+											)}
+										</TouchableOpacity>
+									);
+								})
+							)}
+						</ScrollView>
+
+						<View style={styles.modalButtons}>
+							<Pressable
+								style={[styles.modalButton, styles.modalCancelButton]}
+								onPress={() => {
+									setOptionsModalVisible(false);
+									setSelectedOptions([]);
+								}}
+							>
+								<Text style={styles.modalCloseText}>Annuler</Text>
+							</Pressable>
+							<Pressable
+								style={[styles.modalButton, styles.modalAddButton]}
+								onPress={handleValidateOptions}
+							>
+								<Text style={styles.modalCloseText}>
+									Ajouter {selectedOptions.length > 0 && `(${selectedOptions.length})`}
+								</Text>
+							</Pressable>
+						</View>
+					</View>
+				</View>
+			</Modal>
 
 			{/* Modal Préférences Alimentaires */}
 			<DietaryPreferences
@@ -1271,7 +1625,7 @@ const styles = StyleSheet.create({
 		borderRadius: 35,
 		justifyContent: "center",
 		alignItems: "center",
-		shadowColor: "#4facfe",
+		shadowColor: DEFAULT_THEME.shadowColor,
 		shadowOffset: { width: 0, height: 8 },
 		shadowOpacity: 0.4,
 		shadowRadius: 16,
@@ -1280,13 +1634,13 @@ const styles = StyleSheet.create({
 	welcomeTitle: {
 		fontSize: 32,
 		fontWeight: "800",
-		color: PREMIUM_COLORS.text,
+		color: DEFAULT_THEME.text,
 		letterSpacing: -0.5,
 		textAlign: "left",
 	},
 	subtitle: {
 		fontSize: 16,
-		color: PREMIUM_COLORS.textMuted,
+		color: DEFAULT_THEME.textMuted,
 		fontWeight: "500",
 		textAlign: "center",
 		marginTop: 4,
@@ -1308,7 +1662,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 		paddingVertical: 14,
 		fontSize: 16,
-		color: PREMIUM_COLORS.text,
+		color: DEFAULT_THEME.text,
 		fontWeight: "500",
 	},
 	searchIcon: {
@@ -1318,7 +1672,7 @@ const styles = StyleSheet.create({
 		padding: 4,
 	},
 	clearButtonInner: {
-		backgroundColor: "#667eea",
+		backgroundColor: DEFAULT_THEME.primary[0],
 		borderRadius: 12,
 		padding: 4,
 	},
@@ -1428,11 +1782,15 @@ const styles = StyleSheet.create({
 	},
 	buttonText: {
 		color: "#fff",
-		fontSize: 12,
+		fontSize: 11,
 		fontWeight: "700",
-		letterSpacing: 1.5,
+		letterSpacing: 0.8,
 		textTransform: "uppercase",
 		position: "absolute",
+		textAlign: "center",
+		paddingHorizontal: 8,
+		maxWidth: BUTTON_EXPANDED - 20,
+		lineHeight: 14,
 	},
 	// Anciens styles gardés pour compatibilité
 	categoryPillWrapper: {
@@ -1910,6 +2268,60 @@ const styles = StyleSheet.create({
 		fontWeight: "bold",
 		fontSize: 16,
 	},
+	
+	// Styles options produit (menus/formules)
+	optionItem: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		paddingVertical: 12,
+		paddingHorizontal: 15,
+		borderRadius: 10,
+		backgroundColor: "rgba(255,255,255,0.05)",
+		marginBottom: 8,
+		borderWidth: 2,
+		borderColor: "transparent",
+	},
+	optionItemSelected: {
+		backgroundColor: "rgba(76,175,80,0.15)",
+		borderColor: "#4CAF50",
+	},
+	optionLeft: {
+		flexDirection: "row",
+		alignItems: "center",
+		flex: 1,
+	},
+	optionRadio: {
+		fontSize: 20,
+		marginRight: 10,
+	},
+	optionName: {
+		fontSize: 15,
+		fontWeight: "500",
+		flex: 1,
+	},
+	optionPrice: {
+		fontSize: 14,
+		fontWeight: "600",
+	},
+	modalButtons: {
+		flexDirection: "row",
+		marginTop: 15,
+		gap: 10,
+	},
+	modalButton: {
+		flex: 1,
+		paddingVertical: 12,
+		borderRadius: 10,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	modalCancelButton: {
+		backgroundColor: "#666",
+	},
+	modalAddButton: {
+		backgroundColor: "#4CAF50",
+	},
 
 	// ============================================
 	// 🎨 STYLES PREMIUM 10/10
@@ -1955,13 +2367,13 @@ const styles = StyleSheet.create({
 	premiumProductName: {
 		fontSize: 18,
 		fontWeight: "700",
-		color: PREMIUM_COLORS.text,
+		color: DEFAULT_THEME.text,
 		marginBottom: 6,
 		letterSpacing: -0.3,
 	},
 	premiumProductDesc: {
 		fontSize: 14,
-		color: PREMIUM_COLORS.textMuted,
+		color: DEFAULT_THEME.textMuted,
 		lineHeight: 18,
 		marginBottom: 10,
 	},
@@ -1979,7 +2391,7 @@ const styles = StyleSheet.create({
 	premiumTagText: {
 		fontSize: 11,
 		fontWeight: "600",
-		color: PREMIUM_COLORS.text,
+		color: DEFAULT_THEME.text,
 	},
 	premiumCardActions: {
 		alignItems: "flex-end",
@@ -1990,7 +2402,7 @@ const styles = StyleSheet.create({
 		paddingVertical: 8,
 		borderRadius: 12,
 		marginBottom: 12,
-		shadowColor: "#764ba2",
+		shadowColor: DEFAULT_THEME.shadowColor,
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.18,
 		shadowRadius: 6,
@@ -1999,7 +2411,7 @@ const styles = StyleSheet.create({
 	premiumPriceText: {
 		fontSize: 16,
 		fontWeight: "800",
-		color: PREMIUM_COLORS.text,
+		color: DEFAULT_THEME.textInverse,
 	},
 	premiumCounter: {
 		flexDirection: "row",
@@ -2029,10 +2441,10 @@ const styles = StyleSheet.create({
 	premiumCounterValue: {
 		fontSize: 16,
 		fontWeight: "700",
-		color: PREMIUM_COLORS.textMuted,
+		color: DEFAULT_THEME.textMuted,
 	},
 	premiumCounterValueActive: {
-		color: PREMIUM_COLORS.text,
+		color: DEFAULT_THEME.text,
 	},
 
 	// État vide premium
@@ -2074,7 +2486,7 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 	},
 	premiumCartBadge: {
-		backgroundColor: "#667eea",
+		backgroundColor: DEFAULT_THEME.primary[0],
 		width: 32,
 		height: 32,
 		borderRadius: 16,
@@ -2209,5 +2621,113 @@ const styles = StyleSheet.create({
 		textAlign: "center",
 		marginTop: 10,
 		fontStyle: "italic",
+	},
+
+	// 🇮🇹 ===== STYLES ITALIA (utilisés uniquement pour Lacucinadinini) =====
+	italiaHeader: {
+		marginBottom: 20,
+		overflow: "hidden",
+		borderRadius: 20,
+		marginHorizontal: 10,
+		shadowColor: "#009246",
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		elevation: 8,
+	},
+	italiaFlagBg: {
+		flexDirection: "row",
+		height: 8,
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		zIndex: 1,
+	},
+	italiaFlag: {
+		flex: 1,
+	},
+	italiaHeaderContent: {
+		backgroundColor: "#FFF8E7",
+		padding: 20,
+		paddingTop: 28,
+	},
+	italiaLogoContainer: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 12,
+	},
+	italiaLogo: {
+		width: 60,
+		height: 60,
+		borderRadius: 30,
+		justifyContent: "center",
+		alignItems: "center",
+		marginRight: 15,
+		shadowColor: "#F1BF00",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.5,
+		shadowRadius: 4,
+		elevation: 4,
+	},
+	italiaBrandText: {
+		flex: 1,
+	},
+	italiaTitle: {
+		fontSize: 30,
+		fontWeight: "700",
+		color: "#2C1810",
+		letterSpacing: -0.5,
+		fontFamily: Platform.select({
+			ios: "Georgia",
+			android: "serif",
+		}),
+	},
+	italiaSubtitle: {
+		fontSize: 11,
+		fontWeight: "700",
+		color: "#009246",
+		letterSpacing: 3,
+		marginTop: 2,
+	},
+	italiaUserSection: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		backgroundColor: "rgba(0, 146, 70, 0.08)",
+		borderRadius: 15,
+		padding: 12,
+		borderWidth: 1,
+		borderColor: "rgba(0, 146, 70, 0.15)",
+	},
+	italiaUserText: {
+		fontSize: 16,
+		fontWeight: "600",
+		color: "#2C1810",
+		fontFamily: Platform.select({
+			ios: "Georgia",
+			android: "serif",
+		}),
+	},
+	italiaDietaryButton: {
+		backgroundColor: "rgba(0, 146, 70, 0.1)",
+		borderRadius: 12,
+		padding: 8,
+		borderWidth: 1,
+		borderColor: "#009246",
+	},
+	italiaSlogan: {
+		fontSize: 13,
+		fontWeight: "500",
+		color: "#CE2B37",
+		textAlign: "center",
+		paddingVertical: 8,
+		paddingHorizontal: 20,
+		backgroundColor: "#FFF8E7",
+		fontStyle: "italic",
+		fontFamily: Platform.select({
+			ios: "Georgia",
+			android: "serif",
+		}),
 	},
 });

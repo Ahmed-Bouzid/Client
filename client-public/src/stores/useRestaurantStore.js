@@ -8,12 +8,30 @@ export const useRestaurantStore = create((set, get) => ({
 	name: null,
 	googlePlaceId: null,
 	googleUrl: null,
+	lastFetchedId: null, // 🎯 Cache : dernier restaurant fetch
+	isFetching: false, // 🚦 Flag pour éviter les doubles appels
 
 	/**
 	 * Récupère les infos du restaurant (category, name)
 	 * Et initialise automatiquement le Feature Level Store
+	 * 🎯 Avec cache : ne refetch pas si déjà chargé
 	 */
 	fetchRestaurantInfo: async (restaurantId) => {
+		const state = get();
+		
+		// ✅ Cache : si déjà chargé pour cet ID, on ne refetch pas
+		if (state.lastFetchedId === restaurantId && state.category) {
+			console.log("♻️ [RESTAURANT] Info déjà en cache pour:", restaurantId);
+			return true;
+		}
+		
+		// 🚦 Éviter les appels concurrents
+		if (state.isFetching) {
+			console.log("⏳ [RESTAURANT] Fetch déjà en cours...");
+			return true;
+		}
+		
+		set({ isFetching: true });
 		try {
 			const url = `${API_CONFIG.BASE_URL}/restaurants/${restaurantId}/info`;
 			console.log(
@@ -40,10 +58,13 @@ export const useRestaurantStore = create((set, get) => ({
 			name: data.name,
 			googlePlaceId: data.googlePlaceId || null,
 			googleUrl: data.googleUrl || null,
+			lastFetchedId: restaurantId, // 🎯 Marquer comme fetch
+			isFetching: false,
 		});
 		
 			return true;
 		} catch (error) {
+			set({ isFetching: false });
 			console.error("❌ [RESTAURANT] Erreur fetchRestaurantInfo:", error);
 			set({ category: "restaurant", name: null });
 			// Fallback : niveau complet
