@@ -1,47 +1,78 @@
-import { API_CONFIG } from "../config/apiConfig.js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { API_CONFIG } from "../config/apiConfig.js";
 
 /**
  * Service d'authentification client PUBLIC
- * Génère des tokens simples base64 (pas de JWT backend)
- * Les clients publics n'ont pas besoin d'authentification serveur
+ * Génère un JWT client via le backend (POST /client/token) et le stocke localement.
  */
 export const clientAuthService = {
 	/**
-	 * Génère ou récupère un token client simple
-	 * Format: base64({ clientId: uuid, restaurantId, timestamp })
+	 * Retourne le JWT client stocké, ou en génère un nouveau si des paramètres sont fournis.
+	 *
+	 * Cas 1 - Au moment du join (avec params) :
+	 *   appelle POST /client/token → reçoit un JWT → le stocke → le retourne
+	 *
+	 * Cas 2 - Au moment de la commande (sans params) :
+	 *   lit le JWT dans AsyncStorage et le retourne
+	 *
+	 * @param {string} [clientName] - Pseudo du client (requis au join)
+	 * @param {string} [tableId]    - ID de la table (requis au join)
+	 * @param {string} [restaurantId] - ID du restaurant (requis au join)
+	 * @returns {Promise<string|null>} JWT ou null si aucun token disponible
 	 */
-	async getClientToken() {
+	async getClientToken(clientName, tableId, restaurantId) {
 		try {
-			// 1. Vérifier si on a déjà un token
-			let token = await AsyncStorage.getItem("clientToken");
+			// Cas 1 : paramètres fournis → obtenir un nouveau JWT depuis le backend
+			if (clientName && restaurantId) {
+				console.log("🔑 Génération token client pour:", clientName);
+				const response = await fetch(`${API_CONFIG.BASE_URL}/client/token`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						pseudo: clientName,
+						tableId: tableId || null,
+						restaurantId,
+					}),
+				});
 
-			// 2. Si pas de token, en générer un localement
-			if (!token) {
-				console.log("🔹 Génération nouveau token client local...");
+				if (!response.ok) {
+					console.warn(
+						"⚠️ Échec génération token client (backend):",
+						response.status,
+					);
+					// Fallback : retourner le token stocké si disponible
+					return await AsyncStorage.getItem("clientToken");
+				}
 
-				// Générer un clientId unique
-				const clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+				const data = await response.json();
+				const token = data.token;
 
-				const payload = {
-					clientId,
-					restaurantId: API_CONFIG.RESTAURANT_ID,
-					timestamp: Date.now(),
-					type: "client_public",
-				};
+				if (token) {
+					await AsyncStorage.setItem("clientToken", token);
+					console.log("✅ Token client JWT stocké");
+					return token;
+				}
 
-				// Encoder en base64
-				token = btoa(JSON.stringify(payload));
-
-				// 3. Stocker le token
-				await AsyncStorage.setItem("clientToken", token);
-				console.log("✅ Token client généré et stocké:", clientId);
+				return null;
 			}
 
-			return token;
+			// Cas 2 : pas de params → retourner le token stocké
+			const stored = await AsyncStorage.getItem("clientToken");
+			if (stored) {
+				console.log("🔓 Token client récupéré depuis AsyncStorage");
+				return stored;
+			}
+
+			console.warn("⚠️ Aucun token client disponible");
+			return null;
 		} catch (error) {
 			console.error("❌ Erreur getClientToken:", error);
-			throw error;
+			// Fallback : essayer le token stocké
+			try {
+				return await AsyncStorage.getItem("clientToken");
+			} catch {
+				return null;
+			}
 		}
 	},
 

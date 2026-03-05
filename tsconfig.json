@@ -1,4 +1,11 @@
 {
 	"extends": "./node_modules/expo/tsconfig.base.json",
+	"compilerOptions": {
+		"types": ["expo", "react", "react-native"],
+		"baseUrl": ".",
+		"paths": {
+			"expo-linear-gradient": ["node_modules/expo-linear-gradient"]
+		}
+	},
 	"exclude": ["node_modules"]
 }

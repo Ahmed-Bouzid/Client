@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
 	View,
 	Text,
+	Image,
 	TouchableOpacity,
 	StyleSheet,
 	Modal,
@@ -40,6 +41,86 @@ const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const BUTTON_SMALL = 60;
 const BUTTON_EXPANDED = SCREEN_WIDTH - 40 - 60 * 3 - 8 * 3;
+
+// 🖼️ Images thiings.co pour les catégories du menu (Metro require statique obligatoire)
+const CATEGORY_IMAGES = {
+	starter: require("../../../assets/images/menu/starter.png"),
+	main: require("../../../assets/images/menu/main.png"),
+	dessert: require("../../../assets/images/menu/Dessert.png"),
+	cafe: require("../../../assets/images/menu/Cafe.png"),
+	burger: require("../../../assets/images/menu/Burger.png"),
+	sandwich: require("../../../assets/images/menu/Sandwich.png"),
+	pizza: require("../../../assets/images/menu/Pizza.png"),
+	pates: require("../../../assets/images/menu/Pates.png"),
+	cocktail: require("../../../assets/images/menu/Cocktail.png"),
+	soda: require("../../../assets/images/menu/Soda.png"),
+	vin: require("../../../assets/images/menu/Vin.png"),
+	biere: require("../../../assets/images/menu/Biere.png"),
+	alcool: require("../../../assets/images/menu/Alcool.png"),
+	eau: require("../../../assets/images/menu/Eau.png"),
+	poulet: require("../../../assets/images/menu/Poulet.png"),
+	viande: require("../../../assets/images/menu/Viande.png"),
+	poisson: require("../../../assets/images/menu/Poisson.png"),
+	vege: require("../../../assets/images/menu/Vege.png"),
+	vegan: require("../../../assets/images/menu/Vegan.png"),
+	accompagnement: require("../../../assets/images/menu/Accompagnement.png"),
+};
+
+// 🎯 Helper : retourne l'image thiings.co correspondant à un nom de catégorie
+const getImageByCategory = (name) => {
+	const n = name.toLowerCase();
+	if (n.includes("entree") || n.includes("entrée") || n.includes("salade"))
+		return CATEGORY_IMAGES.starter;
+	if (n.includes("plat") || n.includes("principal"))
+		return CATEGORY_IMAGES.main;
+	if (n.includes("dessert") || n.includes("sucré") || n.includes("tiramisu"))
+		return CATEGORY_IMAGES.dessert;
+	if (
+		n.includes("café") ||
+		n.includes("coffee") ||
+		n.includes("thé") ||
+		n.includes("tea")
+	)
+		return CATEGORY_IMAGES.cafe;
+	if (n.includes("burger")) return CATEGORY_IMAGES.burger;
+	if (n.includes("sandwich") || n.includes("salé"))
+		return CATEGORY_IMAGES.sandwich;
+	if (n.includes("pizza")) return CATEGORY_IMAGES.pizza;
+	if (n.includes("pâtes") || n.includes("pasta")) return CATEGORY_IMAGES.pates;
+	if (n.includes("mocktail") || n.includes("cocktail"))
+		return CATEGORY_IMAGES.cocktail;
+	if (
+		n.includes("boisson") ||
+		n.includes("drink") ||
+		n.includes("soda") ||
+		n.includes("jus")
+	)
+		return CATEGORY_IMAGES.soda;
+	if (n.includes("vin") && !n.includes("vinai")) return CATEGORY_IMAGES.vin;
+	if (n.includes("biere") || n.includes("bière")) return CATEGORY_IMAGES.biere;
+	if (n.includes("aperitif") || n.includes("apéritif") || n.includes("apero"))
+		return CATEGORY_IMAGES.alcool;
+	if (
+		n.includes("digestif") ||
+		n.includes("alcool") ||
+		n.includes("rhum") ||
+		n.includes("vodka") ||
+		n.includes("whisky") ||
+		n.includes("gin")
+	)
+		return CATEGORY_IMAGES.alcool;
+	if (n.includes("eau") || n.includes("plate") || n.includes("gazeuse"))
+		return CATEGORY_IMAGES.eau;
+	if (n.includes("poulet")) return CATEGORY_IMAGES.poulet;
+	if (n.includes("viande") || n.includes("meat")) return CATEGORY_IMAGES.viande;
+	if (n.includes("poisson") || n.includes("fish"))
+		return CATEGORY_IMAGES.poisson;
+	if (n.includes("vegan")) return CATEGORY_IMAGES.vegan;
+	if (n.includes("végé") || n.includes("vege")) return CATEGORY_IMAGES.vege;
+	if (n.includes("accompagnement") || n.includes("side"))
+		return CATEGORY_IMAGES.accompagnement;
+	return null;
+};
 
 // 🎯 Assure une couleur de description lisible, meme si le theme met du blanc
 const getSafeDescColor = (theme) => {
@@ -700,25 +781,46 @@ const AnimatedCategoryButton = ({
 					]}
 				/>
 
-				{/* Icône emoji (visible quand non sélectionné) */}
-				<Animated.Text
-					style={[
-						styles.buttonEmoji,
-						{
-							opacity: iconOpacity,
-							transform: [
-								{
-									scale: iconOpacity.interpolate({
-										inputRange: [0, 1],
-										outputRange: [0, 1],
-									}),
-								},
-							],
-						},
-					]}
-				>
-					{category?.emoji || "🍽️"}
-				</Animated.Text>
+				{/* Icône image thiings.co (ou emoji en fallback) */}
+				{category?.image ? (
+					<Animated.Image
+						source={category.image}
+						style={[
+							styles.buttonEmojiImage,
+							{
+								opacity: iconOpacity,
+								transform: [
+									{
+										scale: iconOpacity.interpolate({
+											inputRange: [0, 1],
+											outputRange: [0, 1],
+										}),
+									},
+								],
+							},
+						]}
+						resizeMode="contain"
+					/>
+				) : (
+					<Animated.Text
+						style={[
+							styles.buttonEmoji,
+							{
+								opacity: iconOpacity,
+								transform: [
+									{
+										scale: iconOpacity.interpolate({
+											inputRange: [0, 1],
+											outputRange: [0, 1],
+										}),
+									},
+								],
+							},
+						]}
+					>
+						{category?.emoji || "🍽️"}
+					</Animated.Text>
+				)}
 
 				{/* Texte (visible quand sélectionné) */}
 				<Animated.Text
@@ -877,6 +979,7 @@ export default function Menu({
 			id: "boisson",
 			title: "Boissons",
 			emoji: "🥤",
+			image: CATEGORY_IMAGES.soda,
 			gradient: ["#a955ff", "#ea51ff"],
 			icon: "glass-cocktail",
 		},
@@ -884,6 +987,7 @@ export default function Menu({
 			id: "autre",
 			title: "Sandwiches",
 			emoji: "🥪",
+			image: CATEGORY_IMAGES.sandwich,
 			gradient: ["#FFD700", "#FF8C00"],
 			icon: "sandwich",
 		},
@@ -891,6 +995,7 @@ export default function Menu({
 			id: "dessert",
 			title: "Desserts",
 			emoji: "🍰",
+			image: CATEGORY_IMAGES.dessert,
 			gradient: ["#ffa9c6", "#f434e2"],
 			icon: "cake",
 		},
@@ -1024,6 +1129,7 @@ export default function Menu({
 				id: catName,
 				title: catName.charAt(0).toUpperCase() + catName.slice(1),
 				emoji: getEmojiByCategory(catName),
+				image: getImageByCategory(catName),
 				gradient: DEFAULT_THEME.primary,
 				icon: "restaurant",
 			};
@@ -1054,6 +1160,7 @@ export default function Menu({
 				id: "autre",
 				title: "Sandwiches",
 				emoji: "🥪",
+				image: CATEGORY_IMAGES.sandwich,
 				gradient: ["#FFD700", "#FF8C00"],
 				icon: "sandwich",
 			};
@@ -1661,105 +1768,102 @@ export default function Menu({
 				</Modal>
 			)}
 
-{/* 🎯 Modal Options Produit (pour menus/formules) - Grille 3 colonnes */}
-		<Modal
-			transparent
-			visible={optionsModalVisible}
-			animationType="slide"
-			onRequestClose={closeOptionsModal}
-		>
-			<View style={styles.modalOverlay}>
-				<View style={[styles.modalContent, { maxHeight: "95%", width: "95%" }]}>
-					<View style={styles.modalHeaderOptions}>
-						<Text
-							style={[
-								styles.modalTitle,
-								{ color: "#333", flex: 1, fontSize: 14 },
-							]}
-						>
-							Options
-						</Text>
-						<TouchableOpacity
-							onPress={closeOptionsModal}
-							style={styles.modalCloseIcon}
-						>
-							<Ionicons name="close-circle" size={32} color="#333" />
-						</TouchableOpacity>
-					</View>
-
-					<ScrollView
-						style={styles.optionsScrollContainer}
-						showsVerticalScrollIndicator={false}
+			{/* 🎯 Modal Options Produit (pour menus/formules) - Grille 3 colonnes */}
+			<Modal
+				transparent
+				visible={optionsModalVisible}
+				animationType="slide"
+				onRequestClose={closeOptionsModal}
+			>
+				<View style={styles.modalOverlay}>
+					<View
+						style={[
+							styles.modalContent,
+							{ maxHeight: "95%", width: "95%", height: "92%" },
+						]}
 					>
-						{loadingOptions ? (
-							<ActivityIndicator
-								size="small"
-								color={DEFAULT_THEME.primary[0]}
-							/>
-						) : optionGroups.length === 0 ? (
+						<View style={styles.modalHeaderOptions}>
 							<Text
 								style={[
-									styles.modalDescription,
-									{ color: getSafeDescColor(currentStyle) },
+									styles.modalTitle,
+									{ color: "#333", flex: 1, fontSize: 14 },
 								]}
 							>
-								Aucune option disponible
+								Options
 							</Text>
-						) : (
-							optionGroups.map((group) => (
-								<View key={group.id} style={styles.optionGroupContainer}>
-									<Text
-										style={[
-											styles.optionGroupTitle,
-											{ color: "#222" },
-										]}
-									>
-										{group.name}
-									</Text>
-									<View style={styles.optionsGrid}>
-										{(group.choices || []).map((choice) => {
-											const isSelected =
-												selectedOptions[group.id]?.id === choice.id;
-											return (
-												<TouchableOpacity
-													key={choice.id}
-													style={[
-														styles.optionGridItem,
-														isSelected && styles.optionGridItemSelected,
-													]}
-													onPress={() => toggleOption(group.id, choice)}
-													activeOpacity={0.7}
-												>
-													<Text style={styles.optionGridCheckmark}>
-														{isSelected ? "✅" : "⭕"}
-													</Text>
-													<Text
+							<TouchableOpacity
+								onPress={closeOptionsModal}
+								style={styles.modalCloseIcon}
+							>
+								<Ionicons name="close-circle" size={32} color="#333" />
+							</TouchableOpacity>
+						</View>
+
+						<ScrollView
+							style={styles.optionsScrollContainer}
+							showsVerticalScrollIndicator={false}
+						>
+							{loadingOptions ? (
+								<ActivityIndicator
+									size="small"
+									color={DEFAULT_THEME.primary[0]}
+								/>
+							) : optionGroups.length === 0 ? (
+								<Text
+									style={[
+										styles.modalDescription,
+										{ color: getSafeDescColor(currentStyle) },
+									]}
+								>
+									Aucune option disponible
+								</Text>
+							) : (
+								optionGroups.map((group) => (
+									<View key={group.id} style={styles.optionGroupContainer}>
+										<Text style={[styles.optionGroupTitle, { color: "#222" }]}>
+											{group.name}
+										</Text>
+										<View style={styles.optionsGrid}>
+											{(group.choices || []).map((choice) => {
+												const isSelected =
+													selectedOptions[group.id]?.id === choice.id;
+												return (
+													<TouchableOpacity
+														key={choice.id}
 														style={[
-															styles.optionGridName,
-															{ color: "#333" },
+															styles.optionGridItem,
+															isSelected && styles.optionGridItemSelected,
 														]}
-														numberOfLines={2}
+														onPress={() => toggleOption(group.id, choice)}
+														activeOpacity={0.7}
 													>
-														{choice.name}
-													</Text>
-													{choice.priceAdjustment > 0 && (
-														<Text
-															style={[
-																styles.optionGridPrice,
-																{ color: "#4CAF50" },
-															]}
-														>
-															+{choice.priceAdjustment.toFixed(2)}€
+														<Text style={styles.optionGridCheckmark}>
+															{isSelected ? "✅" : "⭕"}
 														</Text>
-													)}
-												</TouchableOpacity>
-											);
-										})}
+														<Text
+															style={[styles.optionGridName, { color: "#333" }]}
+															numberOfLines={2}
+														>
+															{choice.name}
+														</Text>
+														{choice.priceAdjustment > 0 && (
+															<Text
+																style={[
+																	styles.optionGridPrice,
+																	{ color: "#4CAF50" },
+																]}
+															>
+																+{choice.priceAdjustment.toFixed(2)}€
+															</Text>
+														)}
+													</TouchableOpacity>
+												);
+											})}
+										</View>
 									</View>
-								</View>
-							))
-						)}
-					</ScrollView>
+								))
+							)}
+						</ScrollView>
 
 						<View style={styles.modalButtons}>
 							<Pressable
@@ -2001,6 +2105,11 @@ const styles = StyleSheet.create({
 	},
 	buttonEmoji: {
 		fontSize: 24,
+		position: "absolute",
+	},
+	buttonEmojiImage: {
+		width: 32,
+		height: 32,
 		position: "absolute",
 	},
 	buttonText: {
@@ -2437,8 +2546,9 @@ const styles = StyleSheet.create({
 		width: "85%",
 		backgroundColor: "#fff",
 		borderRadius: 15,
-		padding: 25,
-		alignItems: "center",
+		padding: 18,
+		alignItems: "stretch",
+		overflow: "hidden",
 	},
 	modalTitle: {
 		fontSize: 22,
@@ -2550,7 +2660,8 @@ const styles = StyleSheet.create({
 	},
 	optionsScrollContainer: {
 		flex: 1,
-		paddingVertical: 16,
+		width: "100%",
+		paddingVertical: 12,
 	},
 	optionGroupContainer: {
 		marginBottom: 16,
@@ -2593,8 +2704,10 @@ const styles = StyleSheet.create({
 	},
 	modalButtons: {
 		flexDirection: "row",
-		marginTop: 15,
+		alignSelf: "stretch",
+		marginTop: 10,
 		gap: 10,
+		paddingBottom: 4,
 	},
 	modalButton: {
 		flex: 1,

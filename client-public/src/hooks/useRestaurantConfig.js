@@ -12,7 +12,7 @@ export default function useRestaurantConfig(restaurantId) {
 	const [config, setConfig] = useState(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState(null);
-	
+
 	// 🎯 Cache : mémoriser le dernier ID fetch pour éviter les appels répétés
 	const lastFetchedId = useRef(null);
 	const isFetchingRef = useRef(false);
@@ -25,13 +25,13 @@ export default function useRestaurantConfig(restaurantId) {
 			setConfig(null);
 			return;
 		}
-		
+
 		// ✅ Cache : si déjà chargé pour cet ID, ne pas refetch
 		if (lastFetchedId.current === restaurantId && config) {
 			console.log("♻️ [useRestaurantConfig] Config déjà en cache");
 			return;
 		}
-		
+
 		// 🚦 Éviter les appels concurrents
 		if (isFetchingRef.current) {
 			console.log("⏳ [useRestaurantConfig] Fetch déjà en cours...");

@@ -9,5 +9,11 @@ export const API_CONFIG = {
 	RESTAURANT_ID: Resto_id_key,
 	// TableId par défaut pour le développement (peut être surchargé)
 	// En production, le tableId devrait venir d'un QR code scanné
-	DEFAULT_TABLE_ID: "69833a4ee8aa1df146b5931f", // "686af692bb4cba684ff3b757" pour le développement
+	DEFAULT_TABLE_ID: "6960d0037aca682cfc81925a", // "686af692bb4cba684ff3b757" pour le développement
 };
+
+//tableid: 6960d0037aca682cfc81925a grillz
+//
+//
+//
+//

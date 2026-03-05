@@ -306,18 +306,37 @@ export const connectSocket = (
 
 	socket.on("connect_error", (error) => {
 		const errorMsg = error?.message || error?.toString() || "unknown";
-		console.error("❌ Erreur connexion Socket:", errorMsg);
+		const errorMsgLower = errorMsg.toLowerCase();
 		isConnected = false;
+
+		// ⭐ Distinguer les erreurs temporaires (pas des erreurs critiques)
+		const isTimout =
+			errorMsgLower.includes("timeout") ||
+			errorMsgLower.includes("econnrefused") ||
+			errorMsgLower.includes("network") ||
+			errorMsgLower.includes("enotfound");
+
+		if (isTimout) {
+			// Erreur temporaire → Log simple (Socket.io gère la reconnexion auto)
+			console.warn(
+				"⏱️ Erreur connexion temporaire (reconnexion auto):",
+				errorMsg,
+			);
+			return;
+		}
 
 		// ⭐ Vérifier si c'est une erreur d'authentification
 		// Dans ce cas, arrêter complètement la reconnexion
-		if (
-			errorMsg.toLowerCase().includes("token invalide") ||
-			errorMsg.toLowerCase().includes("unauthorized") ||
-			errorMsg.toLowerCase().includes("authentification") ||
-			errorMsg.toLowerCase().includes("invalid token")
-		) {
-			console.error("🔐 Erreur d'authentification Socket → Arrêt complet");
+		const isAuthError =
+			errorMsgLower.includes("token invalide") ||
+			errorMsgLower.includes("unauthorized") ||
+			errorMsgLower.includes("authentification") ||
+			errorMsgLower.includes("invalid token");
+
+		if (isAuthError) {
+			// Erreur d'authentification normale (session expirée)
+			console.warn("⚠️ Session Socket expirée ou invalide:", errorMsg);
+			console.warn("🔐 Arrêt Socket → Reconnexion requise");
 			// Déconnecter proprement pour éviter la boucle infinie
 			stopHeartbeat();
 			socket.disconnect();
@@ -325,6 +344,9 @@ export const connectSocket = (
 			eventListeners.clear();
 			eventQueue = [];
 			retryQueue = [];
+		} else {
+			// Erreur inattendue (rare)
+			console.error("❌ Erreur connexion Socket inattendue:", errorMsg);
 		}
 	});
 

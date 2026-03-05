@@ -25,7 +25,7 @@ import { useRestaurantStore } from "../stores/useRestaurantStore";
 import { useReservationStatus } from "../hooks/useReservationStatus"; // 🚪 Écoute fermeture réservation
 import FeedbackScreen from "../components/FeedbackScreen"; // 🌟 Feedback & Avis Google
 import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 API Feedback
-import { PREMIUM_COLORS } from "../theme/colors";
+import { buildSafeTheme, DEFAULT_THEME } from "../theme/defaultTheme";
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
 
 const { width, height } = Dimensions.get("window");
@@ -37,7 +37,7 @@ const PremiumPaymentItem = ({
 	isSelected,
 	isPaid,
 	onToggle,
-	theme = PREMIUM_COLORS,
+	theme = DEFAULT_THEME,
 }) => {
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(20)).current;
@@ -218,11 +218,9 @@ export default function Payment({
 	const restaurantId = useRestaurantStore((state) => state.id);
 	useReservationStatus(restaurantId, reservationId, onReservationClosed);
 
-	// 🎨 Thème dynamique depuis la BDD, fallback PREMIUM_COLORS
+	// 🎨 Thème dynamique depuis la BDD, fallback DEFAULT_THEME
 	const { config } = useRestaurantConfig(restaurantId);
-	const theme = config?.style
-		? { ...PREMIUM_COLORS, ...config.style }
-		: PREMIUM_COLORS;
+	const theme = buildSafeTheme(config?.style, config?.styleKey);
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -1389,12 +1387,12 @@ const styles = StyleSheet.create({
 	title: {
 		fontSize: 32,
 		fontWeight: "800",
-		color: PREMIUM_COLORS.text,
+		color: DEFAULT_THEME.text,
 		letterSpacing: -0.5,
 	},
 	subtitle: {
 		fontSize: 16,
-		color: PREMIUM_COLORS.textMuted,
+		color: DEFAULT_THEME.textMuted,
 		marginTop: 4,
 	},
 	// Error State
@@ -1415,12 +1413,12 @@ const styles = StyleSheet.create({
 	errorTitle: {
 		fontSize: 28,
 		fontWeight: "800",
-		color: PREMIUM_COLORS.text,
+		color: DEFAULT_THEME.text,
 		marginBottom: 12,
 	},
 	errorText: {
 		fontSize: 16,
-		color: PREMIUM_COLORS.textMuted,
+		color: DEFAULT_THEME.textMuted,
 		textAlign: "center",
 		lineHeight: 24,
 		marginBottom: 32,
@@ -1448,7 +1446,7 @@ const styles = StyleSheet.create({
 		padding: 20,
 		borderRadius: 20,
 		borderWidth: 1,
-		borderColor: PREMIUM_COLORS.glassBorder,
+		borderColor: DEFAULT_THEME.glassBorder,
 	},
 	statusBadge: {
 		flexDirection: "row",
@@ -1538,7 +1536,7 @@ const styles = StyleSheet.create({
 	sectionTitle: {
 		fontSize: 18,
 		fontWeight: "700",
-		color: PREMIUM_COLORS.text,
+		color: DEFAULT_THEME.text,
 	},
 	selectAllBtn: {
 		borderRadius: 20,
@@ -1657,7 +1655,7 @@ const styles = StyleSheet.create({
 	paidSectionTitle: {
 		fontSize: 16,
 		fontWeight: "600",
-		color: PREMIUM_COLORS.textMuted,
+		color: DEFAULT_THEME.textMuted,
 	},
 	// Empty State
 	emptyState: {
@@ -1675,12 +1673,12 @@ const styles = StyleSheet.create({
 	emptyStateTitle: {
 		fontSize: 24,
 		fontWeight: "800",
-		color: PREMIUM_COLORS.text,
+		color: DEFAULT_THEME.text,
 		marginBottom: 8,
 	},
 	emptyStateSubtext: {
 		fontSize: 16,
-		color: PREMIUM_COLORS.textMuted,
+		color: DEFAULT_THEME.textMuted,
 		marginBottom: 24,
 	},
 	emptyStateButton: {
@@ -1701,7 +1699,7 @@ const styles = StyleSheet.create({
 		marginBottom: 20,
 		borderRadius: 20,
 		overflow: "hidden",
-		shadowColor: "#667eea",
+		shadowColor: DEFAULT_THEME.shadowColor,
 		shadowOffset: { width: 0, height: 8 },
 		shadowOpacity: 0.35,
 		shadowRadius: 16,

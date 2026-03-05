@@ -21,6 +21,12 @@ export const orderService = {
 		try {
 			const token = await clientAuthService.getClientToken();
 
+			if (!token) {
+				throw new Error(
+					"Session expirée. Veuillez vous reconnecter en scannant le QR code.",
+				);
+			}
+
 			const response = await fetch(`${API_CONFIG.BASE_URL}/orders/`, {
 				method: "POST",
 				headers: {

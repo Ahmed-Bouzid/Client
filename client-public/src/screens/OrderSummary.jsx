@@ -12,14 +12,14 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
-import { PREMIUM_COLORS } from "../theme/colors";
+import { buildSafeTheme, DEFAULT_THEME } from "../theme/defaultTheme";
 import useRestaurantConfig from "../hooks/useRestaurantConfig";
 import { useRestaurantStore } from "../stores/useRestaurantStore";
 
 const { width } = Dimensions.get("window");
 
 // 🎴 Premium Order Card Component
-const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity, theme = PREMIUM_COLORS }) => {
+const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity, theme = DEFAULT_THEME }) => {
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(30)).current;
 	const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -186,10 +186,9 @@ const OrderSummary = ({
 	onSubmitOrder = () => {},
 	onBackToMenu = () => {},
 }) => {
-	// 🎨 Thème dynamique depuis la BDD, fallback PREMIUM_COLORS
-	const restaurantId = useRestaurantStore((state) => state.id);
+		const restaurantId = useRestaurantStore((state) => state.id);
 	const { config } = useRestaurantConfig(restaurantId);
-	const theme = config?.style ? { ...PREMIUM_COLORS, ...config.style } : PREMIUM_COLORS;
+	const theme = buildSafeTheme(config?.style, config?.styleKey);
 
 	// Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -501,12 +500,12 @@ const styles = StyleSheet.create({
 	title: {
 		fontSize: 32,
 		fontWeight: "800",
-		color: PREMIUM_COLORS.text,
+		color: DEFAULT_THEME.text,
 		letterSpacing: -0.5,
 	},
 	subtitle: {
 		fontSize: 16,
-		color: PREMIUM_COLORS.textMuted,
+		color: DEFAULT_THEME.textMuted,
 		marginTop: 4,
 	},
 	section: {
@@ -528,7 +527,7 @@ const styles = StyleSheet.create({
 	sectionTitle: {
 		fontSize: 18,
 		fontWeight: "700",
-		color: PREMIUM_COLORS.text,
+		color: DEFAULT_THEME.text,
 		flex: 1,
 	},
 	sectionBadge: {
@@ -638,7 +637,7 @@ const styles = StyleSheet.create({
 		color: "#333",
 	},
 	itemTotalBadge: {
-		backgroundColor: "#667eea",
+		backgroundColor: DEFAULT_THEME.primary[0],
 		paddingHorizontal: 12,
 		paddingVertical: 6,
 		borderRadius: 10,
@@ -677,7 +676,7 @@ const styles = StyleSheet.create({
 		marginVertical: 20,
 		borderRadius: 20,
 		overflow: "hidden",
-		shadowColor: "#667eea",
+		shadowColor: DEFAULT_THEME.shadowColor,
 		shadowOffset: { width: 0, height: 8 },
 		shadowOpacity: 0.4,
 		shadowRadius: 16,

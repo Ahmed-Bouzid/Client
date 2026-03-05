@@ -17,6 +17,7 @@ import {
 	ImageBackground,
 	ScrollView,
 	Image,
+	ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -300,6 +301,25 @@ export default function JoinOrCreateTable({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [restaurantId]);
 
+	const isInitialLoading = !restaurantId || configLoading || !restaurantLoaded;
+	if (isInitialLoading) {
+		return (
+			<LinearGradient
+				colors={DEFAULT_THEME.dark}
+				style={styles.initialLoader}
+				start={{ x: 0, y: 0 }}
+				end={{ x: 1, y: 1 }}
+			>
+				<View style={styles.initialLoaderContent}>
+					<ActivityIndicator size="large" color={DEFAULT_THEME.primary[0]} />
+					<Text style={styles.initialLoaderText}>
+						Chargement du restaurant...
+					</Text>
+				</View>
+			</LinearGradient>
+		);
+	}
+
 	// Table icon scale interpolation
 	const tableIconScale = tableIconAnim.interpolate({
 		inputRange: [0, 1],
@@ -328,10 +348,21 @@ export default function JoinOrCreateTable({
 	};
 
 	const handleJoin = async () => {
+		console.log("🚀 [JOIN] handleJoin démarré", {
+			name: name.trim(),
+			phone: phone.trim(),
+			tableId,
+			restaurantId,
+			isFoodtruck,
+		});
+
 		if (!name.trim()) return setError("Veuillez entrer votre nom.");
 		if (isFoodtruck && !phone.trim())
 			return setError("Veuillez entrer votre numéro de téléphone.");
-		if (!tableId) return setError("Table non identifiée.");
+		if (!tableId) {
+			console.error("❌ [JOIN] tableId manquant !");
+			return setError("Table non identifiée.");
+		}
 
 		setLoading(true);
 		setError("");
@@ -350,21 +381,37 @@ export default function JoinOrCreateTable({
 				tableId,
 				restaurantId,
 			);
-			const clientId = await getOrCreateClientId();
+			console.log(
+				"🔑 [JOIN] Token client obtenu:",
+				token ? "✅ OK" : "❌ NULL",
+			);
 
+			const clientId = await getOrCreateClientId();
+			console.log("👤 [JOIN] clientId:", clientId);
+
+			const finalRestaurantId =
+				restaurantId || (await AsyncStorage.getItem("restaurantId"));
 			const body = {
 				clientName: name.trim(),
 				clientId: clientId,
 				...(isFoodtruck && { clientPhone: phone.trim() }),
 				tableId: tableId,
-				restaurantId:
-					restaurantId || (await AsyncStorage.getItem("restaurantId")),
+				restaurantId: finalRestaurantId,
 				reservationDate: new Date().toISOString(),
 				reservationTime: `${String(new Date().getHours()).padStart(
 					2,
 					"0",
 				)}:${String(new Date().getMinutes()).padStart(2, "0")}`,
 			};
+
+			console.log(
+				"📤 [JOIN] Body envoyé au backend:",
+				JSON.stringify(body, null, 2),
+			);
+			console.log(
+				"🌐 [JOIN] URL:",
+				`${API_CONFIG.BASE_URL}/reservations/client/reservations`,
+			);
 
 			const response = await fetch(
 				`${API_CONFIG.BASE_URL}/reservations/client/reservations`,
@@ -377,17 +424,33 @@ export default function JoinOrCreateTable({
 				},
 			);
 
+			console.log(
+				"📥 [JOIN] HTTP Status:",
+				response.status,
+				response.statusText,
+			);
+
 			const text = await response.text();
+			console.log("📥 [JOIN] Réponse brute:", text);
+
 			let data;
 			try {
 				data = JSON.parse(text);
 			} catch {
+				console.error("❌ [JOIN] Réponse non-JSON:", text);
 				Alert.alert("Erreur", "Réponse serveur inattendue.");
 				setLoading(false);
 				return;
 			}
 
+			console.log("📥 [JOIN] Data parsée:", JSON.stringify(data, null, 2));
+
 			if (!response.ok) {
+				console.error(
+					"❌ [JOIN] Réponse non-OK:",
+					response.status,
+					data.message,
+				);
 				Alert.alert(
 					"Erreur",
 					data.message || "Erreur lors de la création de la réservation.",
@@ -396,8 +459,15 @@ export default function JoinOrCreateTable({
 				return;
 			}
 
+			console.log("✅ [JOIN] Réservation créée/rejointe avec succès");
 			const reservationObj = data.reservation || data;
 			const reservationId = reservationObj._id;
+			console.log(
+				"🎫 [JOIN] reservationId:",
+				reservationId,
+				"| status:",
+				reservationObj.status,
+			);
 			setReservationIdState(reservationId); // pour déclencher le fetch des commandes
 			const guestsArr =
 				data.guests ||
@@ -458,13 +528,14 @@ export default function JoinOrCreateTable({
 			}
 			Alert.alert("✅ Succès", welcomeMsg, [{ text: "OK" }]);
 		} catch (err) {
-			console.error("handleJoin error:", err);
+			console.error("❌ [JOIN] Exception attrapée:", err?.message, err);
 			setError(err.message || "Erreur réseau");
 			Alert.alert(
 				"Erreur",
 				"Impossible de rejoindre la table. Veuillez réessayer.",
 			);
 		} finally {
+			console.log("🏁 [JOIN] handleJoin terminé, loading=false");
 			setLoading(false);
 		}
 	};
@@ -1105,6 +1176,22 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		width: "100%",
+	},
+	initialLoader: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+		paddingHorizontal: 24,
+	},
+	initialLoaderContent: {
+		alignItems: "center",
+		gap: 12,
+	},
+	initialLoaderText: {
+		color: "#fff",
+		fontSize: 16,
+		fontWeight: "600",
+		textAlign: "center",
 	},
 	content: {
 		width: "100%",

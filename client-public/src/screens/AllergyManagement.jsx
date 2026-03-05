@@ -13,15 +13,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useAllergyStore } from "../stores/useAllergyStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { PREMIUM_COLORS } from "../theme/colors";
+import { buildSafeTheme, DEFAULT_THEME } from "../theme/defaultTheme";
 import useRestaurantConfig from "../hooks/useRestaurantConfig";
 import { useRestaurantStore } from "../stores/useRestaurantStore";
 
 export default function AllergyManagement({ onClose }) {
-	// 🎨 Thème dynamique depuis la BDD, fallback PREMIUM_COLORS
-	const restaurantId = useRestaurantStore((state) => state.id);
+		const restaurantId = useRestaurantStore((state) => state.id);
 	const { config } = useRestaurantConfig(restaurantId);
-	const theme = config?.style ? { ...PREMIUM_COLORS, ...config.style } : PREMIUM_COLORS;
+	const theme = buildSafeTheme(config?.style, config?.styleKey);
 
 	const { userAllergenIds, toggleAllergen, allergensCache, setAllergensCache } =
 		useAllergyStore();
@@ -209,7 +208,7 @@ export default function AllergyManagement({ onClose }) {
 					backgroundColor: "#fff",
 					borderRadius: 12,
 					borderLeftWidth: 4,
-					borderLeftColor: "#667eea",
+					borderLeftColor: DEFAULT_THEME.primary[0],
 					shadowColor: "#000",
 					shadowOffset: { width: 0, height: 2 },
 					shadowOpacity: 0.1,
@@ -218,7 +217,7 @@ export default function AllergyManagement({ onClose }) {
 				}}
 			>
 				<View style={{ flexDirection: "row", alignItems: "center" }}>
-					<Ionicons name="information-circle" size={24} color="#667eea" />
+					<Ionicons name="information-circle" size={24} color={DEFAULT_THEME.primary[0]} />
 					<Text
 						style={{
 							marginLeft: 8,
@@ -280,7 +279,7 @@ export default function AllergyManagement({ onClose }) {
 				<View
 					style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
 				>
-					<ActivityIndicator size="large" color="#667eea" />
+					<ActivityIndicator size="large" color={DEFAULT_THEME.primary[0]} />
 					<Text style={{ marginTop: 12, fontSize: 14, color: "#999" }}>
 						Chargement des allergènes...
 					</Text>

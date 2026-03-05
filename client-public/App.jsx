@@ -23,7 +23,7 @@ export default function App() {
 	const [tableNumber, setTableNumber] = useState(null);
 
 	// IDs en dur pour les tests
-	const DEFAULT_TABLE_ID = "686af692bb4cba684ff3b757";
+	const DEFAULT_TABLE_ID = "6960d0037aca682cfc81925a";
 	const DEFAULT_RESTAURANT_ID = Resto_id_key;
 
 	// Stores

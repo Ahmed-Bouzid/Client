@@ -18,19 +18,19 @@ export const useRestaurantStore = create((set, get) => ({
 	 */
 	fetchRestaurantInfo: async (restaurantId) => {
 		const state = get();
-		
+
 		// ✅ Cache : si déjà chargé pour cet ID, on ne refetch pas
 		if (state.lastFetchedId === restaurantId && state.category) {
 			console.log("♻️ [RESTAURANT] Info déjà en cache pour:", restaurantId);
 			return true;
 		}
-		
+
 		// 🚦 Éviter les appels concurrents
 		if (state.isFetching) {
 			console.log("⏳ [RESTAURANT] Fetch déjà en cours...");
 			return true;
 		}
-		
+
 		set({ isFetching: true });
 		try {
 			const url = `${API_CONFIG.BASE_URL}/restaurants/${restaurantId}/info`;
@@ -51,17 +51,17 @@ export const useRestaurantStore = create((set, get) => ({
 
 			const data = await response.json();
 
-		const category = data.category || "restaurant";
+			const category = data.category || "restaurant";
 
-		set({
-			category,
-			name: data.name,
-			googlePlaceId: data.googlePlaceId || null,
-			googleUrl: data.googleUrl || null,
-			lastFetchedId: restaurantId, // 🎯 Marquer comme fetch
-			isFetching: false,
-		});
-		
+			set({
+				category,
+				name: data.name,
+				googlePlaceId: data.googlePlaceId || null,
+				googleUrl: data.googleUrl || null,
+				lastFetchedId: restaurantId, // 🎯 Marquer comme fetch
+				isFetching: false,
+			});
+
 			return true;
 		} catch (error) {
 			set({ isFetching: false });
