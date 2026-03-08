@@ -392,10 +392,7 @@ const PremiumProductCard = ({
 			]}
 		>
 			{/* Gradient accent line */}
-			<LinearGradient
-			colors={activeGradient}
-				style={styles.cardAccentLine}
-			/>
+			<LinearGradient colors={activeGradient} style={styles.cardAccentLine} />
 
 			<TouchableOpacity
 				activeOpacity={0.95}
@@ -680,7 +677,8 @@ const AnimatedCategoryButton = ({
 	otherSelected,
 	themeGradient,
 }) => {
-	const selectedGradient = category.gradient ?? themeGradient ?? DEFAULT_THEME.primary;
+	const selectedGradient =
+		category.gradient ?? themeGradient ?? DEFAULT_THEME.primary;
 	const widthAnim = useRef(new Animated.Value(BUTTON_SMALL)).current;
 	const scaleAnim = useRef(new Animated.Value(1)).current;
 	const iconOpacity = useRef(new Animated.Value(1)).current;
