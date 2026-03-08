@@ -15,15 +15,10 @@ export const productService = {
 
 		if (token) {
 			headers.Authorization = `Bearer ${token}`;
-			console.log(
-				"📨 Headers Authorization:",
-				headers.Authorization.substring(0, 30) + "...",
-			);
 		}
 
 		// Récupérer dynamiquement le restaurantId
 		const restaurantId = await getRestaurantId();
-		console.log("🍽️ Restaurant ID utilisé:", restaurantId);
 
 		const url = `${API_CONFIG.BASE_URL}/products/restaurant/${restaurantId}`;
 		// console.log("🌐 URL complète:", url);
@@ -45,7 +40,6 @@ export const productService = {
 			}
 
 			const data = await response.json();
-			console.log("✅ Produits récupérés:", data.length, "produits");
 			return data;
 		} catch (error) {
 			console.error("💥 Erreur complète dans fetchProducts:", error.message);

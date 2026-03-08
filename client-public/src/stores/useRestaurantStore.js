@@ -21,25 +21,17 @@ export const useRestaurantStore = create((set, get) => ({
 
 		// ✅ Cache : si déjà chargé pour cet ID, on ne refetch pas
 		if (state.lastFetchedId === restaurantId && state.category) {
-			console.log("♻️ [RESTAURANT] Info déjà en cache pour:", restaurantId);
 			return true;
 		}
 
 		// 🚦 Éviter les appels concurrents
 		if (state.isFetching) {
-			console.log("⏳ [RESTAURANT] Fetch déjà en cours...");
 			return true;
 		}
 
 		set({ isFetching: true });
 		try {
 			const url = `${API_CONFIG.BASE_URL}/restaurants/${restaurantId}/info`;
-			console.log(
-				"🏪 [RESTAURANT] Fetching info pour:",
-				restaurantId,
-				"->",
-				url,
-			);
 			const response = await fetch(url);
 
 			if (!response.ok) {

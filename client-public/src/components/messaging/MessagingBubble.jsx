@@ -181,24 +181,14 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 	}, []);
 
 	const handleMessageStatus = useCallback((event) => {
-		console.log("🔔 [MessagingBubble] Événement message-status reçu:", event);
 		if (event.type === "read" && event.data?.messageId) {
 			const targetId = event.data.messageId.toString();
-			console.log("✅ Message marqué comme lu:", targetId);
 
 			setConversation((prev) => {
-				console.log(
-					"🔍 Conversation avant:",
-					prev.map((m) => ({ _id: m._id, status: m.status })),
-				);
 				const updated = prev.map((msg) =>
 					msg._id?.toString() === targetId
 						? { ...msg, status: "read", readAt: event.data.readAt }
 						: msg,
-				);
-				console.log(
-					"🔍 Conversation après:",
-					updated.map((m) => ({ _id: m._id, status: m.status })),
 				);
 				return updated;
 			});
@@ -213,20 +203,11 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 		// 1️⃣ ATTACHER LES LISTENERS D'ABORD
 		on("server-response", handleServerResponse);
 		on("message-status", handleMessageStatus);
-		console.log(
-			"✅ [MessagingBubble] Listeners attachés (server-response, message-status)",
-		);
 
 		// 2️⃣ REJOINDRE LA ROOM APRÈS (garantit que les listeners sont prêts)
-		console.log(
-			`🔌 [MessagingBubble] Rejoindre room: reservation-${reservationId}`,
-		);
 		socketService.joinReservation(reservationId);
 
 		return () => {
-			console.log(
-				`🔌 [MessagingBubble] Quitter room: reservation-${reservationId}`,
-			);
 			socketService.leaveReservation(reservationId);
 			off("server-response", handleServerResponse);
 			off("message-status", handleMessageStatus);
@@ -300,7 +281,6 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 			const data = await messageService.fetchPredefinedMessages();
 			// 🎯 Utiliser les messages par défaut si l'API retourne vide
 			if (!data || data.length === 0) {
-				console.log("⚠️ API vide, utilisation des messages par défaut");
 				setPredefinedMessages(DEFAULT_PREDEFINED_MESSAGES);
 			} else {
 				setPredefinedMessages(data);
@@ -372,7 +352,6 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 					]);
 
 					// TODO: Implémenter l'envoi réel via WebSocket ou endpoint dédié
-					console.log("📤 Message local envoyé:", message.text);
 				} else {
 					// Message prédéfini de l'API - appel normal
 					const result = await messageService.sendMessage({
@@ -384,7 +363,6 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 
 					// ✅ IMPORTANT: Utiliser le vrai _id retourné par le backend
 					const realMessageId = result.data?.messageId || result.data?._id;
-					console.log("📝 Message envoyé, ID backend:", realMessageId);
 
 					setConversation((prev) => [
 						...prev,

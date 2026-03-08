@@ -111,9 +111,6 @@ const addToRetryQueue = (event, data, attempts = 0) => {
 		() => {
 			const item = retryQueue.shift();
 			if (item && socketInstance?.connected) {
-				console.log(
-					`🔄 Retry ${item.attempts + 1}/${MAX_RETRY_ATTEMPTS} pour ${item.event}`,
-				);
 				emitWithAck(item.event, item.data, item.attempts + 1);
 			}
 		},
@@ -153,7 +150,6 @@ const emitWithAck = (event, data, retryAttempt = 0) => {
 			clearTimeout(ackTimeout);
 
 			if (response?.success) {
-				console.log(`✅ ACK reçu pour ${event} (ID: ${eventId})`);
 				resolve(response.data);
 			} else {
 				console.error(`❌ ACK négatif pour ${event}:`, response?.error);
@@ -204,8 +200,6 @@ export const joinReservation = (reservationId) => {
 		return;
 	}
 
-	console.log(`🔌 Rejoindre room: reservation-${reservationId}`);
-
 	socketInstance.emit("join-reservation", { reservationId }, (ack) => {
 		if (!ack?.success) {
 			console.error(`❌ Échec join reservation-${reservationId}:`, ack?.error);
@@ -218,8 +212,6 @@ export const joinReservation = (reservationId) => {
  */
 export const leaveReservation = (reservationId) => {
 	if (!socketInstance) return;
-
-	console.log(`🔌 Quitter room: reservation-${reservationId}`);
 
 	socketInstance.emit("leave-reservation", { reservationId });
 };
@@ -256,7 +248,6 @@ export const connectSocket = (
 	guestToken = null,
 ) => {
 	if (socketInstance?.connected) {
-		console.log("🔌 Socket déjà connecté");
 		// Rejoindre les nouvelles rooms si changement
 		if (restaurantId !== currentRestaurantId || tableId !== currentTableId) {
 			leaveRooms(socketInstance);
@@ -264,8 +255,6 @@ export const connectSocket = (
 		}
 		return socketInstance;
 	}
-
-	console.log(`🔌 Connexion Socket.io au restaurant ${restaurantId}...`);
 
 	// Créer l'instance Socket.io
 	const authConfig = guestToken ? { auth: { token: guestToken } } : {};
@@ -278,7 +267,6 @@ export const connectSocket = (
 
 	// ============ ÉVÉNEMENTS CONNEXION ============
 	socket.on("connect", () => {
-		console.log(`✅ Socket connecté: ${socket.id}`);
 		isConnected = true;
 
 		// Rejoindre les rooms
@@ -289,7 +277,6 @@ export const connectSocket = (
 
 		// Réessayer les événements en queue
 		if (retryQueue.length > 0) {
-			console.log(`🔄 Replay de ${retryQueue.length} événements en queue`);
 			const queue = [...retryQueue];
 			retryQueue = [];
 			queue.forEach((item) => {
@@ -350,9 +337,7 @@ export const connectSocket = (
 		}
 	});
 
-	socket.on("reconnect_attempt", (attemptNumber) => {
-		console.log(`🔄 Tentative de reconnexion #${attemptNumber}`);
-	});
+	socket.on("reconnect_attempt", (attemptNumber) => {});
 
 	// ⭐ Arrêter après échec définitif
 	socket.on("reconnect_failed", () => {
@@ -365,55 +350,46 @@ export const connectSocket = (
 
 	// 📦 Commande créée/mise à jour
 	socket.on("order", (payload) => {
-		console.log("📦 Événement order reçu:", payload.type);
 		notifyListeners("order", payload);
 	});
 
 	// 🍽️ Menu/Produit mis à jour
 	socket.on("menu_updated", (payload) => {
-		console.log("🍽️ Menu mis à jour");
 		notifyListeners("menu_updated", payload);
 	});
 
 	// 🎨 Style appliqué (NOUVEAU)
 	socket.on("style_applied", (payload) => {
-		console.log("🎨 Nouveau style appliqué:", payload.style_id);
 		notifyListeners("style_applied", payload);
 	});
 
 	// 📊 Stock mis à jour
 	socket.on("stock_updated", (payload) => {
-		console.log("📊 Stock mis à jour");
 		notifyListeners("stock_updated", payload);
 	});
 
 	// 🪑 État de table mis à jour
 	socket.on("table_status_updated", (payload) => {
-		console.log("🪑 État de table mis à jour");
 		notifyListeners("table_status_updated", payload);
 	});
 
 	// 💬 Message du serveur
 	socket.on("server_message", (payload) => {
-		console.log("💬 Message du serveur reçu");
 		notifyListeners("server_message", payload);
 	});
 
 	// 📨 Réponse du serveur (messagerie client-serveur)
 	socket.on("server-response", (payload) => {
-		console.log("📨 Réponse serveur reçue:", payload.type);
 		notifyListeners("server-response", payload);
 	});
 
 	// ✅ Statut de message (lu/non lu) pour messagerie client-serveur
 	socket.on("message-status", (payload) => {
-		console.log("✅ [socketService] Événement message-status reçu:", payload);
 		notifyListeners("message-status", payload);
 	});
 
 	// 🔔 Notification générique
 	socket.on("notification", (payload) => {
-		console.log("🔔 Notification reçue:", payload.type);
 		notifyListeners("notification", payload);
 	});
 
@@ -429,7 +405,6 @@ export const connectSocket = (
 export const disconnectSocket = () => {
 	if (!socketInstance) return;
 
-	console.log("🔌 Déconnexion Socket...");
 	stopHeartbeat();
 	leaveRooms(socketInstance);
 	socketInstance.disconnect();

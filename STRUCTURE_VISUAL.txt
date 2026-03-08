@@ -1,103 +1,157 @@
 ╔══════════════════════════════════════════════════════════╗
-║         CLIENT-END STRUCTURE (APRÈS REFACTOR)            ║
+║         CLIENT-END STRUCTURE (ACTUALISÉE – mars 2026)    ║
 ╚══════════════════════════════════════════════════════════╝
 
 CLIENT-end/
 │
 ├── 📱 client-public/
+│   ├── App.jsx                         ⭐ Point d'entrée React Native
+│   ├── index.js                        ⭐ Enregistrement de l'app
 │   │
-│   ├── App.jsx                    ⭐ (ex: app.js)
-│   ├── index.js                   ⭐ (ex: index-client.js)
-│   │
-│   └── 📁 src/                    ⭐ NOUVELLE STRUCTURE
+│   └── 📁 src/
 │       │
-│       ├── 📺 screens/            (4 écrans)
-│       │   ├── Menu.jsx           ✅ Écran menu
-│       │   ├── Payment.jsx        ✅ Écran paiement
-│       │   ├── OrderSummary.jsx   ✅ Résumé commande
-│       │   ├── JoinOrCreateTable.jsx  ✅ Connexion table
-│       │   └── index.js           📦 Exports
+│       ├── 📺 screens/                 (7 écrans)
+│       │   ├── Menu.jsx                ✅ Écran menu principal
+│       │   ├── Payment.jsx             ✅ Écran paiement
+│       │   ├── PaymentScreen.jsx       ✅ Écran paiement (Stripe)
+│       │   ├── OrderSummary.jsx        ✅ Résumé de commande
+│       │   ├── JoinOrCreateTable.jsx   ✅ Connexion à une table
+│       │   ├── AllergyManagement.jsx   ✅ Gestion des allergies
+│       │   ├── DietaryPreferences.jsx  ✅ Préférences alimentaires
+│       │   └── index.js                📦 Exports
 │       │
-│       ├── 🧩 components/         (3 composants)
-│       │   ├── AddOn.jsx          ✅ Suppléments
-│       │   ├── OrderList.jsx      ✅ Liste commandes
-│       │   ├── MenuItems.jsx      ✅ Items menu
-│       │   └── index.js           📦 Exports
+│       ├── 🧩 components/              (10 composants – sous-dossiers)
+│       │   ├── FeatureGuard.jsx        ✅ Guard selon feature level
+│       │   ├── FeedbackScreen.jsx      ✅ Écran de feedback client
+│       │   ├── index.js                📦 Exports
+│       │   │
+│       │   ├── common/
+│       │   │   ├── AllergenBadge.jsx   ✅ Badge allergène
+│       │   │   └── index.js
+│       │   │
+│       │   ├── menu/
+│       │   │   ├── AddOn.jsx           ✅ Suppléments / options
+│       │   │   ├── MenuItems.jsx       ✅ Liste des items de menu
+│       │   │   └── index.js
+│       │   │
+│       │   ├── messaging/
+│       │   │   ├── MessagingBubble.jsx ✅ Bulle de messagerie client↔serveur
+│       │   │   └── index.js
+│       │   │
+│       │   ├── order/
+│       │   │   ├── OrderList.jsx       ✅ Liste des commandes en cours
+│       │   │   └── index.js
+│       │   │
+│       │   └── receipt/
+│       │       ├── ReceiptModal.jsx    ✅ Modal ticket de caisse
+│       │       ├── ReceiptTicket.jsx   ✅ Rendu visuel du ticket
+│       │       └── index.js
 │       │
-│       ├── 📦 stores/             (4 stores Zustand)
-│       │   ├── useCartStore.js
-│       │   ├── useOrderStore.js
-│       │   ├── useProductStore.js
-│       │   ├── useClientTableStore.js
-│       │   └── index.js           📦 Exports
+│       ├── 📦 stores/                  (8 stores Zustand)
+│       │   ├── useCartStore.js         ✅ Panier
+│       │   ├── useOrderStore.js        ✅ Commandes
+│       │   ├── useProductStore.js      ✅ Produits / menu
+│       │   ├── useClientTableStore.js  ✅ Session table client
+│       │   ├── useAllergyStore.js      ✅ Allergies sélectionnées
+│       │   ├── useFeatureLevelStore.js ✅ Niveau de features
+│       │   ├── useRestaurantStore.js   ✅ Config restaurant
+│       │   ├── useRestrictionStore.js  ✅ Restrictions alimentaires
+│       │   └── index.js                📦 Exports
 │       │
-│       ├── 🔌 services/           (1 service)
-│       │   └── productService.js
+│       ├── 🔌 services/                (5 services)
+│       │   ├── productService.js       ✅ Appels API produits
+│       │   ├── socketService.js        ✅ WebSocket client
+│       │   ├── stripeService.js        ✅ Intégration Stripe
+│       │   ├── messageService.js       ✅ Messagerie client↔serveur
+│       │   └── clientFeedbackService.js ✅ Envoi de feedbacks
 │       │
-│       └── 🛠️ utils/              (3 utilitaires)
-│           ├── token.js
-│           ├── customAlert.js
-│           ├── RootNavigation.js
-│           └── index.js           📦 Exports
+│       ├── 🪝 hooks/                   (6 hooks custom)
+│       │   ├── useFeatures.js          ✅ Feature flags
+│       │   ├── useReceiptExport.js     ✅ Export ticket PDF
+│       │   ├── useReservationStatus.js ✅ Statut réservation
+│       │   ├── useRestaurantConfig.js  ✅ Config dynamique resto
+│       │   ├── useSocketClient.js      ✅ Connexion WebSocket
+│       │   ├── useTheme.js             ✅ Thème dynamique
+│       │   └── index.js                📦 Exports
+│       │
+│       ├── ⚙️ config/                  (3 fichiers)
+│       │   ├── api.js                  ✅ Base URL API
+│       │   ├── apiConfig.js            ✅ Config Axios/fetch
+│       │   └── restaurantConfig.js     ✅ Config statique resto
+│       │
+│       ├── 🎨 styles/                  (5 fichiers)
+│       │   ├── appStyles-classic.js    ✅ Thème classique
+│       │   ├── appStyles-classic.fixed.js
+│       │   ├── appStyles-grillz.js     ✅ Thème Grillz
+│       │   ├── appStyles-standard.js   ✅ Thème standard
+│       │   └── buttonStyles.js         ✅ Styles boutons
+│       │
+│       ├── 🎨 theme/                   (3 fichiers)
+│       │   ├── colors.js               ✅ Palette de couleurs
+│       │   ├── defaultTheme.js         ✅ Thème par défaut
+│       │   └── grillzColors.js         ✅ Couleurs Grillz
+│       │
+│       └── 🛠️ utils/                   (5 utilitaires)
+│           ├── token.js                ✅ Gestion token JWT
+│           ├── customAlert.js          ✅ Alertes custom
+│           ├── RootNavigation.js       ✅ Navigation globale
+│           ├── getRestaurantId.js      ✅ Récupération ID resto
+│           ├── secureLogger.js         ✅ Logger sécurisé (sans secrets)
+│           └── index.js                📦 Exports
 │
-├── 🔗 shared-api/                 # API partagée
+├── 🔗 shared-api/                      # API partagée (CLIENT-end spécifique)
+│   ├── package.json
+│   ├── config/
+│   │   ├── apiConfig.js
+│   │   └── featureLevels.js
 │   ├── services/
-│   ├── utils/
-│   └── config/
+│   │   ├── clientAuthService.js
+│   │   ├── orderService.js
+│   │   ├── productService.js
+│   │   └── reservationService.js
+│   └── utils/
+│       └── errorHandler.js
 │
-├── 🖼️ assets/                     # Ressources
+├── 🖼️ assets/                          # Ressources statiques
+│   ├── foodtruck.png
+│   ├── grillz-flyer.jpg
+│   ├── italiashop.png
+│   └── images/
+│       ├── background.webp
+│       ├── icon.png, logo.png, la-carte.jpg, grillz-flyer.jpg
+│       └── menu/                       (21 icônes de catégories)
 │
+├── metro.config.js
 ├── package.json
-├── README.md                      📚 Documentation
-├── REFACTOR_SUMMARY.md            📚 Résumé
-└── STRUCTURE_VISUAL.txt           📚 Ce fichier
+├── tsconfig.json
+└── STRUCTURE_VISUAL.txt                📚 Ce fichier
 
 ╔══════════════════════════════════════════════════════════╗
 ║                    📊 STATISTIQUES                       ║
 ╚══════════════════════════════════════════════════════════╝
 
-📁 Dossiers src/           : 5
-📄 Fichiers totaux         : 19
-📺 Écrans (screens)        : 4
-🧩 Composants              : 3
-📦 Stores Zustand          : 4
-🔌 Services                : 1
-🛠️ Utilitaires             : 3
-📚 Fichiers index          : 5
-📖 Documentation           : 3
-
-╔══════════════════════════════════════════════════════════╗
-║              🎯 CHANGEMENTS PRINCIPAUX                   ║
-╚══════════════════════════════════════════════════════════╝
-
-RENOMMÉ   : app.js                    → App.jsx
-RENOMMÉ   : index-client.js           → index.js
-DÉPLACÉ   : components/Menu.js        → src/screens/Menu.jsx
-DÉPLACÉ   : components/Payment.js     → src/screens/Payment.jsx
-DÉPLACÉ   : components/OrderSummary.js → src/screens/OrderSummary.jsx
-DÉPLACÉ   : components/JoinOrCreateTable.js → src/screens/JoinOrCreateTable.jsx
-DÉPLACÉ   : components/AddOn.js       → src/components/AddOn.jsx
-DÉPLACÉ   : components/OrderList.js   → src/components/OrderList.jsx
-RENOMMÉ   : components/menuItems.js   → src/components/MenuItems.jsx
-DÉPLACÉ   : stores/*                  → src/stores/
-DÉPLACÉ   : services/*                → src/services/
-DÉPLACÉ   : utils/*                   → src/utils/
-CRÉÉ      : src/screens/index.js      (exports centralisés)
-CRÉÉ      : src/components/index.js   (exports centralisés)
-CRÉÉ      : src/stores/index.js       (exports centralisés)
-CRÉÉ      : src/utils/index.js        (exports centralisés)
-CRÉÉ      : README.md                 (documentation complète)
-CRÉÉ      : REFACTOR_SUMMARY.md       (résumé)
+📁 Dossiers src/           : 9  (screens, components, stores, services,
+                                  hooks, config, styles, theme, utils)
+📺 Écrans (screens)        : 7
+🧩 Composants              : 10  (répartis en 5 sous-dossiers)
+📦 Stores Zustand          : 8
+🔌 Services                : 5
+🪝 Hooks custom            : 6
+⚙️ Config                  : 3
+🎨 Styles / Thèmes         : 8
+🛠️ Utilitaires             : 5
+🔗 shared-api services     : 4
 
 ╔══════════════════════════════════════════════════════════╗
 ║              ✅ CONVENTIONS APPLIQUÉES                   ║
 ╚══════════════════════════════════════════════════════════╝
 
-Composants/Écrans : PascalCase.jsx    (Menu.jsx, Payment.jsx)
-Hooks (stores)    : useCamelCase.js   (useCartStore.js)
-Services          : camelCase.js      (productService.js)
-Utilitaires       : camelCase.js      (token.js)
-Dossiers          : kebab-case/       (client-public/)
+Composants/Écrans : PascalCase.jsx      (Menu.jsx, ReceiptModal.jsx)
+Hooks (stores)    : useCamelCase.js     (useCartStore.js, useTheme.js)
+Services          : camelCase.js        (productService.js, socketService.js)
+Utilitaires       : camelCase.js        (token.js, secureLogger.js)
+Dossiers          : kebab-case/         (client-public/, shared-api/)
+Exports           : index.js centralisés dans chaque dossier majeur
 Index exports     : index.js          (fichiers d'export)
 
 ╔══════════════════════════════════════════════════════════╗

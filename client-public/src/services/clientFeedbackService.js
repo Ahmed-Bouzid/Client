@@ -20,15 +20,6 @@ class ClientFeedbackService {
 	 * @returns {Promise<Object>} Réponse API
 	 */
 	async submitFeedback(feedbackData) {
-		console.log(
-			"📝 [CLIENT-FEEDBACK-SERVICE] Soumission feedback:",
-			feedbackData,
-		);
-		console.log(
-			"📝 [CLIENT-FEEDBACK-SERVICE] URL appelée:",
-			`${this.baseURL}/submit`,
-		);
-
 		try {
 			const response = await fetch(`${this.baseURL}/submit`, {
 				method: "POST",
@@ -40,8 +31,6 @@ class ClientFeedbackService {
 			});
 
 			const data = await response.json();
-
-			console.log("✅ [CLIENT-FEEDBACK-SERVICE] Réponse API:", data);
 
 			if (!response.ok) {
 				console.error("❌ [CLIENT-FEEDBACK-SERVICE] Erreur HTTP:", {
@@ -78,10 +67,6 @@ class ClientFeedbackService {
 	 * @returns {Promise<Object>} Statistiques
 	 */
 	async getRestaurantStats(restaurantId, days = 30) {
-		console.log(
-			`📊 [CLIENT-FEEDBACK-SERVICE] Stats restaurant ${restaurantId} (${days} jours)`,
-		);
-
 		try {
 			const response = await fetch(
 				`${this.baseURL}/stats/${restaurantId}?days=${days}`,
@@ -102,7 +87,6 @@ class ClientFeedbackService {
 				);
 			}
 
-			console.log("✅ [CLIENT-FEEDBACK-SERVICE] Stats récupérées:", data.data);
 			return {
 				success: true,
 				data: data.data,
@@ -124,10 +108,6 @@ class ClientFeedbackService {
 	 * @returns {Promise<Object>} Feedbacks d'amélioration
 	 */
 	async getImprovementFeedback(restaurantId, limit = 50) {
-		console.log(
-			`💡 [CLIENT-FEEDBACK-SERVICE] Feedbacks amélioration restaurant ${restaurantId}`,
-		);
-
 		try {
 			const response = await fetch(
 				`${this.baseURL}/improvement/${restaurantId}?limit=${limit}`,
@@ -148,9 +128,6 @@ class ClientFeedbackService {
 				);
 			}
 
-			console.log(
-				`✅ [CLIENT-FEEDBACK-SERVICE] ${data.count} feedbacks récupérés`,
-			);
 			return {
 				success: true,
 				data: data.data,
@@ -172,8 +149,6 @@ class ClientFeedbackService {
 	 * @returns {Promise<Object>} Statut du service
 	 */
 	async testConnection() {
-		console.log("🧪 [CLIENT-FEEDBACK-SERVICE] Test connexion API");
-
 		try {
 			const response = await fetch(`${this.baseURL}/test`, {
 				method: "GET",
@@ -189,10 +164,6 @@ class ClientFeedbackService {
 				throw new Error("Service indisponible");
 			}
 
-			console.log(
-				"✅ [CLIENT-FEEDBACK-SERVICE] Service opérationnel:",
-				data.message,
-			);
 			return {
 				success: true,
 				data,
@@ -215,11 +186,6 @@ class ClientFeedbackService {
 	 * @returns {Promise<Object>} Résultat
 	 */
 	async markGoogleRedirect(feedbackId) {
-		console.log(
-			"🔄 [CLIENT-FEEDBACK-SERVICE] Marquage redirection Google:",
-			feedbackId,
-		);
-
 		try {
 			// Note: Cette fonctionnalité peut être ajoutée plus tard si besoin
 			// Pour l'instant, on se contente de logger

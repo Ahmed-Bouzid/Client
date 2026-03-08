@@ -65,10 +65,6 @@ class StripeService {
 		paymentMode = "client",
 	}) {
 		try {
-			console.log(
-				`💳 [CLIENT] Création PaymentIntent - Order: ${orderId}, Amount: ${amount / 100}€`,
-			);
-
 			const data = await this.fetchWithAuth(`${this.baseURL}/create-intent`, {
 				method: "POST",
 				body: JSON.stringify({
@@ -80,8 +76,6 @@ class StripeService {
 					paymentMode,
 				}),
 			});
-
-			console.log("✅ [CLIENT] PaymentIntent créé:", data.paymentIntentId);
 
 			return data;
 		} catch (error) {
@@ -102,8 +96,6 @@ class StripeService {
 	 */
 	async createFakePayment(orderId, amount, tipAmount = 0) {
 		try {
-			console.log(`🎭 [CLIENT] Création paiement FAKE - Order: ${orderId}`);
-
 			const data = await this.fetchWithAuth(`${this.baseURL}/fake`, {
 				method: "POST",
 				body: JSON.stringify({
@@ -112,8 +104,6 @@ class StripeService {
 					tipAmount,
 				}),
 			});
-
-			console.log("✅ [CLIENT] Paiement fake créé");
 
 			return data;
 		} catch (error) {

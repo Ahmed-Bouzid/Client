@@ -29,20 +29,11 @@ export const useReservationStatus = (
 			return;
 		}
 
-		console.log(
-			`🔔 [RESA STATUS] Écoute des changements de statut pour réservation ${reservationId}`,
-		);
-
 		const handleReservationUpdate = (event) => {
-			console.log("📡 [RESA STATUS] WebSocket event reçu:", event);
-
 			const { type, data } = event;
 
 			// Vérifier si c'est notre réservation
 			if (data._id !== reservationId && data.id !== reservationId) {
-				console.log(
-					"ℹ️ [RESA STATUS] Event pour une autre réservation, ignoré",
-				);
 				return;
 			}
 
@@ -52,14 +43,11 @@ export const useReservationStatus = (
 				data.status === "terminée" &&
 				!hasRedirectedRef.current
 			) {
-				console.log("🚪 [RESA STATUS] Réservation terminée, redirection...");
 				hasRedirectedRef.current = true;
 
 				// Nettoyer AsyncStorage
 				AsyncStorage.multiRemove(["reservationId", "tableId", "guestToken"])
 					.then(() => {
-						console.log("✅ [RESA STATUS] AsyncStorage nettoyé");
-
 						// Alert pour informer l'utilisateur
 						Alert.alert(
 							"Réservation terminée",
@@ -68,9 +56,6 @@ export const useReservationStatus = (
 								{
 									text: "OK",
 									onPress: () => {
-										console.log(
-											"🔄 [RESA STATUS] Redirection vers JoinOrCreateTable",
-										);
 										// Appeler le callback de navigation
 										if (onReservationClosed) {
 											onReservationClosed();
@@ -99,7 +84,6 @@ export const useReservationStatus = (
 
 		// Cleanup
 		return () => {
-			console.log("🧹 [RESA STATUS] Nettoyage listener");
 			off("reservation", handleReservationUpdate);
 			hasRedirectedRef.current = false;
 		};

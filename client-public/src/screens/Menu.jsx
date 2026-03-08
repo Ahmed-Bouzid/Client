@@ -64,6 +64,7 @@ const CATEGORY_IMAGES = {
 	vege: require("../../../assets/images/menu/Vege.png"),
 	vegan: require("../../../assets/images/menu/Vegan.png"),
 	accompagnement: require("../../../assets/images/menu/Accompagnement.png"),
+	sauce: require("../../../assets/images/menu/sauce.png"),
 };
 
 // 🎯 Helper : retourne l'image thiings.co correspondant à un nom de catégorie
@@ -119,6 +120,7 @@ const getImageByCategory = (name) => {
 	if (n.includes("végé") || n.includes("vege")) return CATEGORY_IMAGES.vege;
 	if (n.includes("accompagnement") || n.includes("side"))
 		return CATEGORY_IMAGES.accompagnement;
+	if (n.includes("sauce")) return CATEGORY_IMAGES.sauce;
 	return null;
 };
 
@@ -128,6 +130,11 @@ const getSafeDescColor = (theme) => {
 		theme?.textSecondary || theme?.textMuted || theme?.text || null;
 	if (!candidate || typeof candidate !== "string") {
 		return DEFAULT_THEME.textSecondary;
+	}
+	// 🌑 Thème sombre détecté (ex: Grillz) : `dark` est une string hex unique.
+	// Sur fond sombre on garde les couleurs chaudes telles quelles.
+	if (typeof theme?.dark === "string") {
+		return candidate;
 	}
 	const lower = candidate.toLowerCase();
 
@@ -175,65 +182,75 @@ const GrillzHeader = ({
 	theme,
 	styleConfig = {},
 }) => {
+	// 🔥 Couleurs BBQ hardcodées — évite tout flash bleu du DEFAULT_THEME au chargement
+	const BBQ_PRIMARY =
+		Array.isArray(theme?.primary) &&
+		theme.primary[0] !== DEFAULT_THEME.primary[0]
+			? theme.primary
+			: ["#FF6B35", "#D9381E"];
+
 	return (
 		<View style={styles.grillzHeader}>
-			{/* Background avec effet flammes */}
+			{/* Fond charbon profond */}
 			<LinearGradient
-				colors={
-					Array.isArray(theme?.primary) ? theme.primary : DEFAULT_THEME.primary
-				}
-				style={styles.grillzHeaderBg}
+				colors={["#1A1110", "#2B1F1E"]}
+				style={styles.grillzHeaderOuter}
 				start={{ x: 0, y: 0 }}
-				end={{ x: 1, y: 1 }}
+				end={{ x: 0, y: 1 }}
 			>
-				{/* Logo restaurant */}
+				{/* Barre de flamme signature en haut */}
+				<LinearGradient
+					colors={BBQ_PRIMARY}
+					style={styles.grillzFlameStrip}
+					start={{ x: 0, y: 0 }}
+					end={{ x: 1, y: 0 }}
+				/>
+
+				{/* Ligne branding */}
 				<View style={styles.grillzLogoContainer}>
-					<LinearGradient
-						colors={
-							Array.isArray(theme?.gold) ? theme.gold : ["#ffd700", "#ffed4e"]
-						}
-						style={styles.grillzLogo}
-					>
-						<Ionicons
-							name={styleConfig.headerIcon || "flame"}
-							size={28}
-							color="#1a1a1a"
-						/>
+					{/* Badge BBQ */}
+					<LinearGradient colors={BBQ_PRIMARY} style={styles.grillzLogo}>
+						<Text style={{ fontSize: 24 }}>🍗</Text>
 					</LinearGradient>
 					<View style={styles.grillzBrandText}>
 						<Text style={styles.grillzTitle}>
-							{restaurantName || "Restaurant"}
+							{restaurantName || "LE GRILLZ"} 🔥
 						</Text>
 						<Text style={styles.grillzSubtitle}>
-							{styleConfig.categoryLabel || "RESTAURANT"}
+							{styleConfig.slogan || "🍗 POULET BBQ · FOODTRUCK HALAL 🔥"}
 						</Text>
 					</View>
 				</View>
 
-				{/* Utilisateur - bouton dietary masqué pour foodtrucks */}
+				{/* Séparateur braise */}
+				<View style={styles.grillzDivider} />
+
+				{/* Ligne bienvenue + badges */}
 				<View style={styles.grillzUserButton}>
 					<Text style={styles.grillzUserText}>
 						{userName
 							? `👋 ${userName}`
-							: `👋 Bienvenue${restaurantName ? ` au ${restaurantName}` : ""}`}
+							: `👋 Bienvenue${restaurantName ? ` au ${restaurantName}` : " !"}`}
 					</Text>
-					{styleConfig.categoryLabel && (
-						<View style={styles.grillzHalalBadge}>
-							<Text style={styles.grillzHalalText}>
-								{styleConfig.categoryLabel}
-							</Text>
-						</View>
-					)}
-					{/* Bouton allergènes/restrictions - visible seulement si activé */}
-					{showDietaryFeature && (
-						<TouchableOpacity
-							style={styles.grillzDietaryButton}
-							onPress={onOpenDietary}
-							activeOpacity={0.8}
-						>
-							<Ionicons name="medical" size={18} color="#fff" />
-						</TouchableOpacity>
-					)}
+					<View style={styles.grillzBadgesRow}>
+						{styleConfig.categoryLabel && (
+							<View style={styles.grillzHalalBadge}>
+								<Text style={styles.grillzHalalText}>
+									🥩 {styleConfig.categoryLabel}
+								</Text>
+							</View>
+						)}
+						{/* Bouton allergènes/restrictions — visible si activé */}
+						{showDietaryFeature && (
+							<TouchableOpacity
+								style={styles.grillzDietaryButton}
+								onPress={onOpenDietary}
+								activeOpacity={0.8}
+							>
+								<Ionicons name="medical-outline" size={18} color="#FFFAF0" />
+							</TouchableOpacity>
+						)}
+					</View>
 				</View>
 			</LinearGradient>
 		</View>
@@ -249,13 +266,6 @@ const ItaliaHeader = ({
 	theme,
 	styleConfig = {},
 }) => {
-	console.log("🇮🇹 [ItaliaHeader] RENDER avec:", {
-		restaurantName,
-		headerIcon: styleConfig.headerIcon,
-		categoryLabel: styleConfig.categoryLabel,
-		slogan: styleConfig.slogan,
-	});
-
 	return (
 		<View style={styles.italiaHeader}>
 			{/* Drapeau Italien en arrière-plan */}
@@ -325,9 +335,17 @@ const PremiumProductCard = ({
 	onPress,
 	index,
 	categoryGradient,
+	themeGradient, // 🔥 Gradient fallback du thème (Grillz = orange BBQ, autres = DEFAULT)
 	showAllergens = true, // 🎯 Contrôle l'affichage des allergènes selon le niveau
 	theme, // 🎨 Thème dynamique pour les couleurs de texte
 }) => {
+	// 🎯 Priorité : gradient de la catégorie → primary du thème → DEFAULT bleu
+	// On lit theme.primary directement (= currentStyle) pour éviter tout décalage de timing
+	const activeGradient = Array.isArray(categoryGradient)
+		? categoryGradient
+		: Array.isArray(theme?.primary)
+			? theme.primary
+			: DEFAULT_THEME.primary;
 	const { productContainsUserAllergen } = useAllergyStore();
 	const scaleAnim = useRef(new Animated.Value(0.9)).current;
 	const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -361,15 +379,7 @@ const PremiumProductCard = ({
 	const quantity = cart[item._id] || 0;
 	const descColor = getSafeDescColor(theme);
 
-	useEffect(() => {
-		console.log("🧾 [Menu] Item description", {
-			id: item?._id,
-			name: item?.name,
-			description: item?.description,
-			descLength: item?.description ? item.description.length : 0,
-			descColor,
-		});
-	}, [item?._id, descColor]);
+	useEffect(() => {}, [item?._id, descColor]);
 
 	return (
 		<Animated.View
@@ -383,13 +393,7 @@ const PremiumProductCard = ({
 		>
 			{/* Gradient accent line */}
 			<LinearGradient
-				colors={
-					Array.isArray(categoryGradient)
-						? categoryGradient
-						: DEFAULT_THEME.primary
-				}
-				start={{ x: 0, y: 0 }}
-				end={{ x: 1, y: 0 }}
+			colors={activeGradient}
 				style={styles.cardAccentLine}
 			/>
 
@@ -471,11 +475,7 @@ const PremiumProductCard = ({
 				<View style={styles.premiumCardActions}>
 					{/* Price with gradient */}
 					<LinearGradient
-						colors={
-							Array.isArray(categoryGradient)
-								? categoryGradient
-								: DEFAULT_THEME.primary
-						}
+						colors={activeGradient}
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 1 }}
 						style={styles.premiumPriceBadge}
@@ -527,11 +527,7 @@ const PremiumProductCard = ({
 							onPress={() => onIncrease(item)}
 						>
 							<LinearGradient
-								colors={
-									Array.isArray(categoryGradient)
-										? categoryGradient
-										: DEFAULT_THEME.primary
-								}
+								colors={activeGradient}
 								style={styles.premiumCounterGradient}
 							>
 								<Text style={styles.premiumCounterText}>+</Text>
@@ -682,7 +678,9 @@ const AnimatedCategoryButton = ({
 	isSelected,
 	onPress,
 	otherSelected,
+	themeGradient,
 }) => {
+	const selectedGradient = category.gradient ?? themeGradient ?? DEFAULT_THEME.primary;
 	const widthAnim = useRef(new Animated.Value(BUTTON_SMALL)).current;
 	const scaleAnim = useRef(new Animated.Value(1)).current;
 	const iconOpacity = useRef(new Animated.Value(1)).current;
@@ -758,11 +756,7 @@ const AnimatedCategoryButton = ({
 			>
 				{/* Background gradient (toujours présent mais visible si sélectionné) */}
 				<LinearGradient
-					colors={
-						isSelected
-							? category.gradient || DEFAULT_THEME.primary
-							: ["#fff", "#fff"]
-					}
+					colors={isSelected ? selectedGradient : ["#fff", "#fff"]}
 					start={{ x: 0, y: 0 }}
 					end={{ x: 1, y: 1 }}
 					style={StyleSheet.absoluteFill}
@@ -774,9 +768,7 @@ const AnimatedCategoryButton = ({
 						styles.glowEffect,
 						{
 							opacity: glowOpacity,
-							backgroundColor:
-								(category.gradient && category.gradient[0]) ||
-								DEFAULT_THEME.primary[0],
+							backgroundColor: selectedGradient[0],
 						},
 					]}
 				/>
@@ -892,10 +884,6 @@ export default function Menu({
 	// Mettre à jour le style quand un nouveau style est appliqué en temps réel
 	useEffect(() => {
 		if (liveStyle && liveStyle.config) {
-			console.log(
-				"🎨 [Menu] Nouveau style reçu via WebSocket:",
-				liveStyle.style_id,
-			);
 			// 🚀 Appliquer le style depuis WebSocket (merger avec DEFAULT_THEME pour fallback complet)
 			setCurrentStyle(buildSafeTheme(liveStyle.config, config?.styleKey));
 
@@ -914,17 +902,6 @@ export default function Menu({
 			// Merger avec DEFAULT_THEME pour garantir toutes les propriétés
 			const mergedStyle = buildSafeTheme(config.style, config?.styleKey);
 			setCurrentStyle(mergedStyle);
-
-			// 🔍 DEBUG : Afficher la config chargée
-			console.log("🎨 [MENU] Config chargée:", {
-				styleKey: config?.styleKey,
-				styleName: config?.styleName,
-				useCustomHeader: config?.style?.useCustomHeader,
-				useCustomBackground: config?.style?.useCustomBackground,
-				backgroundImageUrl: config?.style?.backgroundImageUrl,
-				primary: mergedStyle.primary,
-				restaurantId,
-			});
 		}
 	}, [config]);
 
@@ -947,31 +924,14 @@ export default function Menu({
 	const [selectedOptions, setSelectedOptions] = useState({});
 	const [loadingOptions, setLoadingOptions] = useState(false);
 
-	useEffect(() => {
-		console.log("🧩 [Menu] Options modal state", {
-			visible: optionsModalVisible,
-			product: currentProductForOptions?.name,
-			groups: optionGroups.map((group) => ({
-				id: group.id,
-				name: group.name,
-				choices: group.choices?.length || 0,
-			})),
-			selected: Object.keys(selectedOptions),
-		});
-	}, [
+	useEffect(() => {}, [
 		optionsModalVisible,
 		optionGroups,
 		selectedOptions,
 		currentProductForOptions,
 	]);
 
-	useEffect(() => {
-		console.log("🪟 [Menu] Product modal state", {
-			visible: modalVisible,
-			item: selectedItem?.name,
-			description: selectedItem?.description,
-		});
-	}, [modalVisible, selectedItem]);
+	useEffect(() => {}, [modalVisible, selectedItem]);
 
 	// ⚠️ LEGACY : Catégories hardcodées comme fallback
 	const legacyCategories = [
@@ -1130,7 +1090,7 @@ export default function Menu({
 				title: catName.charAt(0).toUpperCase() + catName.slice(1),
 				emoji: getEmojiByCategory(catName),
 				image: getImageByCategory(catName),
-				gradient: DEFAULT_THEME.primary,
+				gradient: null, // ← pas de gradient propre : utilisera themeGradient (couleur du restaurant)
 				icon: "restaurant",
 			};
 		});
@@ -1188,7 +1148,6 @@ export default function Menu({
 			);
 
 			if (!response.ok) {
-				console.log("⚠️ Pas d'options pour ce produit ou erreur API");
 				return [];
 			}
 
@@ -1204,19 +1163,7 @@ export default function Menu({
 
 	// 🎯 Normaliser les options (menus/formules ou options produit)
 	const normalizeOptionGroups = (item, fetchedOptions) => {
-		console.log("🧪 [Menu] normalizeOptionGroups input", {
-			item: item?.name,
-			hasItemOptions: Array.isArray(item?.options),
-			itemOptionsCount: Array.isArray(item?.options) ? item.options.length : 0,
-			fetchedOptionsCount: Array.isArray(fetchedOptions)
-				? fetchedOptions.length
-				: 0,
-		});
 		if (Array.isArray(item?.options) && item.options.length > 0) {
-			console.log("✅ [Menu] Options from item.options", {
-				item: item?.name,
-				groups: item.options.length,
-			});
 			return item.options
 				.filter((group) => group && group.available !== false)
 				.map((group, groupIndex) => {
@@ -1237,10 +1184,6 @@ export default function Menu({
 		}
 
 		if (Array.isArray(fetchedOptions) && fetchedOptions.length > 0) {
-			console.log("✅ [Menu] Options from fetchedOptions", {
-				item: item?.name,
-				options: fetchedOptions.length,
-			});
 			return [
 				{
 					id: "options",
@@ -1261,27 +1204,13 @@ export default function Menu({
 		// 🎯 Vérifier si le produit a des options (notamment pour les menus/formules)
 		// Utiliser directement item.options si disponible, sinon fetch
 		const groups = normalizeOptionGroups(item, null);
-		console.log("🧩 [Menu] handleIncrease", {
-			item: item?.name,
-			hasItemOptions: Array.isArray(item?.options),
-			groups: groups.length,
-		});
 
 		if (groups.length > 0) {
-			// Ouvrir la modale d'options
-			console.log("🪟 [Menu] Open options modal", {
-				item: item?.name,
-				groups: groups.length,
-			});
 			setCurrentProductForOptions(item);
 			setOptionGroups(groups);
 			setSelectedOptions({});
 			setOptionsModalVisible(true);
 		} else {
-			// Ajout direct sans options
-			console.log("➕ [Menu] Add without options", {
-				item: item?.name,
-			});
 			onAdd?.(item);
 		}
 	};
@@ -1367,13 +1296,6 @@ export default function Menu({
 	};
 
 	const openModal = (item) => {
-		console.log("🪟 [Menu] Open product modal", {
-			id: item?._id,
-			name: item?.name,
-			description: item?.description,
-			price: item?.price,
-			category: item?.category,
-		});
 		setSelectedItem(item);
 		setModalVisible(true);
 	};
@@ -1465,7 +1387,6 @@ export default function Menu({
 	const shouldShowBackgroundImage = false; // ❌ Jamais d'image de fond dans Menu
 
 	// 🐛 Debug theme selection
-	console.log("🎨🔍 [Menu] Theme:", config?.styleKey);
 
 	// 🌟 Couleur de fond spécifique pour Italia : blanc pur au lieu de crème
 	const backgroundGradient =
@@ -1592,6 +1513,7 @@ export default function Menu({
 									isSelected={isSelected}
 									otherSelected={selectedCategory && !isSelected}
 									onPress={() => setSelectedCategory(isSelected ? null : cat)}
+									themeGradient={getGradient("primary")}
 								/>
 							);
 						})}
@@ -1617,6 +1539,7 @@ export default function Menu({
 								onPress={() => openModal(item)}
 								index={index}
 								categoryGradient={productCategory?.gradient}
+								themeGradient={getGradient("primary")}
 								showAllergens={hasAllergies}
 								theme={currentStyle}
 							/>
@@ -2938,89 +2861,104 @@ const styles = StyleSheet.create({
 	grillzHeader: {
 		marginBottom: 20,
 	},
-	grillzHeaderBg: {
+	grillzHeaderOuter: {
 		borderRadius: 20,
-		padding: 20,
 		marginHorizontal: 10,
+		overflow: "hidden",
 		shadowColor: "#FF6B35",
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.3,
-		shadowRadius: 8,
-		elevation: 8,
+		shadowOffset: { width: 0, height: 6 },
+		shadowOpacity: 0.5,
+		shadowRadius: 12,
+		elevation: 12,
+		borderWidth: 1,
+		borderColor: "rgba(255, 107, 53, 0.4)",
+	},
+	grillzFlameStrip: {
+		height: 3,
+		width: "100%",
 	},
 	grillzLogoContainer: {
 		flexDirection: "row",
 		alignItems: "center",
-		marginBottom: 8,
+		paddingHorizontal: 18,
+		paddingTop: 16,
+		paddingBottom: 12,
 	},
 	grillzLogo: {
-		width: 50,
-		height: 50,
-		borderRadius: 25,
+		width: 54,
+		height: 54,
+		borderRadius: 27,
 		justifyContent: "center",
 		alignItems: "center",
-		marginRight: 12,
-		shadowColor: "#FFD700",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.4,
-		shadowRadius: 4,
-		elevation: 4,
+		marginRight: 14,
+		shadowColor: "#FF6B35",
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.5,
+		shadowRadius: 8,
+		elevation: 6,
 	},
 	grillzBrandText: {
 		flex: 1,
 	},
 	grillzTitle: {
-		fontSize: 28,
-		fontWeight: "800",
-		color: "#FFF8F0",
+		fontSize: 26,
+		fontWeight: "900",
+		color: "#FFFAF0",
 		letterSpacing: -0.5,
+		textShadowColor: "#FF6B35",
+		textShadowRadius: 8,
+		textShadowOffset: { width: 0, height: 2 },
 	},
 	grillzSubtitle: {
-		fontSize: 12,
-		fontWeight: "600",
-		color: "#FFD700",
-		letterSpacing: 2,
+		fontSize: 11,
+		fontWeight: "700",
+		color: "#D4A574",
+		letterSpacing: 1.2,
+		marginTop: 3,
+	},
+	grillzDivider: {
+		height: 1,
+		backgroundColor: "rgba(255, 107, 53, 0.25)",
+		marginHorizontal: 18,
+		marginBottom: 10,
 	},
 	grillzUserButton: {
-		backgroundColor: "rgba(255, 215, 0, 0.2)",
-		borderRadius: 15,
-		padding: 10,
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "space-between",
-		borderWidth: 1,
-		borderColor: "rgba(255, 215, 0, 0.3)",
+		paddingHorizontal: 18,
+		paddingBottom: 14,
 	},
 	grillzUserText: {
-		fontSize: 16,
+		fontSize: 15,
 		fontWeight: "600",
-		color: "#FFF8F0",
+		color: "#FFFAF0",
+	},
+	grillzBadgesRow: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 8,
 	},
 	grillzHalalBadge: {
-		backgroundColor: "#FFD700",
-		paddingHorizontal: 8,
-		paddingVertical: 4,
-		borderRadius: 8,
+		backgroundColor: "rgba(255, 107, 53, 0.2)",
+		paddingHorizontal: 10,
+		paddingVertical: 5,
+		borderRadius: 10,
+		borderWidth: 1,
+		borderColor: "rgba(255, 107, 53, 0.5)",
 	},
 	grillzHalalText: {
 		fontSize: 10,
 		fontWeight: "800",
-		color: "#1a1a1a",
+		color: "#FF6B35",
 		letterSpacing: 0.5,
 	},
 	grillzDietaryButton: {
-		backgroundColor: "rgba(255, 255, 255, 0.2)",
+		backgroundColor: "rgba(255, 107, 53, 0.2)",
 		borderRadius: 12,
 		padding: 8,
-		marginLeft: 10,
-	},
-	grillzSlogan: {
-		fontSize: 14,
-		fontWeight: "500",
-		color: "#FFD700",
-		textAlign: "center",
-		marginTop: 10,
-		fontStyle: "italic",
+		borderWidth: 1,
+		borderColor: "rgba(255, 107, 53, 0.4)",
 	},
 
 	// 🇮🇹 ===== STYLES ITALIA (utilisés uniquement pour Lacucinadinini) =====

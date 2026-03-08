@@ -83,13 +83,6 @@ export default function JoinOrCreateTable({
 	);
 	const isFoodtruck = category === "foodtruck";
 
-	console.log("🚚 [JoinOrCreateTable] Debug category:", {
-		category,
-		isFoodtruck,
-		restaurantName,
-		restaurantId,
-	});
-
 	// 🎨 Config dynamique du restaurant (style depuis la BDD)
 	const { config, loading: configLoading } = useRestaurantConfig(restaurantId);
 
@@ -108,16 +101,6 @@ export default function JoinOrCreateTable({
 
 	// 🎨 Thème dynamique selon le restaurant — fallback neutre si config absente
 	const theme = buildSafeTheme(config?.style, config?.styleKey);
-
-	console.log("🎨🇮🇹 [JoinOrCreateTable] Theme Debug:", {
-		styleKey: config?.styleKey,
-		hasPrimary: !!theme?.primary,
-		primaryColors: theme?.primary,
-		useCustomBackground,
-		useCustomHeader: config?.style?.useCustomHeader,
-		backgroundImageUrl,
-		hasBackgroundImage: !!backgroundImage,
-	});
 
 	// �🎬 Entrance animations
 	useEffect(() => {
@@ -170,20 +153,12 @@ export default function JoinOrCreateTable({
 		if (!restaurantId || !tableId) return;
 
 		const handleOrderUpdate = (payload) => {
-			console.log("📦 [JoinOrCreateTable] Order WebSocket:", payload.type);
-
 			if (payload.type === "order_updated" && payload.data) {
 				// Mettre à jour la commande dans le state local
 				setOrders((prevOrders) =>
 					prevOrders.map((order) =>
 						order._id === payload.data._id ? payload.data : order,
 					),
-				);
-				console.log(
-					"✅ [JoinOrCreateTable] Order mis à jour:",
-					payload.data._id,
-					"paid:",
-					payload.data.paid,
 				);
 			}
 		};
@@ -234,11 +209,9 @@ export default function JoinOrCreateTable({
 					try {
 						data = JSON.parse(text);
 					} catch (e) {
-						console.log("[FETCH] Guests: réponse non JSON");
 						data = null;
 					}
 					if (data && data.number) {
-						console.log("[FETCH] Numéro de table récupéré:", data.number);
 						setTableNumberState(data.number);
 					}
 					if (typeof data.isAvailable === "boolean") {
@@ -348,14 +321,6 @@ export default function JoinOrCreateTable({
 	};
 
 	const handleJoin = async () => {
-		console.log("🚀 [JOIN] handleJoin démarré", {
-			name: name.trim(),
-			phone: phone.trim(),
-			tableId,
-			restaurantId,
-			isFoodtruck,
-		});
-
 		if (!name.trim()) return setError("Veuillez entrer votre nom.");
 		if (isFoodtruck && !phone.trim())
 			return setError("Veuillez entrer votre numéro de téléphone.");
@@ -381,13 +346,8 @@ export default function JoinOrCreateTable({
 				tableId,
 				restaurantId,
 			);
-			console.log(
-				"🔑 [JOIN] Token client obtenu:",
-				token ? "✅ OK" : "❌ NULL",
-			);
 
 			const clientId = await getOrCreateClientId();
-			console.log("👤 [JOIN] clientId:", clientId);
 
 			const finalRestaurantId =
 				restaurantId || (await AsyncStorage.getItem("restaurantId"));
@@ -404,15 +364,6 @@ export default function JoinOrCreateTable({
 				)}:${String(new Date().getMinutes()).padStart(2, "0")}`,
 			};
 
-			console.log(
-				"📤 [JOIN] Body envoyé au backend:",
-				JSON.stringify(body, null, 2),
-			);
-			console.log(
-				"🌐 [JOIN] URL:",
-				`${API_CONFIG.BASE_URL}/reservations/client/reservations`,
-			);
-
 			const response = await fetch(
 				`${API_CONFIG.BASE_URL}/reservations/client/reservations`,
 				{
@@ -424,14 +375,7 @@ export default function JoinOrCreateTable({
 				},
 			);
 
-			console.log(
-				"📥 [JOIN] HTTP Status:",
-				response.status,
-				response.statusText,
-			);
-
 			const text = await response.text();
-			console.log("📥 [JOIN] Réponse brute:", text);
 
 			let data;
 			try {
@@ -442,8 +386,6 @@ export default function JoinOrCreateTable({
 				setLoading(false);
 				return;
 			}
-
-			console.log("📥 [JOIN] Data parsée:", JSON.stringify(data, null, 2));
 
 			if (!response.ok) {
 				console.error(
@@ -459,15 +401,8 @@ export default function JoinOrCreateTable({
 				return;
 			}
 
-			console.log("✅ [JOIN] Réservation créée/rejointe avec succès");
 			const reservationObj = data.reservation || data;
 			const reservationId = reservationObj._id;
-			console.log(
-				"🎫 [JOIN] reservationId:",
-				reservationId,
-				"| status:",
-				reservationObj.status,
-			);
 			setReservationIdState(reservationId); // pour déclencher le fetch des commandes
 			const guestsArr =
 				data.guests ||
@@ -535,7 +470,6 @@ export default function JoinOrCreateTable({
 				"Impossible de rejoindre la table. Veuillez réessayer.",
 			);
 		} finally {
-			console.log("🏁 [JOIN] handleJoin terminé, loading=false");
 			setLoading(false);
 		}
 	};

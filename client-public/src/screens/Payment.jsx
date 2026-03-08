@@ -286,12 +286,6 @@ export default function Payment({
 				const saved = await AsyncStorage.getItem(storageKey);
 				if (saved) {
 					const parsed = JSON.parse(saved);
-					console.log(
-						"📂 Chargement paidItems:",
-						storageKey,
-						parsed.length,
-						"articles",
-					);
 					setPaidItems(new Set(parsed));
 				}
 			} catch (error) {
@@ -326,7 +320,6 @@ export default function Payment({
 				try {
 					const isSupported = await isApplePaySupported();
 					setApplePayAvailable(isSupported);
-					console.log("📱 Apple Pay disponible:", isSupported);
 				} catch (error) {
 					console.error("Erreur vérification Apple Pay:", error);
 					setApplePayAvailable(false);
@@ -345,11 +338,6 @@ export default function Payment({
 				(item) => !paidItems.has(getItemId(item)),
 			);
 			const nonPaidIds = new Set(nonPaidItems.map((item) => getItemId(item)));
-			console.log(
-				"✅ Items non payés initialisés:",
-				nonPaidItems.length,
-				"items",
-			);
 			setSelectedItems(nonPaidIds);
 		} else {
 			console.warn("⚠️ Aucun item dans allOrders");
@@ -460,8 +448,6 @@ export default function Payment({
 		}
 
 		try {
-			console.log("🔍 Tentative fermeture réservation:", reservationId);
-
 			const response = await fetch(
 				`${API_BASE_URL}/reservations/client/${reservationId}/close`,
 				{
@@ -483,7 +469,6 @@ export default function Payment({
 			}
 
 			const data = await response.json();
-			console.log("✅ Réservation fermée:", data);
 
 			// ⭐ LA TABLE SERA LIBÉRÉE AUTOMATIQUEMENT PAR LA ROUTE BACKEND
 			// Pas besoin d'appeler releaseTable séparément
@@ -503,11 +488,6 @@ export default function Payment({
 	 * 🧾 Affiche le ticket de caisse avec les détails du paiement
 	 */
 	const showReceiptTicket = (paymentDetails, selectedOrders) => {
-		console.log("🧾 showReceiptTicket appelé:", {
-			paymentDetails,
-			selectedOrdersCount: selectedOrders.length,
-		});
-
 		// Récupérer le nom du restaurant depuis le store
 		const restaurantName = useRestaurantStore.getState().name || "Restaurant";
 
@@ -529,9 +509,6 @@ export default function Payment({
 				sum + (parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1),
 			0,
 		);
-
-		console.log("🧾 Montant calculé:", totalAmount);
-		console.log("🧾 Numéro de ticket:", ticketNumber);
 
 		// Traduire le mode de paiement
 		const paymentMethodLabel =
@@ -560,8 +537,6 @@ export default function Payment({
 			paymentMethod: paymentMethodLabel,
 			last4Digits: paymentDetails.last4 || null,
 		};
-
-		console.log("🧾 Receipt data:", receipt);
 
 		setReceiptData(receipt);
 		setShowReceipt(true);
@@ -616,12 +591,7 @@ export default function Payment({
 
 	// 💳 Traitement du paiement
 	const handlePay = async (paymentMethod = "card") => {
-		console.log("⚡ handlePay appelé avec:", paymentMethod);
-		console.log("⚡ selectedItems.size:", selectedItems.size);
-		console.log("⚡ allOrders.length:", allOrders.length);
-
 		if (selectedItems.size === 0) {
-			console.log("❌ STOP: selectedItems.size === 0");
 			Alert.alert(
 				"Erreur",
 				"Veuillez sélectionner au moins un article à payer",
@@ -629,11 +599,8 @@ export default function Payment({
 			return;
 		}
 
-		console.log("✅ Check selectedItems OK");
-
 		// Vérifier que Stripe est bien initialisé
 		if (!initPaymentSheet || !presentPaymentSheet) {
-			console.log("❌ STOP: Stripe hooks manquants");
 			Alert.alert(
 				"Erreur",
 				"Stripe n'est pas correctement initialisé. Veuillez redémarrer l'application.",
@@ -645,10 +612,7 @@ export default function Payment({
 			return;
 		}
 
-		console.log("✅ Check Stripe OK");
-
 		setLoading(true);
-		console.log("🔄 Début du paiement...");
 
 		try {
 			// 1. Filtrer les articles sélectionnés
@@ -697,10 +661,8 @@ export default function Payment({
 			const newPaymentIntentId = paymentIntentResult.paymentIntentId;
 			setClientSecret(newClientSecret);
 			setPaymentIntentId(newPaymentIntentId);
-			console.log("✅ PaymentIntent créé:", newPaymentIntentId);
 
 			// 2.6. Initialiser Payment Sheet
-			console.log("🔄 Initialisation Payment Sheet...");
 			const { error: initError } = await initPaymentSheet({
 				paymentIntentClientSecret: newClientSecret,
 				merchantDisplayName: "SunnyGo Restaurant",
@@ -726,15 +688,11 @@ export default function Payment({
 				return;
 			}
 
-			console.log("✅ Payment Sheet initialisé");
-
 			// 2.7. Présenter Payment Sheet
-			console.log("🔄 Affichage Payment Sheet...");
 			const { error: presentError } = await presentPaymentSheet();
 
 			if (presentError) {
 				if (presentError.code === "Canceled") {
-					console.log("❌ Paiement annulé par l'utilisateur");
 					setLoading(false);
 					return;
 				}
@@ -743,8 +701,6 @@ export default function Payment({
 				setLoading(false);
 				return;
 			}
-
-			console.log("✅ Paiement Stripe réussi!");
 
 			// 3. Ajouter les articles aux paidItems
 			const newPaidItems = new Set(paidItems);
@@ -761,8 +717,6 @@ export default function Payment({
 			// 5. Si paiement complet → Fermer la réservation
 			let reservationClosed = false;
 			if (isFullPayment) {
-				console.log("✅ Paiement complet - Fermeture de la réservation");
-
 				// Fermer la réservation sur le serveur
 				if (reservationId) {
 					const closureResult = await closeReservationOnServer().catch(
@@ -773,13 +727,8 @@ export default function Payment({
 					);
 
 					if (closureResult && closureResult.success) {
-						console.log("✅ Réservation fermée avec succès");
 						reservationClosed = true;
 					} else {
-						console.log(
-							"⚠️ Réservation non fermée:",
-							closureResult?.message || "Erreur inconnue",
-						);
 						Alert.alert(
 							"⚠️ Attention",
 							"Le paiement est effectué mais la fermeture de réservation a échoué. Veuillez contacter le serveur.",
@@ -817,17 +766,6 @@ export default function Payment({
 					(parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1),
 				0,
 			);
-
-			console.log("🔍 DEBUG values:", {
-				amountPaid,
-				remainingAmount,
-				updatedStatus_totalPaid: updatedStatus?.totalPaid,
-				types: {
-					amountPaid: typeof amountPaid,
-					remainingAmount: typeof remainingAmount,
-					totalPaid: typeof updatedStatus?.totalPaid,
-				},
-			});
 
 			// 8. Afficher l'alerte de confirmation
 			const message =
@@ -1213,7 +1151,6 @@ export default function Payment({
 							{/* Bouton Payer par carte */}
 							<TouchableOpacity
 								onPress={() => {
-									console.log("🔘 Bouton paiement cliqué!");
 									try {
 										handlePay("card");
 									} catch (error) {

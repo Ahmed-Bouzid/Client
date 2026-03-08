@@ -77,7 +77,6 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 			try {
 				const isSupported = await isApplePaySupported();
 				setApplePayAvailable(isSupported);
-				console.log("📱 Apple Pay disponible:", isSupported);
 			} catch (error) {
 				console.error("Erreur vérification Apple Pay:", error);
 			}
@@ -98,7 +97,6 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 		try {
 			setLoading(true);
 
-			console.log(`💳 Initialisation paiement: ${method}`);
 
 			// Créer le PaymentIntent
 			const paymentMethodTypes =
@@ -148,7 +146,6 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 				return false;
 			}
 
-			console.log("✅ Payment Sheet initialisé");
 			return true;
 		} catch (error) {
 			console.error("❌ Erreur initialisation paiement:", error);
@@ -176,7 +173,6 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 
 			if (error) {
 				if (error.code === "Canceled") {
-					console.log("Paiement annulé par l'utilisateur");
 					return;
 				}
 
@@ -186,7 +182,6 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 			}
 
 			// Paiement réussi !
-			console.log("✅ Paiement réussi");
 			handlePaymentSuccess("card");
 		} catch (error) {
 			console.error("❌ Erreur présentation Payment Sheet:", error);
@@ -227,7 +222,6 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 								tipCents,
 							);
 
-							console.log("✅ Paiement fake réussi:", result);
 							handlePaymentSuccess("fake");
 						} catch (error) {
 							console.error("❌ Erreur paiement fake:", error);

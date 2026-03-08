@@ -16,8 +16,6 @@ export const messageService = {
 			const restaurantId = await getRestaurantId();
 			const url = `${API_CONFIG.BASE_URL}/client-messages/predefined/${restaurantId}`;
 
-			console.log("📨 Récupération messages prédéfinis...");
-
 			const response = await fetch(url, {
 				method: "GET",
 				headers: {
@@ -30,9 +28,6 @@ export const messageService = {
 			}
 
 			const data = await response.json();
-			console.log(
-				`✅ ${data.messages?.length || 0} messages prédéfinis récupérés`,
-			);
 			return data.messages || [];
 		} catch (error) {
 			console.error("❌ Erreur récupération messages:", error.message);
@@ -58,8 +53,6 @@ export const messageService = {
 		try {
 			const url = `${API_CONFIG.BASE_URL}/client-messages/send`;
 
-			console.log(`📤 Envoi message: ${predefinedMessageId}`);
-
 			const response = await fetch(url, {
 				method: "POST",
 				headers: {
@@ -79,7 +72,6 @@ export const messageService = {
 			}
 
 			const data = await response.json();
-			console.log("✅ Message envoyé avec succès:", data.data?.messageText);
 			return data;
 		} catch (error) {
 			console.error("❌ Erreur envoi message:", error.message);
@@ -106,8 +98,6 @@ export const messageService = {
 		try {
 			// 🎯 Créer d'abord un message prédéfini temporaire côté backend
 			const restaurantId = await getRestaurantId();
-
-			console.log(`📤 Création message temporaire: ${messageText}`);
 
 			// Créer le message prédéfini temporaire
 			const createResponse = await fetch(
@@ -143,8 +133,6 @@ export const messageService = {
 			// Maintenant envoyer avec le predefinedMessageId
 			const url = `${API_CONFIG.BASE_URL}/client-messages/send`;
 
-			console.log(`📤 Envoi message avec ID: ${predefinedMessageId}`);
-
 			const response = await fetch(url, {
 				method: "POST",
 				headers: {
@@ -165,7 +153,6 @@ export const messageService = {
 			}
 
 			const data = await response.json();
-			console.log("✅ Message personnalisé envoyé avec succès:", messageText);
 			return data;
 		} catch (error) {
 			console.error("❌ Erreur envoi message personnalisé:", error.message);
@@ -210,8 +197,6 @@ export const messageService = {
 		try {
 			const url = `${API_CONFIG.BASE_URL}/client-messages/conversation/${reservationId}`;
 
-			console.log(`💬 Récupération conversation: ${reservationId}`);
-
 			const response = await fetch(url, {
 				method: "GET",
 				headers: {
@@ -224,9 +209,6 @@ export const messageService = {
 			}
 
 			const data = await response.json();
-			console.log(
-				`✅ Conversation récupérée: ${data.conversation?.length || 0} messages`,
-			);
 			return data.conversation || [];
 		} catch (error) {
 			console.error("❌ Erreur récupération conversation:", error.message);
@@ -258,9 +240,6 @@ export const messageService = {
 			}
 
 			const data = await response.json();
-			console.log(
-				`🔧 Messagerie ${data.isMessagingEnabled ? "activée" : "désactivée"}`,
-			);
 			return data.isMessagingEnabled;
 		} catch (error) {
 			console.error("❌ Erreur vérification messagerie:", error.message);

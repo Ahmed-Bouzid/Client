@@ -74,7 +74,6 @@ const sanitizeData = (data) => {
 const secureLogger = {
 	info: (message, data = null) => {
 		if (isDevelopment) {
-			console.log(`[INFO] ${message}`, data ? sanitizeData(data) : "");
 		}
 		// En prod : pas de logs (pour performance et sécurité)
 	},
@@ -99,7 +98,6 @@ const secureLogger = {
 	debug: (message, data = null) => {
 		if (isDevelopment) {
 			// ✅ Debug uniquement en développement
-			console.log(`[DEBUG] ${message}`, data ? sanitizeData(data) : "");
 		}
 	},
 

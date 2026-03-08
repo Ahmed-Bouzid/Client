@@ -20,7 +20,6 @@ export const useOrderStore = create((set, get) => ({
 			if (savedId) {
 				// Restaurer l'ID sans vérifier avec le serveur (évite trop de requêtes)
 				set({ activeOrderId: savedId, hasActiveOrder: true });
-				console.log("📦 OrderId restauré:", savedId);
 			} else {
 				// Pas de commande sauvegardée
 				set({ activeOrderId: null, hasActiveOrder: false });
@@ -194,45 +193,21 @@ export const useOrderStore = create((set, get) => ({
 
 		set({ isLoading: true });
 		try {
-			console.log(
-				"\n🌐🌐🌐 ========== USEORDERSTORE - FETCH API ========== 🌐🌐🌐",
-			);
-			console.log(`🔍 Appel API /client-orders/${reservationId}...`);
-			if (clientId) {
-				console.log(`🔑 Avec clientId: ${clientId} (filtrage foodtruck)`);
-			}
 			const data = await orderService.getOrdersByReservation(
 				reservationId,
 				clientId,
 			);
-			console.log("🔥 Réponse brute API:", JSON.stringify(data, null, 2));
 
 			const orders = data.orders || [];
-			console.log(`📊 Nombre de commandes retournées: ${orders.length}`);
 
 			// Analyser chaque commande
-			orders.forEach((order, idx) => {
-				console.log(`\n📦 COMMANDE ${idx + 1}:`, {
-					_id: order._id,
-					reservationId: order.reservationId,
-					clientName: order.clientName,
-					items: order.items?.length || 0,
-					paid: order.paid,
-					totalAmount: order.totalAmount,
-					createdAt: order.createdAt,
-				});
-			});
+			orders.forEach((order, idx) => {});
 
 			// ⭐ APLATIR les items de toutes les commandes en un seul tableau
 			// Payment.jsx s'attend à un tableau d'items, pas un tableau d'orders
 			const allItems = [];
 			orders.forEach((order, orderIndex) => {
-				console.log(
-					`\n🔍 Traitement commande ${orderIndex + 1} (ID: ${order._id}):`,
-				);
-
 				if (order.items && Array.isArray(order.items)) {
-					console.log(`  └─ ${order.items.length} items trouvés`);
 					order.items.forEach((item, itemIndex) => {
 						const enrichedItem = {
 							...item,
@@ -241,9 +216,6 @@ export const useOrderStore = create((set, get) => ({
 							orderPaid: order.paid,
 							totalAmount: order.totalAmount,
 						};
-						console.log(
-							`     ${itemIndex + 1}. ${item.name} x${item.quantity} - ${item.price}€`,
-						);
 						allItems.push(enrichedItem);
 					});
 				} else {
@@ -251,24 +223,11 @@ export const useOrderStore = create((set, get) => ({
 				}
 			});
 
-			console.log(`\n✅ RÉSULTAT FINAL: ${allItems.length} items au total`);
-			console.log("📋 DÉTAIL COMPLET des items aplatis:");
-			allItems.forEach((item, idx) => {
-				console.log(`  ${idx + 1}. ${item.name} (orderId: ${item.orderId})`);
-				console.log(`     - Quantité: ${item.quantity}`);
-				console.log(`     - Prix: ${item.price}€`);
-				console.log(
-					`     - Total item: ${(item.price * item.quantity).toFixed(2)}€`,
-				);
-			});
+			allItems.forEach((item, idx) => {});
 
 			const totalGlobal = allItems.reduce(
 				(sum, i) => sum + i.price * i.quantity,
 				0,
-			);
-			console.log(`\n💰 TOTAL GLOBAL: ${totalGlobal.toFixed(2)}€`);
-			console.log(
-				"🌐🌐🌐 ================================================= 🌐🌐🌐\n",
 			);
 
 			// Mettre à jour allOrders avec les items aplatis

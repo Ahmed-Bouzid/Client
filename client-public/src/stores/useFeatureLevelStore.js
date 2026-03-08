@@ -31,12 +31,6 @@ export const useFeatureLevelStore = create((set, get) => ({
 	 */
 	init: (category) => {
 		const config = getSelfConfig(category || "restaurant");
-		console.log(`🎯 [SELF] Feature Level initialisé:`, {
-			category,
-			level: config.level,
-			tableMode: config.tableMode,
-			features: config.features.length,
-		});
 
 		set({
 			level: config.level,

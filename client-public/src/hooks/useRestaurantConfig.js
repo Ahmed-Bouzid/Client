@@ -28,13 +28,11 @@ export default function useRestaurantConfig(restaurantId) {
 
 		// ✅ Cache : si déjà chargé pour cet ID, ne pas refetch
 		if (lastFetchedId.current === restaurantId && config) {
-			console.log("♻️ [useRestaurantConfig] Config déjà en cache");
 			return;
 		}
 
 		// 🚦 Éviter les appels concurrents
 		if (isFetchingRef.current) {
-			console.log("⏳ [useRestaurantConfig] Fetch déjà en cours...");
 			return;
 		}
 
@@ -47,9 +45,6 @@ export default function useRestaurantConfig(restaurantId) {
 				setError(null);
 
 				const url = `${API_CONFIG.BASE_URL}/restaurants/${restaurantId}/config`;
-				console.log(
-					`🎨 [useRestaurantConfig] Chargement config depuis: ${url}`,
-				);
 
 				const response = await fetch(url, {
 					headers: {
@@ -81,17 +76,6 @@ export default function useRestaurantConfig(restaurantId) {
 					categories: categories || [],
 					menuLayout: menuLayout || "grid",
 				};
-
-				console.log("✅ [useRestaurantConfig] Config chargée:", {
-					styleKey: style.key,
-					styleName: style.name,
-					categoriesCount: categories?.length || 0,
-					menuLayout,
-					headerIcon: style.config?.headerIcon,
-					useCustomHeader: style.config?.useCustomHeader,
-					useCustomBackground: style.config?.useCustomBackground,
-					backgroundImageUrl: style.config?.backgroundImageUrl,
-				});
 
 				setConfig(normalizedConfig);
 				setLoading(false);

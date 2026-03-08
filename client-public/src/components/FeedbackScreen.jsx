@@ -180,68 +180,6 @@ export default function FeedbackScreen({
 				feedbackData.clientName = customerData.clientName.trim();
 			}
 
-			console.log("📝 [FEEDBACK-SCREEN] Props reçues:");
-			console.log("  - restaurantData:", restaurantData);
-			console.log("  - customerData:", customerData);
-			console.log("📝 [FEEDBACK-SCREEN] Soumission feedback:", feedbackData);
-			console.log("📝 [FEEDBACK-SCREEN] Types des données:");
-			console.log(
-				"  - restaurantId:",
-				typeof feedbackData.restaurantId,
-				"=",
-				feedbackData.restaurantId,
-			);
-			console.log(
-				"  - serviceRating:",
-				typeof feedbackData.serviceRating,
-				"=",
-				feedbackData.serviceRating,
-			);
-			console.log(
-				"  - foodQuality:",
-				typeof feedbackData.foodQuality,
-				"=",
-				feedbackData.foodQuality,
-			);
-			console.log(
-				"  - venueExperience:",
-				typeof feedbackData.venueExperience,
-				"=",
-				feedbackData.venueExperience,
-			);
-			if (feedbackData.tableId) {
-				console.log(
-					"  - tableId:",
-					typeof feedbackData.tableId,
-					"=",
-					feedbackData.tableId,
-				);
-			}
-			if (feedbackData.clientId) {
-				console.log(
-					"  - clientId:",
-					typeof feedbackData.clientId,
-					"=",
-					feedbackData.clientId,
-				);
-			}
-			if (feedbackData.clientName) {
-				console.log(
-					"  - clientName:",
-					typeof feedbackData.clientName,
-					"=",
-					feedbackData.clientName,
-				);
-			}
-			if (feedbackData.reservationId) {
-				console.log(
-					"  - reservationId:",
-					typeof feedbackData.reservationId,
-					"=",
-					feedbackData.reservationId,
-				);
-			}
-
 			// 🚨 Validation côté client pour éviter les erreurs de validation serveur
 			const validationErrors = [];
 			if (!isValidObjectId(restaurantId)) {
@@ -274,8 +212,6 @@ export default function FeedbackScreen({
 
 			// 🌐 Appel API pour sauvegarder le feedback
 			const response = await clientFeedbackService.submitFeedback(feedbackData);
-
-			console.log("✅ [FEEDBACK-SCREEN] Réponse API:", response);
 
 			// ✅ Passer au succès peu importe la réponse (fallback garanti)
 			setCurrentStep("success");
@@ -340,8 +276,6 @@ export default function FeedbackScreen({
 				// ✅ SÉCURITÉ: Encoder l'ID pour éviter l'injection
 				finalUrl = `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
 			}
-
-			console.log("🔗 Redirection Google (sécurisée)");
 
 			// ✅ SÉCURITÉ: Vérifier que l'URL peut être ouverte
 			const canOpen = await Linking.canOpenURL(finalUrl);

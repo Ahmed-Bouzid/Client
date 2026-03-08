@@ -45,15 +45,10 @@ export const useSocketClient = (
 			return;
 		}
 
-		console.log(`🔌 useSocketClient: Connexion au restaurant ${restaurantId}`);
-
 		// ✅ Récupérer le token client avant de connecter
 		const connectWithToken = async () => {
 			try {
 				const token = guestToken || (await clientAuthService.getClientToken());
-				console.log(
-					`🔑 Token client pour Socket.io: ${token?.substring(0, 20)}...`,
-				);
 				socketService.connect(restaurantId, tableId, token);
 			} catch (error) {
 				console.error("❌ Erreur récupération token pour Socket.io:", error);
@@ -216,7 +211,6 @@ export const useMenuUpdates = (restaurantId) => {
 		if (!shouldConnect) return;
 
 		const handleMenuUpdate = (payload) => {
-			console.log("🍽️ Menu mis à jour:", payload);
 			setMenuData(payload);
 		};
 
@@ -243,7 +237,6 @@ export const useStyleUpdates = (restaurantId) => {
 		if (!shouldConnect) return;
 
 		const handleStyleUpdate = (payload) => {
-			console.log("🎨 Style mis à jour:", payload);
 			setStyleData(payload);
 		};
 
@@ -271,8 +264,6 @@ export const useOrderUpdates = (restaurantId, tableId = null) => {
 		if (!shouldConnect) return;
 
 		const handleOrderEvent = (payload) => {
-			console.log("📦 Commande:", payload.type);
-
 			if (payload.type === "order_created") {
 				setOrders((prev) => [...prev, payload.data]);
 			} else if (payload.type === "order_updated") {

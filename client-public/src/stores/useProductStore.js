@@ -96,11 +96,6 @@ const useProductStore = create((set, get) => ({
 		try {
 			const products = await productService.fetchProducts(token);
 			set({ products });
-			console.log(
-				"📦 [ProductStore] Produits chargés:",
-				products.length,
-				"produits",
-			);
 			return products;
 		} catch (err) {
 			console.error("❌ Error fetching products:", err);
@@ -117,12 +112,6 @@ const useProductStore = create((set, get) => ({
 	getCategories: () => {
 		const { products } = get();
 
-		console.log("🔍 [ProductStore.getCategories] Début extraction...");
-		console.log(
-			"📦 [ProductStore] Produits disponibles:",
-			products?.length || 0,
-		);
-
 		if (!products || products.length === 0) {
 			console.warn(
 				"⚠️ [ProductStore] Aucun produit disponible pour extraire les catégories",
@@ -136,18 +125,9 @@ const useProductStore = create((set, get) => ({
 			category: p.category,
 			categoryType: typeof p.category,
 		}));
-		console.log(
-			"📋 [ProductStore] Échantillon produits:",
-			JSON.stringify(sample, null, 2),
-		);
 
 		// Extraire les catégories uniques (valeurs brutes du backend)
 		const rawCategories = products.map((p) => p.category).filter((cat) => cat); // Filtrer les undefined/null
-
-		console.log(
-			"🏷️ [ProductStore] Catégories brutes (avant normalisation):",
-			rawCategories.slice(0, 10),
-		);
 
 		const uniqueCategories = [
 			...new Set(
@@ -155,21 +135,12 @@ const useProductStore = create((set, get) => ({
 			),
 		];
 
-		console.log(
-			"🏷️ [ProductStore] Catégories uniques trouvées:",
-			uniqueCategories,
-		);
-
 		// Mapper chaque catégorie backend vers sa config UI
 		const categoriesWithUI = uniqueCategories
 			.map((categoryKey) => {
-				console.log(
-					`🔍 [ProductStore] Recherche config pour: "${categoryKey}"`,
-				);
 				const uiConfig = CATEGORY_UI_CONFIG[categoryKey];
 
 				if (uiConfig) {
-					console.log(`  → Config prédéfinie trouvée: ${uiConfig.title}`);
 					return {
 						...uiConfig,
 						id: categoryKey,
@@ -177,7 +148,6 @@ const useProductStore = create((set, get) => ({
 				}
 
 				// ✨ Fallback intelligent : créer une config dynamique
-				console.log(`  → Création config dynamique pour: "${categoryKey}"`);
 
 				// Capitaliser proprement le titre
 				const dynamicTitle = categoryKey
@@ -265,11 +235,6 @@ const useProductStore = create((set, get) => ({
 				};
 			})
 			.sort((a, b) => a.title.localeCompare(b.title)); // Tri alphabétique
-
-		console.log(
-			"🎨 [ProductStore] Catégories avec config UI:",
-			categoriesWithUI.map((c) => ({ id: c.id, title: c.title })),
-		);
 
 		return categoriesWithUI;
 	},

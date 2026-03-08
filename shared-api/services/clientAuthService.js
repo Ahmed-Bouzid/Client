@@ -24,7 +24,6 @@ export const clientAuthService = {
 		try {
 			// Cas 1 : paramètres fournis → obtenir un nouveau JWT depuis le backend
 			if (clientName && restaurantId) {
-				console.log("🔑 Génération token client pour:", clientName);
 				const response = await fetch(`${API_CONFIG.BASE_URL}/client/token`, {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
@@ -49,7 +48,6 @@ export const clientAuthService = {
 
 				if (token) {
 					await AsyncStorage.setItem("clientToken", token);
-					console.log("✅ Token client JWT stocké");
 					return token;
 				}
 
@@ -59,7 +57,6 @@ export const clientAuthService = {
 			// Cas 2 : pas de params → retourner le token stocké
 			const stored = await AsyncStorage.getItem("clientToken");
 			if (stored) {
-				console.log("🔓 Token client récupéré depuis AsyncStorage");
 				return stored;
 			}
 

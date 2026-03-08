@@ -78,7 +78,6 @@ export default function App() {
 				if (response.ok) {
 					const tableData = await response.json();
 					setTableNumber(tableData.number || tableData.tableNumber || "?");
-					console.log("✅ Table info chargée:", tableData);
 				}
 			} catch (error) {
 				console.error("Erreur récupération table:", error);
@@ -89,7 +88,6 @@ export default function App() {
 
 	// Log de débogage pour l'ID du restaurant
 	useEffect(() => {
-		console.log(`[DEBUG] Restaurant ID: ${Resto_id_key}`);
 	}, []);
 
 	// Initialiser le panier quand le userName change
@@ -190,7 +188,6 @@ export default function App() {
 				origin: "client",
 			};
 
-			console.log("📤 Envoi commande avec données:", orderData);
 
 			// ⭐ ENVOYER TOUTES LES DONNÉES
 			await submitOrderToServer(orderData);
@@ -303,7 +300,6 @@ export default function App() {
 			// On redirige vers join (écran de départ)
 			setStep("join");
 
-			console.log("✅ Session nettoyée après paiement réussi");
 		} catch (error) {
 			console.error("❌ Erreur nettoyage session:", error);
 			// Même en cas d'erreur, on redirige
