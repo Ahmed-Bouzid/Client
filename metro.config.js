@@ -22,11 +22,15 @@ config.resolver = {
 	],
 	// Sur web : remplacer les modules natifs incompatibles par des stubs vides
 	resolveRequest: (context, moduleName, platform) => {
-		if (platform === "web" && moduleName === "@stripe/stripe-react-native") {
-			return {
-				filePath: path.resolve(__dirname, "stubs/stripe-react-native.js"),
-				type: "sourceFile",
+		if (platform === "web") {
+			const webStubs = {
+				"@stripe/stripe-react-native": path.resolve(__dirname, "stubs/stripe-react-native.js"),
+				"react-native-view-shot": path.resolve(__dirname, "stubs/view-shot.js"),
+				"expo-sharing": path.resolve(__dirname, "stubs/expo-sharing.js"),
 			};
+			if (webStubs[moduleName]) {
+				return { filePath: webStubs[moduleName], type: "sourceFile" };
+			}
 		}
 		return context.resolveRequest(context, moduleName, platform);
 	},

@@ -1,5 +1,15 @@
 import { registerRootComponent } from "expo";
+import React from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import App from "./App"; // ton App.jsx client-public
+
+function Root() {
+	return (
+		<SafeAreaProvider>
+			<App />
+		</SafeAreaProvider>
+	);
+}
 
 // Enregistrer le service worker sur web uniquement (PWA offline support)
 if (typeof window !== "undefined" && "serviceWorker" in navigator) {
@@ -15,4 +25,4 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
 	});
 }
 
-registerRootComponent(App);
+registerRootComponent(Root);
