@@ -230,7 +230,11 @@ export const useOrderStore = create((set, get) => ({
 				0,
 			);
 
-			// Mettre à jour allOrders avec les items aplatis
+			// Mettre à jour allOrders avec les items aplatis + persister pour offline
+			await AsyncStorage.setItem(
+				`cachedOrders_${reservationId}`,
+				JSON.stringify(allItems),
+			);
 			set({
 				allOrders: allItems,
 				isLoading: false,
@@ -238,6 +242,27 @@ export const useOrderStore = create((set, get) => ({
 
 			return allItems;
 		} catch (error) {
+			// ── Offline fallback : servir les commandes depuis le cache ──────────
+			const isNetworkError =
+				error?.message?.includes("Network") ||
+				error?.message?.includes("fetch") ||
+				error?.message?.includes("network") ||
+				error?.response === undefined;
+
+			if (isNetworkError) {
+				try {
+					const cached = await AsyncStorage.getItem(`cachedOrders_${reservationId}`);
+					if (cached) {
+						const cachedItems = JSON.parse(cached);
+						console.warn("[Offline] Affichage des commandes en cache");
+						set({ allOrders: cachedItems, isLoading: false });
+						return cachedItems;
+					}
+				} catch {
+					// si le JSON est corrompu, ignorer
+				}
+			}
+
 			console.error("❌ Erreur fetchOrdersByReservation:", error);
 			set({ allOrders: [], isLoading: false });
 			errorHandler.handleError(error);

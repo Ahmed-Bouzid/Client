@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "SunnyGo",
+    "slug": "sunnygo-client",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FF8C42"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#FF8C42"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/icon.png",
+      "name": "SunnyGo",
+      "shortName": "SunnyGo",
+      "description": "Commandez directement depuis votre table",
+      "themeColor": "#FF8C42",
+      "backgroundColor": "#FFFFFF",
+      "lang": "fr",
+      "scope": "/",
+      "startUrl": "/",
+      "display": "standalone",
+      "orientation": "portrait"
+    }
+  }
+}

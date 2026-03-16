@@ -16,6 +16,7 @@ import { useAllergyStore } from "./src/stores/useAllergyStore";
 import { useRestrictionStore } from "./src/stores/useRestrictionStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getUrlParams } from "./src/utils/getUrlParams";
+import { Platform, View, StyleSheet } from "react-native";
 
 export default function App() {
 	const [step, setStep] = useState("join"); // join, menu, addOn, orders, payment
@@ -326,6 +327,8 @@ export default function App() {
 			publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""}
 			merchantIdentifier="merchant.com.orderit.app"
 		>
+			{/* Sur web tablette/desktop, centrer le contenu et limiter la largeur */}
+			<View style={Platform.OS === "web" ? styles.webWrapper : { flex: 1 }}>
 			<SafeAreaView
 				style={{ flex: 1, backgroundColor: "whitesmoke" }}
 				edges={["top", "left", "right"]}
@@ -399,6 +402,19 @@ export default function App() {
 
 				<AlertComponent />
 			</SafeAreaView>
+			</View>
 		</StripeProvider>
 	);
 }
+
+const styles = StyleSheet.create({
+	webWrapper: {
+		flex: 1,
+		// Sur web, centrer le contenu et limiter à la largeur mobile (480px)
+		// pour un rendu optimal sur tablette et desktop
+		alignSelf: "center",
+		width: "100%",
+		maxWidth: 480,
+		backgroundColor: "whitesmoke",
+	},
+});
