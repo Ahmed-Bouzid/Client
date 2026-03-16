@@ -2,3 +2,4 @@
 export { default as token } from "./token";
 export { useCustomAlert } from "./customAlert";
 export { default as RootNavigation } from "./RootNavigation";
+export { getUrlParams, hasValidRestaurantInUrl } from "./getUrlParams";

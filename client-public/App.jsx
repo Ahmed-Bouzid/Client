@@ -15,6 +15,7 @@ import { useCartStore } from "./src/stores/useCartStore";
 import { useAllergyStore } from "./src/stores/useAllergyStore";
 import { useRestrictionStore } from "./src/stores/useRestrictionStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getUrlParams } from "./src/utils/getUrlParams";
 
 export default function App() {
 	const [step, setStep] = useState("join"); // join, menu, addOn, orders, payment
@@ -63,32 +64,44 @@ export default function App() {
 	// Initialisation au démarrage
 	useEffect(() => {
 		const initialize = async () => {
-			// Initialiser avec les IDs en dur pour les tests
-			await initTable(DEFAULT_TABLE_ID, DEFAULT_RESTAURANT_ID);
+			// 🌐 Sur web : lire restaurantId + tableId depuis l'URL (/r/[restaurantId]/[tableId])
+			const { restaurantId: urlRestaurantId, tableId: urlTableId } = getUrlParams();
+
+			// Priorité : URL > env var (null en prod sans URL)
+			const finalRestaurantId = urlRestaurantId || DEFAULT_RESTAURANT_ID;
+			const finalTableId = urlTableId || DEFAULT_TABLE_ID;
+
+			// Persister dans AsyncStorage pour que les stores y aient accès
+			if (urlRestaurantId) {
+				await AsyncStorage.setItem("restaurantId", urlRestaurantId);
+			}
+			if (urlTableId) {
+				await AsyncStorage.setItem("tableId", urlTableId);
+			}
+
+			await initTable(finalTableId, finalRestaurantId);
 			await initOrder();
 
 			// ⭐ Initialiser les stores d'allergies et restrictions
 			await useAllergyStore.getState().init();
 			await useRestrictionStore.getState().init();
 
-			// ⭐ Récupérer le numéro de table depuis l'API
-			try {
-				const response = await fetch(
-					`${API_BASE_URL}/tables/${DEFAULT_TABLE_ID}`,
-				);
-				if (response.ok) {
-					const tableData = await response.json();
-					setTableNumber(tableData.number || tableData.tableNumber || "?");
+			// ⭐ Récupérer le numéro de table depuis l'API (si tableId disponible)
+			if (finalTableId) {
+				try {
+					const response = await fetch(
+						`${API_BASE_URL}/tables/${finalTableId}`,
+					);
+					if (response.ok) {
+						const tableData = await response.json();
+						setTableNumber(tableData.number || tableData.tableNumber || "?");
+					}
+				} catch (error) {
+					console.error("Erreur récupération table:", error);
 				}
-			} catch (error) {
-				console.error("Erreur récupération table:", error);
 			}
 		};
 		initialize();
-	}, []);
-
-	// Log de débogage pour l'ID du restaurant
-	useEffect(() => {
 	}, []);
 
 	// Initialiser le panier quand le userName change
