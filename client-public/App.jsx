@@ -22,9 +22,10 @@ export default function App() {
 	const [clientId, setClientId] = useState("");
 	const [tableNumber, setTableNumber] = useState(null);
 
-	// IDs en dur pour les tests
-	const DEFAULT_TABLE_ID = "6960d0037aca682cfc81925a";
-	const DEFAULT_RESTAURANT_ID = Resto_id_key;
+	// En production, tableId et restaurantId viennent du QR code (URL param)
+	// null = pas de fallback hardcodé
+	const DEFAULT_TABLE_ID = null;
+	const DEFAULT_RESTAURANT_ID = Resto_id_key; // null en production, valeur dev depuis .env
 
 	// Stores
 	const {
@@ -309,7 +310,7 @@ export default function App() {
 
 	return (
 		<StripeProvider
-			publishableKey="pk_test_51Ski7zH5JuPQb6uBbPv7B8vwFCwhCL0nINHqUX1oxpNm0Qz3fUn5ZoGWf9jwd2dXVizHD0pTalhdEejZMQy9evAi00m3oQWIw0"
+			publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""}
 			merchantIdentifier="merchant.com.orderit.app"
 		>
 			<SafeAreaView
