@@ -57,6 +57,10 @@ export default function JoinOrCreateTable({
 	const [hasJoinedTable, setHasJoinedTable] = useState(false);
 	const [restaurantLoaded, setRestaurantLoaded] = useState(false);
 
+	// 🔄 Session reprise (re-scan QR) : si une session active existe pour cette table
+	const [existingSession, setExistingSession] = useState(null); // { reservationId, clientName, clientId, tableNumber }
+
+
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(50)).current;
@@ -273,6 +277,44 @@ export default function JoinOrCreateTable({
 		// ⚠️ NE PAS mettre fetchRestaurantInfo dans les deps (cause boucle infinie)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [restaurantId]);
+
+	// 🔄 Vérifier si une session active existe pour ce tableId (détection re-scan QR)
+	useEffect(() => {
+		if (!tableId) return;
+		const checkExistingSession = async () => {
+			try {
+				const savedTableId = await AsyncStorage.getItem("currentTableId");
+				const savedReservationId = await AsyncStorage.getItem("currentReservationId");
+				const savedClientName = await AsyncStorage.getItem("currentClientName");
+				const savedClientId = await AsyncStorage.getItem("currentClientId");
+				const savedTableNumber = await AsyncStorage.getItem("currentTableNumber");
+
+				// Session existante si : même table + reservationId sauvegardé + nom client
+				if (savedTableId === tableId && savedReservationId && savedClientName) {
+					setExistingSession({
+						reservationId: savedReservationId,
+						clientName: savedClientName,
+						clientId: savedClientId,
+						tableNumber: savedTableNumber,
+					});
+				} else {
+					setExistingSession(null);
+				}
+			} catch (e) {
+				setExistingSession(null);
+			}
+		};
+		checkExistingSession();
+	}, [tableId]);
+
+	// ✅ Reprendre la session existante sans re-saisir le formulaire
+	const handleResumeSession = () => {
+		if (!existingSession) return;
+		const { reservationId, clientName, clientId, tableNumber: savedTN } = existingSession;
+		setExistingSession(null); // reset card
+		onJoin?.(clientName, reservationId, tableId, savedTN || displayTableNumber, clientId);
+	};
+
 
 	const isInitialLoading = !restaurantId || configLoading || !restaurantLoaded;
 	if (isInitialLoading) {
@@ -777,6 +819,41 @@ export default function JoinOrCreateTable({
 							</View>
 						)}
 
+					{/* 🔄 REPRISE DE SESSION — card visible si re-scan QR avec session active */}
+					{existingSession && (
+						<View style={styles.resumeSessionCard}>
+							<BlurView intensity={30} tint="light" style={styles.resumeSessionBlur}>
+								<View style={styles.resumeSessionContent}>
+									<MaterialIcons name="replay" size={28} color={theme.primary?.[0] || "#667eea"} />
+									<View style={styles.resumeSessionText}>
+										<Text style={styles.resumeSessionTitle}>Session en cours</Text>
+										<Text style={styles.resumeSessionSubtitle}>
+											Reprendre la commande de{" "}
+											<Text style={{ fontWeight: "700" }}>{existingSession.clientName}</Text>
+											{" "}?
+										</Text>
+									</View>
+								</View>
+								<View style={styles.resumeSessionButtons}>
+									<TouchableOpacity
+										style={[styles.resumeBtn, { backgroundColor: theme.primary?.[0] || "#667eea" }]}
+										onPress={handleResumeSession}
+										activeOpacity={0.8}
+									>
+										<Text style={styles.resumeBtnText}>Reprendre</Text>
+									</TouchableOpacity>
+									<TouchableOpacity
+										style={styles.resumeBtnSecondary}
+										onPress={() => setExistingSession(null)}
+										activeOpacity={0.8}
+									>
+										<Text style={styles.resumeBtnSecondaryText}>Nouvelle session</Text>
+									</TouchableOpacity>
+								</View>
+							</BlurView>
+						</View>
+					)}
+
 					{/* 📋 Formulaire avec inputs stylisés (conditionnel) */}
 					<View
 						style={
@@ -1046,6 +1123,67 @@ export default function JoinOrCreateTable({
 }
 
 const styles = StyleSheet.create({
+	// 🔄 RESUME SESSION CARD
+	resumeSessionCard: {
+		marginBottom: 16,
+		borderRadius: 16,
+		overflow: "hidden",
+	},
+	resumeSessionBlur: {
+		padding: 16,
+		borderRadius: 16,
+		borderWidth: 1,
+		borderColor: "rgba(102, 126, 234, 0.3)",
+	},
+	resumeSessionContent: {
+		flexDirection: "row",
+		alignItems: "center",
+		marginBottom: 12,
+		gap: 12,
+	},
+	resumeSessionText: {
+		flex: 1,
+	},
+	resumeSessionTitle: {
+		fontSize: 15,
+		fontWeight: "700",
+		color: "#1a1a2e",
+		marginBottom: 2,
+	},
+	resumeSessionSubtitle: {
+		fontSize: 13,
+		color: "#666",
+	},
+	resumeSessionButtons: {
+		flexDirection: "row",
+		gap: 10,
+	},
+	resumeBtn: {
+		flex: 1,
+		paddingVertical: 10,
+		borderRadius: 10,
+		alignItems: "center",
+	},
+	resumeBtnText: {
+		color: "#fff",
+		fontWeight: "700",
+		fontSize: 14,
+	},
+	resumeBtnSecondary: {
+		flex: 1,
+		paddingVertical: 10,
+		borderRadius: 10,
+		alignItems: "center",
+		backgroundColor: "rgba(0,0,0,0.08)",
+		borderWidth: 1,
+		borderColor: "rgba(0,0,0,0.1)",
+	},
+	resumeBtnSecondaryText: {
+		color: "#333",
+		fontWeight: "600",
+		fontSize: 13,
+	},
+
 	// 🔥 FOND ET STRUCTURE GRILLZ
 	scrollContainer: {
 		flex: 1,

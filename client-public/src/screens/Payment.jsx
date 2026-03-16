@@ -206,6 +206,27 @@ export default function Payment({
 		totalPaid: 0,
 	});
 
+	// 👥 Multi-clients : filtrage par clientId (Option C)
+	// false = affiche uniquement les commandes du client courant
+	// true  = affiche toutes les commandes de la table
+	const [payForWholeTable, setPayForWholeTable] = useState(false);
+
+	// Commandes filtrées selon le mode actif
+	const visibleOrders = payForWholeTable
+		? allOrders
+		: allOrders.filter((item) => !item.clientId || item.clientId === clientId);
+
+	const otherClientsCount = allOrders.filter(
+		(item) => item.clientId && item.clientId !== clientId,
+	).length;
+	const [reservationStatus, setReservationStatus] = useState({
+		canClose: false,
+		reason: "",
+		unpaidOrders: [],
+		totalDue: 0,
+		totalPaid: 0,
+	});
+
 	// 🧾 États pour le ticket de caisse
 	const [showReceipt, setShowReceipt] = useState(false);
 	const [receiptData, setReceiptData] = useState(null);
@@ -331,18 +352,21 @@ export default function Payment({
 		checkApplePay();
 	}, [isApplePaySupported]);
 
-	// ✅ Initialiser la sélection avec les articles non payés
+	// ✅ Initialiser la sélection avec les articles non payés (du client courant uniquement)
 	useEffect(() => {
-		if (allOrders && allOrders.length > 0) {
-			const nonPaidItems = allOrders.filter(
+		if (visibleOrders && visibleOrders.length > 0) {
+			const nonPaidItems = visibleOrders.filter(
 				(item) => !paidItems.has(getItemId(item)),
 			);
 			const nonPaidIds = new Set(nonPaidItems.map((item) => getItemId(item)));
 			setSelectedItems(nonPaidIds);
 		} else {
-			console.warn("⚠️ Aucun item dans allOrders");
+			// Pas d'items pour ce client — ne pas logguer d'avertissement si c'est normal
+			if (allOrders.length > 0 && !payForWholeTable) {
+				// D'autres commandes existent mais ne sont pas pour ce client
+			}
 		}
-	}, [allOrders, paidItems]);
+	}, [visibleOrders, paidItems, payForWholeTable]);
 
 	// 🔍 Vérifier si la réservation peut être fermée
 	const checkReservationClosure = async () => {
@@ -415,7 +439,7 @@ export default function Payment({
 	// 🎯 Tout sélectionner/désélectionner
 	const toggleAll = () => {
 		const nonPaidItems =
-			allOrders?.filter((item) => !paidItems.has(getItemId(item))) || [];
+			visibleOrders?.filter((item) => !paidItems.has(getItemId(item))) || [];
 		if (nonPaidItems.length === 0) return;
 
 		const allNonPaidIds = new Set(nonPaidItems.map((item) => getItemId(item)));
@@ -430,7 +454,7 @@ export default function Payment({
 	// 🎯 Sélectionner 1/3 des articles disponibles
 	const selectOneThird = () => {
 		const nonPaidItems =
-			allOrders?.filter((item) => !paidItems.has(getItemId(item))) || [];
+			visibleOrders?.filter((item) => !paidItems.has(getItemId(item))) || [];
 		if (nonPaidItems.length === 0) return;
 
 		const oneThirdCount = Math.ceil(nonPaidItems.length / 3);
@@ -836,9 +860,9 @@ export default function Payment({
 	// 📊 Calculs pour l'affichage
 	const isProcessing = loading || isLoading;
 	const availableItems =
-		allOrders?.filter((item) => !paidItems.has(getItemId(item))) || [];
+		visibleOrders?.filter((item) => !paidItems.has(getItemId(item))) || [];
 	const paidItemsList =
-		allOrders?.filter((item) => paidItems.has(getItemId(item))) || [];
+		visibleOrders?.filter((item) => paidItems.has(getItemId(item))) || [];
 	const allSelected =
 		selectedItems.size === availableItems.length && availableItems.length > 0;
 	const selectedOrders = availableItems.filter((item) =>
@@ -962,6 +986,47 @@ export default function Payment({
 
 				{/* Items Section */}
 				<View style={styles.itemsSection}>
+					{/* 👥 Toggle : Mes articles / Toute la table */}
+					{otherClientsCount > 0 && (
+						<View style={styles.clientToggleRow}>
+							<TouchableOpacity
+								style={[
+									styles.clientToggleBtn,
+									!payForWholeTable && styles.clientToggleBtnActive,
+								]}
+								onPress={() => setPayForWholeTable(false)}
+								activeOpacity={0.8}
+							>
+								<MaterialIcons name="person" size={15} color={!payForWholeTable ? "#fff" : "#666"} />
+								<Text style={[styles.clientToggleText, !payForWholeTable && styles.clientToggleTextActive]}>
+									Mes articles
+								</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={[
+									styles.clientToggleBtn,
+									payForWholeTable && styles.clientToggleBtnActive,
+								]}
+								onPress={() =>
+									Alert.alert(
+										"Payer pour toute la table",
+										"Vous allez régler les commandes de tous les clients de cette table. Confirmez-vous ?",
+										[
+											{ text: "Annuler", style: "cancel" },
+											{ text: "Confirmer", onPress: () => setPayForWholeTable(true) },
+										],
+									)
+								}
+								activeOpacity={0.8}
+							>
+								<MaterialIcons name="group" size={15} color={payForWholeTable ? "#fff" : "#666"} />
+								<Text style={[styles.clientToggleText, payForWholeTable && styles.clientToggleTextActive]}>
+									Toute la table
+								</Text>
+							</TouchableOpacity>
+						</View>
+					)}
+
 					{/* Section Header */}
 					<View style={styles.sectionHeader}>
 						<View style={styles.sectionTitleRow}>
@@ -1272,6 +1337,36 @@ export default function Payment({
 }
 
 const styles = StyleSheet.create({
+	// 👥 CLIENT TOGGLE (Mes articles / Toute la table)
+	clientToggleRow: {
+		flexDirection: "row",
+		marginBottom: 12,
+		borderRadius: 10,
+		backgroundColor: "rgba(0,0,0,0.06)",
+		padding: 3,
+		gap: 3,
+	},
+	clientToggleBtn: {
+		flex: 1,
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 8,
+		borderRadius: 8,
+		gap: 5,
+	},
+	clientToggleBtnActive: {
+		backgroundColor: "#667eea",
+	},
+	clientToggleText: {
+		fontSize: 13,
+		fontWeight: "600",
+		color: "#666",
+	},
+	clientToggleTextActive: {
+		color: "#fff",
+	},
+
 	container: {
 		flex: 1,
 	},
