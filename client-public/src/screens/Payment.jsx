@@ -219,13 +219,6 @@ export default function Payment({
 	const otherClientsCount = allOrders.filter(
 		(item) => item.clientId && item.clientId !== clientId,
 	).length;
-	const [reservationStatus, setReservationStatus] = useState({
-		canClose: false,
-		reason: "",
-		unpaidOrders: [],
-		totalDue: 0,
-		totalPaid: 0,
-	});
 
 	// 🧾 États pour le ticket de caisse
 	const [showReceipt, setShowReceipt] = useState(false);

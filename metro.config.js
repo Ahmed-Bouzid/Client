@@ -20,6 +20,16 @@ config.resolver = {
 		path.resolve(__dirname, "node_modules"),
 		path.resolve(__dirname, "shared-api/node_modules"),
 	],
+	// Sur web : remplacer les modules natifs incompatibles par des stubs vides
+	resolveRequest: (context, moduleName, platform) => {
+		if (platform === "web" && moduleName === "@stripe/stripe-react-native") {
+			return {
+				filePath: path.resolve(__dirname, "stubs/stripe-react-native.js"),
+				type: "sourceFile",
+			};
+		}
+		return context.resolveRequest(context, moduleName, platform);
+	},
 };
 
 module.exports = config;
