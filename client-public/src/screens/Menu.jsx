@@ -319,10 +319,7 @@ const ItaliaHeader = ({
 				</View>
 			</View>
 
-			{/* Slogan italien */}
-			{styleConfig.slogan && (
-				<Text style={styles.italiaSlogan}>{styleConfig.slogan}</Text>
-			)}
+			{/* Slogan supprimé */}
 		</View>
 	);
 };
@@ -1948,9 +1945,9 @@ const styles = StyleSheet.create({
 		width: "100%",
 	},
 	headerIcon: {
-		width: 50,
-		height: 50,
-		borderRadius: 25,
+		width: 42,
+		height: 42,
+		borderRadius: 21,
 		justifyContent: "center",
 		alignItems: "center",
 		shadowColor: DEFAULT_THEME.shadowColor,
@@ -2074,19 +2071,19 @@ const styles = StyleSheet.create({
 	},
 	// 🔍 Bouton loupe rond dans la barre de catégories
 	searchRoundButton: {
-		width: 46,
-		height: 46,
-		borderRadius: 23,
+		width: BUTTON_SMALL,
+		height: BUTTON_SMALL,
+		borderRadius: 30,
 		backgroundColor: "#fff",
 		justifyContent: "center",
 		alignItems: "center",
 		marginLeft: 20,
 		marginRight: 4,
 		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
-		shadowRadius: 4,
-		elevation: 3,
+		shadowOffset: { width: 0, height: 3 },
+		shadowOpacity: 0.15,
+		shadowRadius: 5,
+		elevation: 5,
 		flexShrink: 0,
 	},
 	// 🔍 Input de recherche inline (mode actif)
@@ -2976,17 +2973,17 @@ const styles = StyleSheet.create({
 
 	// 🔥 ===== STYLES GRILLZ (utilisés uniquement pour Le Grillz) =====
 	grillzHeader: {
-		marginBottom: 20,
+		marginBottom: 8,
 	},
 	grillzHeaderOuter: {
-		borderRadius: 20,
+		borderRadius: 16,
 		marginHorizontal: 10,
 		overflow: "hidden",
 		shadowColor: "#FF6B35",
-		shadowOffset: { width: 0, height: 6 },
-		shadowOpacity: 0.5,
-		shadowRadius: 12,
-		elevation: 12,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.4,
+		shadowRadius: 8,
+		elevation: 8,
 		borderWidth: 1,
 		borderColor: "rgba(255, 107, 53, 0.4)",
 	},
@@ -2997,57 +2994,53 @@ const styles = StyleSheet.create({
 	grillzLogoContainer: {
 		flexDirection: "row",
 		alignItems: "center",
-		paddingHorizontal: 18,
-		paddingTop: 16,
-		paddingBottom: 12,
+		paddingHorizontal: 14,
+		paddingTop: 10,
+		paddingBottom: 8,
 	},
 	grillzLogo: {
-		width: 54,
-		height: 54,
-		borderRadius: 27,
+		width: 42,
+		height: 42,
+		borderRadius: 21,
 		justifyContent: "center",
 		alignItems: "center",
-		marginRight: 14,
+		marginRight: 10,
 		shadowColor: "#FF6B35",
-		shadowOffset: { width: 0, height: 4 },
+		shadowOffset: { width: 0, height: 3 },
 		shadowOpacity: 0.5,
-		shadowRadius: 8,
-		elevation: 6,
+		shadowRadius: 6,
+		elevation: 5,
 	},
 	grillzBrandText: {
 		flex: 1,
 	},
 	grillzTitle: {
-		fontSize: 26,
+		fontSize: 20,
 		fontWeight: "900",
 		color: "#FFFAF0",
 		letterSpacing: -0.5,
 		textShadowColor: "#FF6B35",
-		textShadowRadius: 8,
-		textShadowOffset: { width: 0, height: 2 },
+		textShadowRadius: 6,
+		textShadowOffset: { width: 0, height: 1 },
 	},
 	grillzSubtitle: {
-		fontSize: 11,
-		fontWeight: "700",
-		color: "#D4A574",
-		letterSpacing: 1.2,
-		marginTop: 3,
+		display: "none",
 	},
 	grillzDivider: {
 		height: 1,
 		backgroundColor: "rgba(255, 107, 53, 0.25)",
-		marginHorizontal: 18,
-		marginBottom: 10,
+		marginHorizontal: 14,
+		marginBottom: 6,
 	},
 	grillzUserButton: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "space-between",
-		paddingHorizontal: 18,
-		paddingBottom: 14,
+		paddingHorizontal: 14,
+		paddingBottom: 10,
 	},
 	grillzUserText: {
-		fontSize: 15,
+		fontSize: 14,
 		fontWeight: "600",
 		color: "#FFFAF0",
 	},
@@ -3104,21 +3097,22 @@ const styles = StyleSheet.create({
 	},
 	italiaHeaderContent: {
 		backgroundColor: "#FFF8E7",
-		padding: 20,
-		paddingTop: 28,
+		paddingHorizontal: 14,
+		paddingVertical: 12,
+		paddingTop: 18,
 	},
 	italiaLogoContainer: {
 		flexDirection: "row",
 		alignItems: "center",
-		marginBottom: 12,
+		marginBottom: 8,
 	},
 	italiaLogo: {
-		width: 60,
-		height: 60,
-		borderRadius: 30,
+		width: 42,
+		height: 42,
+		borderRadius: 21,
 		justifyContent: "center",
 		alignItems: "center",
-		marginRight: 15,
+		marginRight: 10,
 		shadowColor: "#F1BF00",
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.5,
@@ -3129,7 +3123,7 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	italiaTitle: {
-		fontSize: 30,
+		fontSize: 20,
 		fontWeight: "700",
 		color: "#2C1810",
 		letterSpacing: -0.5,
@@ -3139,11 +3133,7 @@ const styles = StyleSheet.create({
 		}),
 	},
 	italiaSubtitle: {
-		fontSize: 11,
-		fontWeight: "700",
-		color: "#009246",
-		letterSpacing: 3,
-		marginTop: 2,
+		display: "none",
 	},
 	italiaUserSection: {
 		flexDirection: "row",
