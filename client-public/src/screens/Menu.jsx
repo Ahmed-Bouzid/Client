@@ -910,6 +910,7 @@ export default function Menu({
 	const { currentOrder, fetchActiveOrder } = useOrderStore();
 
 	const [selectedCategory, setSelectedCategory] = useState(null);
+	const headerAnim = useRef(new Animated.Value(1)).current;
 	const [modalVisible, setModalVisible] = useState(false);
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [searchQuery, setSearchQuery] = useState("");
@@ -937,6 +938,15 @@ export default function Menu({
 	]);
 
 	useEffect(() => {}, [modalVisible, selectedItem]);
+
+	// 🎯 Animation collapse du header quand une catégorie est sélectionnée
+	useEffect(() => {
+		Animated.timing(headerAnim, {
+			toValue: selectedCategory ? 0 : 1,
+			duration: 250,
+			useNativeDriver: false,
+		}).start();
+	}, [selectedCategory]);
 
 	// ⚠️ LEGACY : Catégories hardcodées comme fallback
 	const legacyCategories = [
@@ -1433,7 +1443,12 @@ export default function Menu({
 				/>
 			</View>
 
-			{/* 🔒 Header Conditionnel : Italia, Grillz ou Standard */}
+			{/* 🔒 Header Conditionnel : Italia, Grillz ou Standard — collapse quand catégorie sélectionnée */}
+			<Animated.View style={{
+				maxHeight: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 400] }),
+				opacity: headerAnim,
+				overflow: "hidden",
+			}}>
 			{config?.styleKey === "italia" ? (
 				<ItaliaHeader
 					userName={userName}
@@ -1504,6 +1519,7 @@ export default function Menu({
 					<Text style={styles.subtitle}>Découvrez notre carte</Text>
 				</View>
 			)}
+			</Animated.View>
 
 			{/* 🔍 Barre de recherche Premium */}
 			<PremiumSearchBar
