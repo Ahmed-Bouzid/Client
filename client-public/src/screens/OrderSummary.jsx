@@ -30,14 +30,14 @@ const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity, theme = DEFAU
 				toValue: 1,
 				duration: 400,
 				delay: index * 80,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 			Animated.spring(slideAnim, {
 				toValue: 0,
 				tension: 50,
 				friction: 8,
 				delay: index * 80,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 		]).start();
 	}, []);
@@ -45,7 +45,7 @@ const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity, theme = DEFAU
 	const handlePressIn = () => {
 		Animated.spring(scaleAnim, {
 			toValue: 0.98,
-			useNativeDriver: true,
+			useNativeDriver: false,
 		}).start();
 	};
 
@@ -53,7 +53,7 @@ const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity, theme = DEFAU
 		Animated.spring(scaleAnim, {
 			toValue: 1,
 			friction: 3,
-			useNativeDriver: true,
+			useNativeDriver: false,
 		}).start();
 	};
 
@@ -200,13 +200,13 @@ const OrderSummary = ({
 			Animated.timing(fadeAnim, {
 				toValue: 1,
 				duration: 600,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 			Animated.spring(slideAnim, {
 				toValue: 0,
 				tension: 50,
 				friction: 8,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 		]).start();
 	}, []);
@@ -229,7 +229,7 @@ const OrderSummary = ({
 	const handlePressIn = () => {
 		Animated.spring(buttonScale, {
 			toValue: 0.95,
-			useNativeDriver: true,
+			useNativeDriver: false,
 		}).start();
 	};
 
@@ -237,7 +237,7 @@ const OrderSummary = ({
 		Animated.spring(buttonScale, {
 			toValue: 1,
 			friction: 3,
-			useNativeDriver: true,
+			useNativeDriver: false,
 		}).start();
 	};
 

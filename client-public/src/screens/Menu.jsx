@@ -30,6 +30,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useOrderStore } from "../stores/useOrderStore.js";
 import DietaryPreferences from "./DietaryPreferences.jsx";
 import MessagingBubble from "../components/messaging/MessagingBubble.jsx";
+import AddOnFlow from "../components/menu/AddOnFlow.jsx"; // ⭐ NOUVEAU : Flux complet add-ons
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
 import { useStyleUpdates } from "../hooks/useSocketClient.js"; // ⭐ NOUVEAU : WebSocket temps réel
 import { useReservationStatus } from "../hooks/useReservationStatus.js"; // 🚪 Écoute fermeture réservation
@@ -358,20 +359,20 @@ const PremiumProductCard = ({
 				friction: 8,
 				tension: 40,
 				delay: index * 80,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 			Animated.timing(opacityAnim, {
 				toValue: 1,
 				duration: 400,
 				delay: index * 80,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 			Animated.spring(translateY, {
 				toValue: 0,
 				friction: 8,
 				tension: 40,
 				delay: index * 80,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 		]).start();
 	}, []);
@@ -600,19 +601,19 @@ const PremiumFloatingCart = ({ itemCount, total, onPress }) => {
 					toValue: 1,
 					friction: 6,
 					tension: 40,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.loop(
 					Animated.sequence([
 						Animated.timing(bounceAnim, {
 							toValue: -5,
 							duration: 1500,
-							useNativeDriver: true,
+							useNativeDriver: false,
 						}),
 						Animated.timing(bounceAnim, {
 							toValue: 0,
 							duration: 1500,
-							useNativeDriver: true,
+							useNativeDriver: false,
 						}),
 					]),
 				),
@@ -621,7 +622,7 @@ const PremiumFloatingCart = ({ itemCount, total, onPress }) => {
 			Animated.spring(scaleAnim, {
 				toValue: 0,
 				friction: 8,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}).start();
 		}
 	}, [itemCount > 0]);
@@ -698,18 +699,18 @@ const AnimatedCategoryButton = ({
 				Animated.timing(iconOpacity, {
 					toValue: 0,
 					duration: 150,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.timing(textOpacity, {
 					toValue: 1,
 					duration: 200,
 					delay: 100,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.timing(glowOpacity, {
 					toValue: 0.5,
 					duration: 300,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 			]).start();
 		} else {
@@ -725,17 +726,17 @@ const AnimatedCategoryButton = ({
 					toValue: 1,
 					duration: 200,
 					delay: 50,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.timing(textOpacity, {
 					toValue: 0,
 					duration: 100,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.timing(glowOpacity, {
 					toValue: 0,
 					duration: 200,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 			]).start();
 		}
@@ -921,6 +922,12 @@ export default function Menu({
 	const [optionGroups, setOptionGroups] = useState([]);
 	const [selectedOptions, setSelectedOptions] = useState({});
 	const [loadingOptions, setLoadingOptions] = useState(false);
+
+	// ⭐ NOUVEAU : Gestion des add-ons
+	const [addOnsModalVisible, setAddOnsModalVisible] = useState(false);
+	const [currentProductWithAddOns, setCurrentProductWithAddOns] =
+		useState(null);
+	const [selectedAddOns, setSelectedAddOns] = useState([]);
 
 	useEffect(() => {}, [
 		optionsModalVisible,
@@ -1208,7 +1215,13 @@ export default function Menu({
 			setOptionGroups(groups);
 			setSelectedOptions({});
 			setOptionsModalVisible(true);
+		} else if (item.hasAddOns) {
+			// ⭐ NOUVEAU : Si pas d'options mais produit accepte des add-ons, afficher modal add-ons
+			setCurrentProductWithAddOns(item);
+			setSelectedAddOns([]);
+			setAddOnsModalVisible(true);
 		} else {
+			// Pas d'options ni d'add-ons, ajouter directement
 			onAdd?.(item);
 		}
 	};
@@ -1253,8 +1266,16 @@ export default function Menu({
 			finalPrice: (currentProductForOptions.price || 0) + optionsTotal,
 		};
 
-		onAdd?.(itemWithOptions);
-		closeOptionsModal();
+		// ⭐ NOUVEAU : Vérifier si le produit accepte des add-ons
+		if (itemWithOptions.hasAddOns) {
+			setCurrentProductWithAddOns(itemWithOptions);
+			setSelectedAddOns([]);
+			setAddOnsModalVisible(true);
+			closeOptionsModal();
+		} else {
+			onAdd?.(itemWithOptions);
+			closeOptionsModal();
+		}
 	};
 
 	// Toggle sélection d'une option
@@ -1807,6 +1828,26 @@ export default function Menu({
 					</View>
 				</View>
 			</Modal>
+
+			{/* ⭐ NOUVEAU : Modal Add-ons (flux complet) */}
+			{addOnsModalVisible && currentProductWithAddOns && (
+				<AddOnFlow
+					dish={currentProductWithAddOns}
+					allowedAddOns={currentProductWithAddOns.allowedAddOns || []}
+					onComplete={(finalItem) => {
+						// finalItem contient déjà selectedAddOns, addOnsTotal, finalPrice
+						onAdd?.(finalItem);
+						setAddOnsModalVisible(false);
+						setCurrentProductWithAddOns(null);
+						setSelectedAddOns([]);
+					}}
+					onCancel={() => {
+						setAddOnsModalVisible(false);
+						setCurrentProductWithAddOns(null);
+						setSelectedAddOns([]);
+					}}
+				/>
+			)}
 
 			{/* Modal Préférences Alimentaires */}
 			<DietaryPreferences

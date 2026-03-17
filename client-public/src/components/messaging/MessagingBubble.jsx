@@ -240,12 +240,12 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 					toValue: 1,
 					friction: 6,
 					tension: 100,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.timing(bubbleOpacity, {
 					toValue: 1,
 					duration: 400,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 			]).start();
 			startPulseAnimation();
@@ -262,12 +262,12 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 				Animated.timing(pulseAnim, {
 					toValue: 1.08,
 					duration: 1200,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.timing(pulseAnim, {
 					toValue: 1,
 					duration: 1200,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 			]),
 		).start();
@@ -302,7 +302,7 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 		Animated.timing(modalOpacity, {
 			toValue: 1,
 			duration: 200,
-			useNativeDriver: true,
+			useNativeDriver: false,
 		}).start();
 
 		setTimeout(() => {
@@ -315,7 +315,7 @@ const MessagingBubble = ({ reservationId, clientId, clientName, style }) => {
 		Animated.timing(modalOpacity, {
 			toValue: 0,
 			duration: 150,
-			useNativeDriver: true,
+			useNativeDriver: false,
 		}).start(() => {
 			setIsOpen(false);
 			setSelectedCategory(null);

@@ -113,13 +113,13 @@ export default function JoinOrCreateTable({
 			Animated.timing(fadeAnim, {
 				toValue: 1,
 				duration: 800,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 			Animated.spring(slideAnim, {
 				toValue: 0,
 				tension: 50,
 				friction: 8,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 		]).start();
 
@@ -129,12 +129,12 @@ export default function JoinOrCreateTable({
 				Animated.timing(tableIconAnim, {
 					toValue: 1,
 					duration: 1500,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.timing(tableIconAnim, {
 					toValue: 0,
 					duration: 1500,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 			]),
 		).start();
@@ -145,7 +145,7 @@ export default function JoinOrCreateTable({
 				toValue: 1,
 				duration: 500,
 				delay: 200 + index * 100,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}).start();
 		});
 	}, []);
@@ -184,7 +184,7 @@ export default function JoinOrCreateTable({
 	const handlePressIn = () => {
 		Animated.spring(buttonScale, {
 			toValue: 0.95,
-			useNativeDriver: true,
+			useNativeDriver: false,
 		}).start();
 	};
 
@@ -192,7 +192,7 @@ export default function JoinOrCreateTable({
 		Animated.spring(buttonScale, {
 			toValue: 1,
 			friction: 3,
-			useNativeDriver: true,
+			useNativeDriver: false,
 		}).start();
 	};
 

@@ -30,13 +30,13 @@ const ConfettiParticle = ({ delay, left, visible }) => {
 					toValue: height + 50,
 					duration: 3000,
 					delay,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.loop(
 					Animated.timing(rotateAnim, {
 						toValue: 1,
 						duration: 1000,
-						useNativeDriver: true,
+						useNativeDriver: false,
 					}),
 				),
 			]).start();
@@ -81,12 +81,12 @@ export const ReceiptModal = ({
 				Animated.timing(slideAnim, {
 					toValue: 0,
 					duration: 400,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.timing(overlayAnim, {
 					toValue: 1,
 					duration: 300,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 			]).start();
 		} else {
@@ -94,12 +94,12 @@ export const ReceiptModal = ({
 				Animated.timing(slideAnim, {
 					toValue: height,
 					duration: 300,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.timing(overlayAnim, {
 					toValue: 0,
 					duration: 200,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 			]).start();
 		}

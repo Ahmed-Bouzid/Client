@@ -158,13 +158,13 @@ export default function DietaryPreferences({ visible, onClose }) {
 			Animated.timing(fadeAnim, {
 				toValue: 1,
 				duration: 300,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}).start();
 		} else {
 			Animated.timing(fadeAnim, {
 				toValue: 0,
 				duration: 200,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}).start();
 		}
 	}, [visible]);

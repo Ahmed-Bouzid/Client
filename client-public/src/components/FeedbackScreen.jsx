@@ -73,19 +73,19 @@ export default function FeedbackScreen({
 				Animated.timing(fadeAnim, {
 					toValue: 1,
 					duration: 300,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.spring(slideAnim, {
 					toValue: 0,
 					tension: 50,
 					friction: 8,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 				Animated.spring(scaleAnim, {
 					toValue: 1,
 					tension: 50,
 					friction: 8,
-					useNativeDriver: true,
+					useNativeDriver: false,
 				}),
 			]).start();
 		} else {
@@ -308,12 +308,12 @@ export default function FeedbackScreen({
 			Animated.timing(fadeAnim, {
 				toValue: 0,
 				duration: 200,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 			Animated.timing(slideAnim, {
 				toValue: SCREEN_HEIGHT,
 				duration: 200,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 		]).start(() => {
 			// Reset états

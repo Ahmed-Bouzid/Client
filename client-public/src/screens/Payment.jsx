@@ -49,14 +49,14 @@ const PremiumPaymentItem = ({
 				toValue: 1,
 				duration: 400,
 				delay: index * 60,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 			Animated.spring(slideAnim, {
 				toValue: 0,
 				tension: 50,
 				friction: 8,
 				delay: index * 60,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 		]).start();
 	}, []);
@@ -66,12 +66,12 @@ const PremiumPaymentItem = ({
 			Animated.timing(scaleAnim, {
 				toValue: 0.95,
 				duration: 100,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 			Animated.spring(scaleAnim, {
 				toValue: 1,
 				friction: 3,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 		]).start();
 		onToggle?.();
@@ -246,13 +246,13 @@ export default function Payment({
 			Animated.timing(fadeAnim, {
 				toValue: 1,
 				duration: 600,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 			Animated.spring(slideAnim, {
 				toValue: 0,
 				tension: 50,
 				friction: 8,
-				useNativeDriver: true,
+				useNativeDriver: false,
 			}),
 		]).start();
 	}, []);
@@ -870,7 +870,7 @@ export default function Payment({
 	const handlePressIn = () => {
 		Animated.spring(buttonScale, {
 			toValue: 0.95,
-			useNativeDriver: true,
+			useNativeDriver: false,
 		}).start();
 	};
 
@@ -878,7 +878,7 @@ export default function Payment({
 		Animated.spring(buttonScale, {
 			toValue: 1,
 			friction: 3,
-			useNativeDriver: true,
+			useNativeDriver: false,
 		}).start();
 	};
 
