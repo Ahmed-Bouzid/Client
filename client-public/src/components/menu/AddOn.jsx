@@ -58,12 +58,17 @@ export default function AddOn({
 	currentOrders = [],
 	onComplete = () => {},
 	onBack = () => {},
+	allowedAddOns = [], // ⭐ NOUVEAU : liste des add-ons autorisés pour ce produit
+	dish = null, // ⭐ NOUVEAU : le produit sélectionné (pour contexte)
 }) {
+	// ⭐ NOUVEAU : Utiliser les add-ons réels si fournis, sinon fallback aux données fictives
+	const dataAddOns = allowedAddOns.length > 0 ? allowedAddOns : sampleAddOns;
+	
 	const [selected, setSelected] = useState([]);
 
 	const toggleItem = (item) => {
-		if (selected.includes(item)) {
-			setSelected(selected.filter((i) => i !== item));
+		if (selected.find((i) => i._id === item._id || i.id === item.id)) {
+			setSelected(selected.filter((i) => i._id !== item._id && i.id !== item.id));
 		} else {
 			setSelected([...selected, item]);
 		}
@@ -91,8 +96,8 @@ export default function AddOn({
 			{/* Liste des add-ons */}
 			<ScrollView style={styles.listContainer}>
 				<FlatList
-					data={sampleAddOns}
-					keyExtractor={(item) => item.id.toString()}
+				data={dataAddOns}
+				keyExtractor={(item) => (item._id || item.id).toString()}
 					renderItem={({ item }) => (
 						<TouchableOpacity
 							style={[
