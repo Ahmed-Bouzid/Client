@@ -217,9 +217,6 @@ const GrillzHeader = ({
 						<Text style={styles.grillzTitle}>
 							{restaurantName || "LE GRILLZ"} 🔥
 						</Text>
-						<Text style={styles.grillzSubtitle}>
-							{styleConfig.slogan || "🍗 POULET BBQ · FOODTRUCK HALAL 🔥"}
-						</Text>
 					</View>
 				</View>
 
@@ -295,9 +292,6 @@ const ItaliaHeader = ({
 					<View style={styles.italiaBrandText}>
 						<Text style={styles.italiaTitle}>
 							{restaurantName || "Ristorante"}
-						</Text>
-						<Text style={styles.italiaSubtitle}>
-							{styleConfig.categoryLabel || "CUCINA ITALIANA"}
 						</Text>
 					</View>
 				</View>
@@ -1515,7 +1509,7 @@ export default function Menu({
 							</Text>
 						</View>
 					</View>
-					<Text style={styles.subtitle}>Découvrez notre carte</Text>
+					{/* Sous-titre supprimé */}
 				</View>
 			)}
 			</Animated.View>
