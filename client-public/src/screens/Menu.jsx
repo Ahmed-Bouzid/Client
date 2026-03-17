@@ -1594,6 +1594,7 @@ export default function Menu({
 							/>
 						);
 					}}
+					style={{ flex: 1 }}
 					contentContainerStyle={styles.premiumListContainer}
 					showsVerticalScrollIndicator={false}
 					ListEmptyComponent={
@@ -1632,6 +1633,7 @@ export default function Menu({
 							theme={currentStyle}
 						/>
 					)}
+					style={{ flex: 1 }}
 					contentContainerStyle={styles.premiumListContainer}
 					showsVerticalScrollIndicator={false}
 					ListEmptyComponent={
@@ -2056,7 +2058,7 @@ const styles = StyleSheet.create({
 	},
 	// ⭐ Zone fixe pour les boutons de catégories
 	categoriesFixedZone: {
-		height: 80,
+		height: 84,
 		marginHorizontal: -20,
 		marginBottom: 10,
 		justifyContent: "center",
@@ -2110,6 +2112,7 @@ const styles = StyleSheet.create({
 		gap: 8,
 		paddingLeft: 4,
 		paddingRight: 20,
+		paddingVertical: 4,
 	},
 	// 🎨 Bouton animé style gradient-menu
 	animatedButton: {
