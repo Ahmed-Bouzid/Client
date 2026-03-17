@@ -5,9 +5,5 @@
 
 export const Resto_id_key = process.env.EXPO_PUBLIC_DEFAULT_RESTAURANT_ID || null;
 
-// IDs connus (référence pour le développement uniquement) :
-// 6983310d35c06895f98d7549  →  MabCafé
-// 6970ef6594abf8bacd9d804d  →  Lacucinadinini
-// 695e4300adde654b80f6911a  →  Le Grillz ⚡ AVEC COMMANDES EXPRESS
-// 686af511bb4cba684ff3b72e  →  Chez Ahmed
-// 69a035934b395eaaba6b8d21  →  laBoucle
+// IDs connus (référence pour le développement local uniquement — ne pas commiter en prod) :
+// MabCafé / Lacucinadinini / Le Grillz / Chez Ahmed / laBoucle

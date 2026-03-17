@@ -572,7 +572,7 @@ export default function Payment({
 			// Préparer les données feedback avec valeurs par défaut sûres
 			const feedbackPayload = {
 				restaurantData: {
-					id: restaurantId || restaurantStore.id || "695e4300adde654b80f6911a", // Fallback vers ID par défaut
+					id: restaurantId || restaurantStore.id, // Fallback vers ID par défaut
 					name: restaurantStore.name || "Restaurant",
 					googleUrl: restaurantStore.googleUrl || null,
 					googlePlaceId: restaurantStore.googlePlaceId || null,
@@ -580,7 +580,7 @@ export default function Payment({
 				customerData: {
 					clientId: clientId || "anonymous-" + Date.now(),
 					clientName: userName || "Client",
-					tableId: tableId || "686af692bb4cba684ff3b757", // Table par défaut
+					tableId: tableId || null,
 					tableNumber: tableNumber || "1",
 					reservationId: reservationId || null,
 				},

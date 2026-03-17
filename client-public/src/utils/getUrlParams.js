@@ -22,7 +22,7 @@ export const getUrlParams = () => {
 	}
 
 	try {
-		const pathname = window.location.pathname; // ex: /r/695e4300adde654b80f6911a/6960d003
+		const pathname = window.location.pathname; // ex: /r/[restaurantId]/[tableId]
 		const match = pathname.match(/^\/r\/([^/]+)(?:\/([^/]+))?/);
 
 		if (!match) {
