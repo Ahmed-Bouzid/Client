@@ -2061,6 +2061,7 @@ const styles = StyleSheet.create({
 		height: 84,
 		marginHorizontal: -20,
 		marginBottom: 10,
+		marginTop: -8,
 		paddingVertical: 4,
 		justifyContent: "center",
 		flexDirection: "row",
