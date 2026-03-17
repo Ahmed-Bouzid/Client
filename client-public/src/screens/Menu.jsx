@@ -1549,7 +1549,7 @@ export default function Menu({
 						<ScrollView
 							horizontal
 							showsHorizontalScrollIndicator={false}
-							style={{ flex: 1 }}
+							style={{ flex: 1, overflow: 'visible' }}
 							contentContainerStyle={styles.horizontalCategoriesContainer}
 						>
 							{categories.map((cat) => {
@@ -2061,9 +2061,11 @@ const styles = StyleSheet.create({
 		height: 84,
 		marginHorizontal: -20,
 		marginBottom: 10,
+		paddingVertical: 4,
 		justifyContent: "center",
 		flexDirection: "row",
 		alignItems: "center",
+		overflow: "visible",
 	},
 	// 🔍 Bouton loupe rond dans la barre de catégories
 	searchRoundButton: {
