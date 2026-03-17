@@ -914,6 +914,8 @@ export default function Menu({
 	const [modalVisible, setModalVisible] = useState(false);
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [searchQuery, setSearchQuery] = useState("");
+	const [searchVisible, setSearchVisible] = useState(false);
+	const searchInputRef = useRef(null);
 	const [showDietaryModal, setShowDietaryModal] = useState(false);
 
 	// 🎯 Gestion des options de menu
@@ -1521,40 +1523,61 @@ export default function Menu({
 			)}
 			</Animated.View>
 
-			{/* 🔍 Barre de recherche Premium */}
-			<PremiumSearchBar
-				value={searchQuery}
-				onChangeText={(text) => {
-					setSearchQuery(text);
-					if (text.trim()) setSelectedCategory(null);
-				}}
-				onClear={() => setSearchQuery("")}
-			/>
+			{/* 🔍 Barre de recherche Premium — déplacée dans la zone catégories */}
 
-			{/* ⭐ Zone fixe pour les boutons de catégories avec scroll horizontal */}
-			{!searchQuery.trim() && (
-				<View style={styles.categoriesFixedZone}>
-					<ScrollView
-						horizontal
-						showsHorizontalScrollIndicator={false}
-						contentContainerStyle={styles.horizontalCategoriesContainer}
-					>
-						{categories.map((cat) => {
-							const isSelected = selectedCategory?.id === cat.id;
-							return (
-								<AnimatedCategoryButton
-									key={cat.id}
-									category={cat}
-									isSelected={isSelected}
-									otherSelected={selectedCategory && !isSelected}
-									onPress={() => setSelectedCategory(isSelected ? null : cat)}
-									themeGradient={getGradient("primary")}
-								/>
-							);
-						})}
-					</ScrollView>
-				</View>
-			)}
+			{/* ⭐ Zone fixe : bouton loupe + catégories (ou barre de recherche active) */}
+			<View style={styles.categoriesFixedZone}>
+				{searchVisible ? (
+					/* Mode recherche : input compact avec bouton fermer */
+					<View style={styles.inlineSearchContainer}>
+						<MaterialIcons name="search" size={20} color={DEFAULT_THEME.textAccent} style={{ marginRight: 8 }} />
+						<TextInput
+							ref={searchInputRef}
+							style={styles.inlineSearchInput}
+							placeholder="Rechercher..."
+							placeholderTextColor="#999"
+							value={searchQuery}
+							onChangeText={(text) => { setSearchQuery(text); if (text.trim()) setSelectedCategory(null); }}
+							autoFocus
+							returnKeyType="search"
+						/>
+						<TouchableOpacity onPress={() => { setSearchVisible(false); setSearchQuery(""); }} activeOpacity={0.7}>
+							<MaterialIcons name="close" size={20} color="#999" />
+						</TouchableOpacity>
+					</View>
+				) : (
+					<>
+						{/* 🔍 Bouton loupe rond */}
+						<TouchableOpacity
+							style={styles.searchRoundButton}
+							onPress={() => setSearchVisible(true)}
+							activeOpacity={0.8}
+						>
+							<MaterialIcons name="search" size={22} color={DEFAULT_THEME.textAccent} />
+						</TouchableOpacity>
+						<ScrollView
+							horizontal
+							showsHorizontalScrollIndicator={false}
+							style={{ flex: 1 }}
+							contentContainerStyle={styles.horizontalCategoriesContainer}
+						>
+							{categories.map((cat) => {
+								const isSelected = selectedCategory?.id === cat.id;
+								return (
+									<AnimatedCategoryButton
+										key={cat.id}
+										category={cat}
+										isSelected={isSelected}
+										otherSelected={selectedCategory && !isSelected}
+										onPress={() => setSelectedCategory(isSelected ? null : cat)}
+										themeGradient={getGradient("primary")}
+									/>
+								);
+							})}
+						</ScrollView>
+					</>
+				)}
+			</View>
 
 			{/* 🔍 Résultats de recherche */}
 			{searchQuery.trim() ? (
@@ -1887,7 +1910,7 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 		padding: 20,
-		paddingTop: 50,
+		paddingTop: 30,
 	},
 	// Décorations premium (identique OrderSummary)
 	bgDecor: {
@@ -1913,42 +1936,38 @@ const styles = StyleSheet.create({
 	},
 	// 🎨 Header Premium
 	premiumHeader: {
-		marginBottom: 20,
+		marginBottom: 8,
 		alignItems: "center",
-		paddingTop: 10,
+		paddingTop: 4,
 	},
 	headerRow: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "flex-start",
-		marginBottom: 8,
+		marginBottom: 0,
 		width: "100%",
 	},
 	headerIcon: {
-		width: 70,
-		height: 70,
-		borderRadius: 35,
+		width: 50,
+		height: 50,
+		borderRadius: 25,
 		justifyContent: "center",
 		alignItems: "center",
 		shadowColor: DEFAULT_THEME.shadowColor,
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.4,
-		shadowRadius: 16,
-		elevation: 12,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		elevation: 8,
 	},
 	welcomeTitle: {
-		fontSize: 32,
+		fontSize: 22,
 		fontWeight: "800",
 		color: DEFAULT_THEME.text,
 		letterSpacing: -0.5,
 		textAlign: "left",
 	},
 	subtitle: {
-		fontSize: 16,
-		color: DEFAULT_THEME.textMuted,
-		fontWeight: "500",
-		textAlign: "center",
-		marginTop: 4,
+		display: "none",
 	},
 	// 🔍 Barre de recherche Premium
 	premiumSearchContainer: {
@@ -2050,13 +2069,56 @@ const styles = StyleSheet.create({
 		marginHorizontal: -20,
 		marginBottom: 10,
 		justifyContent: "center",
+		flexDirection: "row",
+		alignItems: "center",
+	},
+	// 🔍 Bouton loupe rond dans la barre de catégories
+	searchRoundButton: {
+		width: 46,
+		height: 46,
+		borderRadius: 23,
+		backgroundColor: "#fff",
+		justifyContent: "center",
+		alignItems: "center",
+		marginLeft: 20,
+		marginRight: 4,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
+		elevation: 3,
+		flexShrink: 0,
+	},
+	// 🔍 Input de recherche inline (mode actif)
+	inlineSearchContainer: {
+		flex: 1,
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "#fff",
+		borderRadius: 23,
+		paddingHorizontal: 14,
+		paddingVertical: 8,
+		marginHorizontal: 14,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
+		elevation: 3,
+	},
+	inlineSearchInput: {
+		flex: 1,
+		fontSize: 15,
+		color: DEFAULT_THEME.text,
+		fontWeight: "500",
+		paddingVertical: 0,
 	},
 	// ⭐ Container scroll horizontal pour les boutons
 	horizontalCategoriesContainer: {
 		flexDirection: "row",
 		alignItems: "center",
 		gap: 8,
-		paddingHorizontal: 25,
+		paddingLeft: 4,
+		paddingRight: 20,
 	},
 	// 🎨 Bouton animé style gradient-menu
 	animatedButton: {
