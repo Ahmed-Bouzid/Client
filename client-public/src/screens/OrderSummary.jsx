@@ -1,734 +1,293 @@
-import React, { useRef, useEffect } from "react";
+/**
+ * OrderSummary - Style Foodmood
+ * Écran de validation AVANT envoi de la commande
+ * L'utilisateur peut modifier les quantités avant de confirmer
+ */
+import React, { useState } from "react";
 import {
-	View,
-	Text,
-	TouchableOpacity,
-	StyleSheet,
-	ScrollView,
-	Animated,
-	Dimensions,
-	Platform,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Platform,
+  StatusBar,
+  Image,
+  Alert,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
-import { MaterialIcons, Ionicons } from "@expo/vector-icons";
-import { buildSafeTheme, DEFAULT_THEME } from "../theme/defaultTheme";
-import useRestaurantConfig from "../hooks/useRestaurantConfig";
-import { useRestaurantStore } from "../stores/useRestaurantStore";
+import { MaterialIcons } from "@expo/vector-icons";
 
-const { width } = Dimensions.get("window");
+const PANINI_IMAGE = require("../../assets/images/menu/image-fond/panini.png");
 
-// 🎴 Premium Order Card Component
-const PremiumOrderCard = ({ item, index, isSent, onUpdateQuantity, theme = DEFAULT_THEME }) => {
-	const fadeAnim = useRef(new Animated.Value(0)).current;
-	const slideAnim = useRef(new Animated.Value(30)).current;
-	const scaleAnim = useRef(new Animated.Value(1)).current;
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
+export default function OrderSummary({
+  currentOrder = [],
+  onUpdateQuantity = () => {},
+  onConfirm = () => {},
+  onBackToMenu = () => {},
+}) {
+  const total = currentOrder.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
 
-	useEffect(() => {
-		Animated.parallel([
-			Animated.timing(fadeAnim, {
-				toValue: 1,
-				duration: 400,
-				delay: index * 80,
-				useNativeDriver: false,
-			}),
-			Animated.spring(slideAnim, {
-				toValue: 0,
-				tension: 50,
-				friction: 8,
-				delay: index * 80,
-				useNativeDriver: false,
-			}),
-		]).start();
-	}, []);
+  const summaryText = currentOrder.map((i) => `${i.quantity || 1} x ${i.name}`).join(", ");
+  const dateText = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) +
+    " à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
-	const handlePressIn = () => {
-		Animated.spring(scaleAnim, {
-			toValue: 0.98,
-			useNativeDriver: false,
-		}).start();
-	};
+  const handleQuantityChange = (item, delta) => {
+    const newQty = (item.quantity || 1) + delta;
+    if (newQty <= 0) {
+      Alert.alert("Supprimer", "Voulez-vous supprimer cet article ?", [
+        { text: "Non" },
+        { text: "Oui", onPress: () => onUpdateQuantity(item, 0) }
+      ]);
+    } else {
+      onUpdateQuantity(item, newQty);
+    }
+  };
 
-	const handlePressOut = () => {
-		Animated.spring(scaleAnim, {
-			toValue: 1,
-			friction: 3,
-			useNativeDriver: false,
-		}).start();
-	};
+  const handleConfirm = () => {
+    if (currentOrder.length === 0) {
+      Alert.alert("Panier vide", "Ajoutez des articles avant de confirmer");
+      return;
+    }
+    onConfirm();
+  };
 
-	const itemTotal = (item?.price || 0) * (item?.quantity || 0);
+  return (
+    <View style={styles.container}>
+      {/* ═══════════════════════════════════════════════════════════
+          HEADER
+      ═══════════════════════════════════════════════════════════ */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onBackToMenu} style={styles.backBtn}>
+          <MaterialIcons name="chevron-left" size={28} color="#1F2937" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Récapitulatif</Text>
+      </View>
 
-	return (
-		<Animated.View
-			style={[
-				styles.orderCard,
-				{
-					opacity: fadeAnim,
-					transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
-				},
-			]}
-		>
-			<LinearGradient
-				colors={
-					isSent
-						? ["rgba(255,255,255,0.1)", "rgba(255,255,255,0.05)"]
-						: ["rgba(255,255,255,0.95)", "rgba(248,249,250,0.95)"]
-				}
-				style={styles.orderCardGradient}
-				start={{ x: 0, y: 0 }}
-				end={{ x: 1, y: 1 }}
-			>
-				<View style={styles.orderCardContent}>
-					{/* Left: Product Info */}
-					<View style={styles.productInfo}>
-						<LinearGradient
-							colors={
-								isSent ? theme.secondary : theme.primary
-							}
-							style={styles.productIconBg}
-							start={{ x: 0, y: 0 }}
-							end={{ x: 1, y: 1 }}
-						>
-							<Ionicons
-								name={isSent ? "checkmark-circle" : "restaurant"}
-								size={20}
-								color="#fff"
-							/>
-						</LinearGradient>
-						<View style={styles.productDetails}>
-							<Text
-								style={[styles.productName, isSent && styles.productNameSent]}
-							>
-								{item?.name || "Produit"}
-							</Text>
-							<Text
-								style={[styles.productPrice, isSent && styles.productPriceSent]}
-							>
-								{item?.price || 0}€ × {item?.quantity || 0}
-							</Text>
-						</View>
-					</View>
+      {/* ═══════════════════════════════════════════════════════════
+          SUMMARY
+      ═══════════════════════════════════════════════════════════ */}
+      <View style={styles.summarySection}>
+        <View style={styles.summaryLeft}>
+          <Text style={styles.summaryText} numberOfLines={2}>
+            {summaryText || "Aucun article"}
+          </Text>
+          <Text style={styles.summaryDate}>{dateText}</Text>
+        </View>
+        <Text style={styles.summaryPrice}>${total.toFixed(2)}</Text>
+      </View>
 
-					{/* Right: Quantity or Total */}
-					{isSent ? (
-						<View style={styles.sentBadge}>
-							<LinearGradient
-								colors={theme.success}
-								style={styles.sentBadgeGradient}
-								start={{ x: 0, y: 0 }}
-								end={{ x: 1, y: 0 }}
-							>
-								<Text style={styles.sentBadgeText}>
-									{itemTotal.toFixed(2)}€
-								</Text>
-							</LinearGradient>
-						</View>
-					) : (
-						<View style={styles.quantityControls}>
-							<TouchableOpacity
-								style={styles.quantityBtn}
-								onPress={() =>
-									onUpdateQuantity?.(item, (item?.quantity || 0) - 1)
-								}
-								onPressIn={handlePressIn}
-								onPressOut={handlePressOut}
-							>
-								<LinearGradient
-									colors={theme.secondary}
-									style={styles.quantityBtnGradient}
-									start={{ x: 0, y: 0 }}
-									end={{ x: 1, y: 1 }}
-								>
-									<MaterialIcons name="remove" size={20} color="#fff" />
-								</LinearGradient>
-							</TouchableOpacity>
+      {/* ═══════════════════════════════════════════════════════════
+          PRODUCT CARDS - Editables
+      ═══════════════════════════════════════════════════════════ */}
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        {currentOrder.length === 0 ? (
+          <View style={styles.emptyState}>
+            <MaterialIcons name="shopping-cart" size={80} color="#D1D5DB" />
+            <Text style={styles.emptyText}>Panier vide</Text>
+            <TouchableOpacity style={styles.emptyButton} onPress={onBackToMenu}>
+              <Text style={styles.emptyButtonText}>Retour au menu</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          currentOrder.map((item, index) => {
+            const itemPrice = (item.price || 0) * (item.quantity || 1);
 
-							<View style={styles.quantityDisplay}>
-								<Text style={styles.quantityText}>{item?.quantity || 0}</Text>
-							</View>
+            return (
+              <View key={item._id || index} style={styles.card}>
+                <View style={styles.cardTop}>
+                  {/* Image */}
+                  <View style={styles.productImageContainer}>
+                    <Image 
+                      source={item.image && item.image.trim() !== "" ? {uri: item.image} : PANINI_IMAGE} 
+                      style={styles.productImage} 
+                      resizeMode="cover" 
+                    />
+                  </View>
 
-							<TouchableOpacity
-								style={styles.quantityBtn}
-								onPress={() =>
-									onUpdateQuantity?.(item, (item?.quantity || 0) + 1)
-								}
-								onPressIn={handlePressIn}
-								onPressOut={handlePressOut}
-							>
-								<LinearGradient
-									colors={theme.success}
-									style={styles.quantityBtnGradient}
-									start={{ x: 0, y: 0 }}
-									end={{ x: 1, y: 1 }}
-								>
-									<MaterialIcons name="add" size={20} color="#fff" />
-								</LinearGradient>
-							</TouchableOpacity>
+                  {/* Infos */}
+                  <View style={styles.infoContainer}>
+                    <Text style={styles.productName}>{item.name}</Text>
+                    <Text style={styles.productPrice}>${itemPrice.toFixed(2)}</Text>
+                  </View>
 
-							<View style={styles.itemTotalBadge}>
-								<Text style={styles.itemTotalText}>
-									{itemTotal.toFixed(2)}€
-								</Text>
-							</View>
-						</View>
-					)}
-				</View>
-			</LinearGradient>
-		</Animated.View>
-	);
-};
+                  {/* Quantity controls */}
+                  <View style={styles.quantityControls}>
+                    <TouchableOpacity 
+                      style={styles.quantityBtn} 
+                      onPress={() => handleQuantityChange(item, -1)}
+                    >
+                      <MaterialIcons name="remove" size={20} color="#1F2937" />
+                    </TouchableOpacity>
+                    <Text style={styles.quantityText}>{item.quantity || 1}</Text>
+                    <TouchableOpacity 
+                      style={styles.quantityBtn} 
+                      onPress={() => handleQuantityChange(item, 1)}
+                    >
+                      <MaterialIcons name="add" size={20} color="#1F2937" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
 
-const OrderSummary = ({
-	allOrders = [],
-	currentOrder = [],
-	onUpdateQuantity = () => {},
-	onSubmitOrder = () => {},
-	onBackToMenu = () => {},
-}) => {
-		const restaurantId = useRestaurantStore((state) => state.id);
-	const { config } = useRestaurantConfig(restaurantId);
-	const theme = buildSafeTheme(config?.style, config?.styleKey);
+                {/* Description */}
+                {item.description && (
+                  <Text style={styles.productDescription} numberOfLines={2}>
+                    {item.description}
+                  </Text>
+                )}
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
 
-	// Animation refs
-	const fadeAnim = useRef(new Animated.Value(0)).current;
-	const slideAnim = useRef(new Animated.Value(30)).current;
-	const buttonScale = useRef(new Animated.Value(1)).current;
+      {/* ═══════════════════════════════════════════════════════════
+          FOOTER
+      ═══════════════════════════════════════════════════════════ */}
+      {currentOrder.length > 0 && (
+        <View style={styles.footer}>
+          {/* Confirm button */}
+          <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm} activeOpacity={0.9}>
+            <Text style={styles.confirmBtnText}>Confirmer la commande • ${total.toFixed(2)}</Text>
+          </TouchableOpacity>
 
-	useEffect(() => {
-		Animated.parallel([
-			Animated.timing(fadeAnim, {
-				toValue: 1,
-				duration: 600,
-				useNativeDriver: false,
-			}),
-			Animated.spring(slideAnim, {
-				toValue: 0,
-				tension: 50,
-				friction: 8,
-				useNativeDriver: false,
-			}),
-		]).start();
-	}, []);
+          {/* Back button */}
+          <TouchableOpacity style={styles.backButton} onPress={onBackToMenu} activeOpacity={0.9}>
+            <Text style={styles.backButtonText}>Retour au menu</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
 
-	// Sécurité contre les données undefined
-	const safeAllOrders = allOrders || [];
-	const safeCurrentOrder = currentOrder || [];
-
-	const sentOrders = safeAllOrders.filter((item) => item && item.sent);
-	const totalSent = sentOrders.reduce(
-		(sum, item) => sum + (item?.price || 0) * (item?.quantity || 0),
-		0
-	);
-	const totalCurrent = safeCurrentOrder.reduce(
-		(sum, item) => sum + (item?.price || 0) * (item?.quantity || 0),
-		0
-	);
-	const totalAll = totalSent + totalCurrent;
-
-	const handlePressIn = () => {
-		Animated.spring(buttonScale, {
-			toValue: 0.95,
-			useNativeDriver: false,
-		}).start();
-	};
-
-	const handlePressOut = () => {
-		Animated.spring(buttonScale, {
-			toValue: 1,
-			friction: 3,
-			useNativeDriver: false,
-		}).start();
-	};
-
-	return (
-		<LinearGradient
-			colors={theme.background || [theme.dark, theme.card]}
-			style={styles.container}
-			start={{ x: 0, y: 0 }}
-			end={{ x: 1, y: 1 }}
-		>
-			{/* Background decorations */}
-			<View style={styles.bgDecor}>
-				<LinearGradient
-					colors={[...theme.primary, "transparent"]}
-					style={[styles.bgCircle, styles.bgCircle1]}
-				/>
-				<LinearGradient
-					colors={[...theme.accent, "transparent"]}
-					style={[styles.bgCircle, styles.bgCircle2]}
-				/>
-			</View>
-
-			<ScrollView
-				style={styles.scrollView}
-				contentContainerStyle={styles.scrollContent}
-				showsVerticalScrollIndicator={false}
-			>
-				<Animated.View
-					style={[
-						styles.header,
-						{
-							opacity: fadeAnim,
-							transform: [{ translateY: slideAnim }],
-						},
-					]}
-				>
-					{/* Header Icon */}
-					<LinearGradient
-						colors={theme.accent}
-						style={styles.headerIcon}
-						start={{ x: 0, y: 0 }}
-						end={{ x: 1, y: 1 }}
-					>
-						<Ionicons name="receipt" size={32} color="#fff" />
-					</LinearGradient>
-
-					<Text style={styles.title}>Récapitulatif</Text>
-					<Text style={styles.subtitle}>Votre commande</Text>
-				</Animated.View>
-
-				{/* 📋 Sent Orders Section */}
-				{sentOrders.length > 0 && (
-					<View style={styles.section}>
-						<View style={styles.sectionHeader}>
-							<LinearGradient
-								colors={theme.secondary}
-								style={styles.sectionIconBg}
-								start={{ x: 0, y: 0 }}
-								end={{ x: 1, y: 1 }}
-							>
-								<MaterialIcons name="history" size={18} color="#fff" />
-							</LinearGradient>
-							<Text style={styles.sectionTitle}>Commandes envoyées</Text>
-							<View style={styles.sectionBadge}>
-								<Text style={styles.sectionBadgeText}>{sentOrders.length}</Text>
-							</View>
-						</View>
-
-						{sentOrders.map((item, index) => (
-							<PremiumOrderCard
-								key={`sent-${index}`}
-								item={item}
-								index={index}
-								isSent={true}
-								theme={theme}
-							/>
-						))}
-
-						{/* Sent Total */}
-						<View style={styles.sectionTotal}>
-							<BlurView
-								intensity={20}
-								tint="light"
-								style={styles.sectionTotalBlur}
-							>
-								<Text style={styles.sectionTotalLabel}>Sous-total envoyé</Text>
-								<Text style={styles.sectionTotalValue}>
-									{totalSent.toFixed(2)}€
-								</Text>
-							</BlurView>
-						</View>
-					</View>
-				)}
-
-				{/* 🛒 Current Order Section */}
-				{safeCurrentOrder.length > 0 && (
-					<View style={styles.section}>
-						<View style={styles.sectionHeader}>
-							<LinearGradient
-								colors={theme.success}
-								style={styles.sectionIconBg}
-								start={{ x: 0, y: 0 }}
-								end={{ x: 1, y: 1 }}
-							>
-								<MaterialIcons name="shopping-cart" size={18} color="#fff" />
-							</LinearGradient>
-							<Text style={styles.sectionTitle}>Commande en cours</Text>
-							<View style={[styles.sectionBadge, styles.sectionBadgeActive]}>
-								<Text style={styles.sectionBadgeText}>
-									{safeCurrentOrder.length}
-								</Text>
-							</View>
-						</View>
-
-						{safeCurrentOrder.map((item, index) => (
-							<PremiumOrderCard
-								key={`current-${index}`}
-								item={item}
-								index={index}
-								isSent={false}
-								onUpdateQuantity={onUpdateQuantity}
-								theme={theme}
-							/>
-						))}
-
-						{/* Current Total */}
-						<View style={styles.sectionTotal}>
-							<BlurView
-								intensity={20}
-								tint="light"
-								style={styles.sectionTotalBlur}
-							>
-								<Text style={styles.sectionTotalLabel}>
-									Sous-total en cours
-								</Text>
-								<Text style={styles.sectionTotalValue}>
-									{totalCurrent.toFixed(2)}€
-								</Text>
-							</BlurView>
-						</View>
-					</View>
-				)}
-
-				{/* 💰 Grand Total */}
-				<View style={styles.grandTotalContainer}>
-					<LinearGradient
-						colors={theme.primary}
-						style={styles.grandTotalGradient}
-						start={{ x: 0, y: 0 }}
-						end={{ x: 1, y: 0 }}
-					>
-						<View style={styles.grandTotalContent}>
-							<View style={styles.grandTotalLeft}>
-								<MaterialIcons name="payments" size={28} color="#fff" />
-								<Text style={styles.grandTotalLabel}>TOTAL À PAYER</Text>
-							</View>
-							<Text style={styles.grandTotalValue}>{totalAll.toFixed(2)}€</Text>
-						</View>
-					</LinearGradient>
-				</View>
-
-				{/* 🎬 Action Buttons */}
-				<Animated.View
-					style={[
-						styles.actionsContainer,
-						{ transform: [{ scale: buttonScale }] },
-					]}
-				>
-					{safeCurrentOrder.length > 0 && (
-						<TouchableOpacity
-							onPress={() => onSubmitOrder?.()}
-							onPressIn={handlePressIn}
-							onPressOut={handlePressOut}
-							activeOpacity={0.9}
-						>
-							<LinearGradient
-								colors={theme.success}
-								style={styles.actionButton}
-								start={{ x: 0, y: 0 }}
-								end={{ x: 1, y: 0 }}
-							>
-								<MaterialIcons name="send" size={22} color="#fff" />
-								<Text style={styles.actionButtonText}>Envoyer la commande</Text>
-							</LinearGradient>
-						</TouchableOpacity>
-					)}
-
-					<TouchableOpacity
-						onPress={() => onBackToMenu?.()}
-						onPressIn={handlePressIn}
-						onPressOut={handlePressOut}
-						activeOpacity={0.9}
-					>
-						<LinearGradient
-							colors={theme.accent}
-							style={styles.actionButton}
-							start={{ x: 0, y: 0 }}
-							end={{ x: 1, y: 0 }}
-						>
-							<MaterialIcons name="restaurant-menu" size={22} color="#fff" />
-							<Text style={styles.actionButtonText}>Retour au menu</Text>
-						</LinearGradient>
-					</TouchableOpacity>
-				</Animated.View>
-			</ScrollView>
-		</LinearGradient>
-	);
-};
-
+// ═══════════════════════════════════════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════════════════════════════════════
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
-	bgDecor: {
-		...StyleSheet.absoluteFillObject,
-		overflow: "hidden",
-	},
-	bgCircle: {
-		position: "absolute",
-		borderRadius: 999,
-		opacity: 0.2,
-	},
-	bgCircle1: {
-		width: width * 0.7,
-		height: width * 0.7,
-		top: -width * 0.2,
-		right: -width * 0.2,
-	},
-	bgCircle2: {
-		width: width * 0.5,
-		height: width * 0.5,
-		bottom: 100,
-		left: -width * 0.2,
-	},
-	scrollView: {
-		flex: 1,
-	},
-	scrollContent: {
-		padding: 20,
-		paddingBottom: 40,
-	},
-	header: {
-		alignItems: "center",
-		marginBottom: 30,
-		paddingTop: 20,
-	},
-	headerIcon: {
-		width: 70,
-		height: 70,
-		borderRadius: 35,
-		justifyContent: "center",
-		alignItems: "center",
-		marginBottom: 16,
-		shadowColor: "#4facfe",
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.4,
-		shadowRadius: 16,
-		elevation: 12,
-	},
-	title: {
-		fontSize: 32,
-		fontWeight: "800",
-		color: DEFAULT_THEME.text,
-		letterSpacing: -0.5,
-	},
-	subtitle: {
-		fontSize: 16,
-		color: DEFAULT_THEME.textMuted,
-		marginTop: 4,
-	},
-	section: {
-		marginBottom: 24,
-	},
-	sectionHeader: {
-		flexDirection: "row",
-		alignItems: "center",
-		marginBottom: 16,
-	},
-	sectionIconBg: {
-		width: 36,
-		height: 36,
-		borderRadius: 12,
-		justifyContent: "center",
-		alignItems: "center",
-		marginRight: 12,
-	},
-	sectionTitle: {
-		fontSize: 18,
-		fontWeight: "700",
-		color: DEFAULT_THEME.text,
-		flex: 1,
-	},
-	sectionBadge: {
-		backgroundColor: "rgba(255,255,255,0.2)",
-		paddingHorizontal: 12,
-		paddingVertical: 4,
-		borderRadius: 12,
-	},
-	sectionBadgeActive: {
-		backgroundColor: "#38ef7d",
-	},
-	sectionBadgeText: {
-		fontSize: 14,
-		fontWeight: "bold",
-		color: "#fff",
-	},
-	orderCard: {
-		marginBottom: 12,
-		borderRadius: 16,
-		overflow: "hidden",
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.15,
-		shadowRadius: 12,
-		elevation: 6,
-	},
-	orderCardGradient: {
-		borderRadius: 16,
-		borderWidth: 1,
-		borderColor: "rgba(255,255,255,0.1)",
-	},
-	orderCardContent: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
-		padding: 16,
-	},
-	productInfo: {
-		flexDirection: "row",
-		alignItems: "center",
-		flex: 1,
-	},
-	productIconBg: {
-		width: 44,
-		height: 44,
-		borderRadius: 14,
-		justifyContent: "center",
-		alignItems: "center",
-		marginRight: 14,
-	},
-	productDetails: {
-		flex: 1,
-	},
-	productName: {
-		fontSize: 16,
-		fontWeight: "700",
-		color: "#333",
-		marginBottom: 4,
-	},
-	productNameSent: {
-		color: "rgba(255,255,255,0.9)",
-	},
-	productPrice: {
-		fontSize: 14,
-		color: "#666",
-	},
-	productPriceSent: {
-		color: "rgba(255,255,255,0.6)",
-	},
-	sentBadge: {
-		borderRadius: 12,
-		overflow: "hidden",
-	},
-	sentBadgeGradient: {
-		paddingHorizontal: 14,
-		paddingVertical: 8,
-		borderRadius: 12,
-	},
-	sentBadgeText: {
-		color: "#fff",
-		fontWeight: "bold",
-		fontSize: 15,
-	},
-	quantityControls: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 8,
-	},
-	quantityBtn: {
-		borderRadius: 10,
-		overflow: "hidden",
-	},
-	quantityBtnGradient: {
-		width: 36,
-		height: 36,
-		justifyContent: "center",
-		alignItems: "center",
-		borderRadius: 10,
-	},
-	quantityDisplay: {
-		minWidth: 32,
-		alignItems: "center",
-	},
-	quantityText: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: "#333",
-	},
-	itemTotalBadge: {
-		backgroundColor: DEFAULT_THEME.primary[0],
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 10,
-		marginLeft: 8,
-	},
-	itemTotalText: {
-		color: "#fff",
-		fontWeight: "bold",
-		fontSize: 14,
-	},
-	sectionTotal: {
-		marginTop: 12,
-		borderRadius: 12,
-		overflow: "hidden",
-	},
-	sectionTotalBlur: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		padding: 16,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: "rgba(255,255,255,0.2)",
-	},
-	sectionTotalLabel: {
-		fontSize: 14,
-		color: "rgba(255,255,255,0.7)",
-		fontWeight: "600",
-	},
-	sectionTotalValue: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: "#fff",
-	},
-	grandTotalContainer: {
-		marginVertical: 20,
-		borderRadius: 20,
-		overflow: "hidden",
-		shadowColor: DEFAULT_THEME.shadowColor,
-		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.4,
-		shadowRadius: 16,
-		elevation: 12,
-	},
-	grandTotalGradient: {
-		borderRadius: 20,
-	},
-	grandTotalContent: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		padding: 24,
-	},
-	grandTotalLeft: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 12,
-	},
-	grandTotalLabel: {
-		fontSize: 16,
-		fontWeight: "700",
-		color: "#fff",
-		letterSpacing: 1,
-	},
-	grandTotalValue: {
-		fontSize: 32,
-		fontWeight: "800",
-		color: "#fff",
-	},
-	actionsContainer: {
-		gap: 14,
-	},
-	actionButton: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		paddingVertical: 18,
-		borderRadius: 16,
-		gap: 12,
-		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 6 },
-		shadowOpacity: 0.25,
-		shadowRadius: 12,
-		elevation: 8,
-	},
-	actionButtonText: {
-		color: "#fff",
-		fontWeight: "bold",
-		fontSize: 17,
-		letterSpacing: 0.5,
-	},
-});
+  container: { flex: 1, backgroundColor: "#FEF7F0" },
 
-export default OrderSummary;
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: Platform.OS === "ios" ? 60 : StatusBar.currentHeight + 16,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
+  backBtn: { marginRight: 8 },
+  headerTitle: { fontSize: 18, fontWeight: "600", color: "#1F2937" },
+
+  summarySection: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  summaryLeft: { flex: 1, paddingRight: 16 },
+  summaryText: { fontSize: 13, fontWeight: "700", color: "#1F2937", lineHeight: 18 },
+  summaryDate: { fontSize: 11, color: "#9CA3AF", fontStyle: "italic", marginTop: 4 },
+  summaryPrice: { fontSize: 28, fontWeight: "700", color: "#EA580C" },
+
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 180 },
+
+  emptyState: { alignItems: "center", paddingVertical: 100 },
+  emptyText: { fontSize: 22, fontWeight: "700", color: "#1F2937", marginTop: 20, marginBottom: 30 },
+  emptyButton: {
+    backgroundColor: "#F87171",
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 30,
+  },
+  emptyButtonText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
+
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+
+  cardTop: { flexDirection: "row", alignItems: "center" },
+  productImageContainer: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    overflow: "hidden",
+    marginRight: 12,
+    marginTop: -10,
+    marginLeft: -10,
+  },
+  productImage: { width: "100%", height: "100%", marginTop: 10 },
+  infoContainer: { flex: 1, marginLeft: 14 },
+  productName: { fontSize: 16, fontWeight: "700", color: "#1F2937", marginBottom: 4 },
+  productPrice: { fontSize: 16, fontWeight: "700", color: "#EA580C" },
+  productDescription: { fontSize: 13, color: "#9CA3AF", marginTop: 12, lineHeight: 18 },
+
+  quantityControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 20,
+    padding: 4,
+  },
+  quantityBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  quantityText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginHorizontal: 12,
+    minWidth: 24,
+    textAlign: "center",
+  },
+
+  footer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FEF7F0",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === "ios" ? 40 : 24,
+  },
+
+  confirmBtn: {
+    backgroundColor: "#F87171",
+    paddingVertical: 16,
+    borderRadius: 30,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  confirmBtnText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
+
+  backButton: {
+    backgroundColor: "transparent",
+    paddingVertical: 14,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    alignItems: "center",
+  },
+  backButtonText: { fontSize: 13, fontWeight: "500", color: "#9CA3AF" },
+});

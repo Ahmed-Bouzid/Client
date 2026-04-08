@@ -1,0 +1,598 @@
+import { StyleSheet, Dimensions } from "react-native";
+import { PREMIUM_COLORS } from "../theme/colors";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+
+// Styles originaux pour restaurant standard (clean, neutre, professionnel)
+const appStyles = StyleSheet.create({
+	container: {
+		flex: 1,
+		padding: 20,
+		paddingTop: 50,
+	},
+	// Décorations premium
+	bgDecor: {
+		...StyleSheet.absoluteFillObject,
+		overflow: "hidden",
+	},
+	bgCircle: {
+		position: "absolute",
+		borderRadius: 999,
+		opacity: 0.18,
+	},
+	bgCircle1: {
+		width: SCREEN_WIDTH * 0.7,
+		height: SCREEN_WIDTH * 0.7,
+		top: -SCREEN_WIDTH * 0.2,
+		right: -SCREEN_WIDTH * 0.2,
+	},
+	bgCircle2: {
+		width: SCREEN_WIDTH * 0.5,
+		height: SCREEN_WIDTH * 0.5,
+		bottom: 100,
+		left: -SCREEN_WIDTH * 0.2,
+	},
+	// Header Premium
+	premiumHeader: {
+		marginBottom: 20,
+		alignItems: "center",
+		paddingTop: 10,
+	},
+	headerIconContainer: {
+		position: "relative",
+		width: 70,
+		height: 70,
+		justifyContent: "center",
+		alignItems: "center",
+		marginBottom: 16,
+	},
+	headerIcon: {
+		width: 70,
+		height: 70,
+		borderRadius: 35,
+		justifyContent: "center",
+		alignItems: "center",
+		shadowColor: "#4facfe",
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.4,
+		shadowRadius: 16,
+		elevation: 12,
+	},
+	allergyBadgeAbsolute: {
+		position: "absolute",
+		top: -6,
+		right: -6,
+		width: 24,
+		height: 24,
+		borderRadius: 12,
+		backgroundColor: "#ff6b6b",
+		justifyContent: "center",
+		alignItems: "center",
+		borderWidth: 2,
+		borderColor: "#fff",
+	},
+	allergyBadgeText: {
+		fontSize: 12,
+		fontWeight: "800",
+		color: "#fff",
+	},
+	welcomeTitle: {
+		fontSize: 32,
+		fontWeight: "800",
+		color: PREMIUM_COLORS.text,
+		letterSpacing: -0.5,
+		textAlign: "center",
+	},
+	subtitle: {
+		fontSize: 16,
+		color: PREMIUM_COLORS.textMuted,
+		fontWeight: "500",
+		textAlign: "center",
+		marginTop: 4,
+	},
+	// Barre de recherche Premium
+	premiumSearchContainer: {
+		marginBottom: 20,
+		borderRadius: 16,
+		borderWidth: 2,
+		overflow: "hidden",
+	},
+	premiumSearchGradient: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingHorizontal: 16,
+		paddingVertical: 4,
+	},
+	premiumSearchInput: {
+		flex: 1,
+		paddingVertical: 14,
+		fontSize: 16,
+		color: PREMIUM_COLORS.text,
+		fontWeight: "500",
+	},
+	searchIcon: {
+		marginRight: 12,
+	},
+	clearButton: {
+		padding: 4,
+	},
+	clearButtonInner: {
+		backgroundColor: "#667eea",
+		borderRadius: 12,
+		padding: 4,
+	},
+	// Résultats de recherche
+	searchResultsCount: {
+		fontSize: 14,
+		color: "#666",
+		marginBottom: 10,
+		fontWeight: "500",
+	},
+	emptySearch: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+		paddingVertical: 50,
+	},
+	emptySearchEmoji: {
+		fontSize: 50,
+		marginBottom: 15,
+	},
+	emptySearchText: {
+		fontSize: 16,
+		color: "#333",
+		fontWeight: "500",
+		marginBottom: 5,
+	},
+	emptySearchSubtext: {
+		fontSize: 14,
+		color: "#999",
+	},
+	// Barre de catégories
+	categoriesBar: {
+		flexDirection: "row",
+		justifyContent: "center",
+		alignItems: "center",
+		gap: 8,
+		marginBottom: 20,
+		paddingHorizontal: 5,
+	},
+	animatedButton: {
+		borderRadius: 30,
+		justifyContent: "center",
+		alignItems: "center",
+		overflow: "hidden",
+		backgroundColor: "#fff",
+		elevation: 5,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 3 },
+		shadowOpacity: 0.15,
+		shadowRadius: 5,
+	},
+	glowEffect: {
+		position: "absolute",
+		top: 10,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		borderRadius: 30,
+		opacity: 0,
+		transform: [{ scale: 1.1 }],
+	},
+	buttonEmoji: {
+		fontSize: 24,
+		position: "absolute",
+	},
+	buttonText: {
+		color: "#fff",
+		fontSize: 12,
+		fontWeight: "700",
+		letterSpacing: 1.5,
+		textTransform: "uppercase",
+		position: "absolute",
+	},
+	// État vide
+	noCategorySelected: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+		paddingHorizontal: 30,
+		paddingBottom: 100,
+	},
+	noCategoryGradient: {
+		padding: 40,
+		borderRadius: 24,
+		alignItems: "center",
+	},
+	noCategoryEmoji: {
+		fontSize: 60,
+		marginBottom: 16,
+	},
+	noCategoryText: {
+		fontSize: 20,
+		fontWeight: "700",
+		color: "#1a1a2e",
+		marginBottom: 8,
+		textAlign: "center",
+	},
+	noCategorySubtext: {
+		fontSize: 14,
+		color: "#666",
+		textAlign: "center",
+	},
+	emptyCategory: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+		paddingVertical: 50,
+	},
+	emptyCategoryText: {
+		fontSize: 16,
+		color: "#999",
+	},
+	// Liste premium
+	premiumListContainer: {
+		paddingHorizontal: 5,
+		paddingBottom: 150,
+	},
+	// Carte produit premium
+	premiumCard: {
+		borderRadius: 20,
+		marginBottom: 16,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.15,
+		shadowRadius: 12,
+		elevation: 6,
+		borderWidth: 1,
+		borderColor: "rgba(255,255,255,0.08)",
+	},
+	cardAccentLine: {
+		height: 4,
+		width: "100%",
+		borderTopLeftRadius: 20,
+		borderTopRightRadius: 20,
+		overflow: "hidden",
+	},
+	premiumCardContent: {
+		flexDirection: "row",
+		padding: 18,
+		justifyContent: "space-between",
+		backgroundColor: "rgba(255,255,255,0.07)",
+		borderBottomLeftRadius: 20,
+		borderBottomRightRadius: 20,
+	},
+	premiumCardInfo: {
+		flex: 1,
+		paddingRight: 12,
+	},
+	premiumProductName: {
+		fontSize: 18,
+		fontWeight: "700",
+		color: PREMIUM_COLORS.text,
+		marginBottom: 6,
+		letterSpacing: -0.3,
+	},
+	premiumProductDesc: {
+		fontSize: 14,
+		color: PREMIUM_COLORS.textMuted,
+		lineHeight: 18,
+		marginBottom: 10,
+	},
+	premiumTagsRow: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		gap: 6,
+	},
+	premiumTag: {
+		backgroundColor: "rgba(76,175,80,0.12)",
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		borderRadius: 8,
+	},
+	premiumTagText: {
+		fontSize: 11,
+		fontWeight: "600",
+		color: PREMIUM_COLORS.text,
+	},
+	premiumCardActions: {
+		alignItems: "flex-end",
+		justifyContent: "space-between",
+	},
+	premiumPriceBadge: {
+		paddingHorizontal: 14,
+		paddingVertical: 8,
+		borderRadius: 12,
+		marginBottom: 12,
+		shadowColor: "#764ba2",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.18,
+		shadowRadius: 6,
+		elevation: 4,
+	},
+	premiumPriceText: {
+		fontSize: 16,
+		fontWeight: "800",
+		color: PREMIUM_COLORS.text,
+	},
+	premiumCounter: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 4,
+	},
+	premiumCounterBtn: {
+		borderRadius: 12,
+		overflow: "hidden",
+	},
+	premiumCounterGradient: {
+		width: 36,
+		height: 36,
+		justifyContent: "center",
+		alignItems: "center",
+		borderRadius: 12,
+	},
+	premiumCounterText: {
+		fontSize: 20,
+		fontWeight: "700",
+		color: "#fff",
+	},
+	premiumCounterValueContainer: {
+		width: 32,
+		alignItems: "center",
+	},
+	premiumCounterValue: {
+		fontSize: 16,
+		fontWeight: "700",
+		color: PREMIUM_COLORS.textMuted,
+	},
+	premiumCounterValueActive: {
+		color: PREMIUM_COLORS.text,
+	},
+	// Panier flottant Premium
+	premiumFloatingCart: {
+		position: "absolute",
+		bottom: 20,
+		left: 16,
+		right: 16,
+		borderRadius: 20,
+		overflow: "hidden",
+	},
+	premiumCartBlur: {
+		borderRadius: 20,
+		overflow: "hidden",
+	},
+	premiumCartGradient: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "space-between",
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+		borderRadius: 20,
+		borderWidth: 1,
+		borderColor: "rgba(0,0,0,0.05)",
+	},
+	premiumCartInfo: {
+		flexDirection: "row",
+		alignItems: "center",
+	},
+	premiumCartBadge: {
+		backgroundColor: "#667eea",
+		width: 32,
+		height: 32,
+		borderRadius: 16,
+		justifyContent: "center",
+		alignItems: "center",
+		marginRight: 12,
+	},
+	premiumCartBadgeText: {
+		color: "#fff",
+		fontWeight: "800",
+		fontSize: 14,
+	},
+	premiumCartTextContainer: {},
+	premiumCartLabel: {
+		fontSize: 12,
+		color: "#666",
+		fontWeight: "500",
+	},
+	premiumCartTotal: {
+		fontSize: 18,
+		fontWeight: "800",
+		color: "#1a1a2e",
+	},
+	premiumCartButton: {
+		flexDirection: "row",
+		alignItems: "center",
+		paddingHorizontal: 20,
+		paddingVertical: 12,
+		borderRadius: 14,
+		gap: 8,
+	},
+	premiumCartButtonText: {
+		color: "#fff",
+		fontWeight: "700",
+		fontSize: 14,
+	},
+	// Bouton paiement
+	payButtonFloat: {
+		position: "absolute",
+		bottom: 20,
+		left: 20,
+		right: 20,
+		borderRadius: 12,
+		overflow: "hidden",
+	},
+	payButtonGradient: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 12,
+		borderRadius: 12,
+	},
+	payButtonText: {
+		color: "#fff",
+		fontWeight: "bold",
+		fontSize: 16,
+	},
+	// Modal
+	modalOverlayDark: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.8)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	modalContent: {
+		width: "85%",
+		backgroundColor: "#fff",
+		borderRadius: 15,
+		padding: 20,
+		alignItems: "center",
+	},
+	modalTitle: {
+		fontSize: 20,
+		fontWeight: "700",
+		color: "#333",
+		marginBottom: 8,
+	},
+	modalImage: {
+		width: "100%",
+		height: 200,
+		borderRadius: 12,
+		marginVertical: 15,
+		backgroundColor: "#f0f0f0",
+	},
+	modalAllergens: {
+		fontSize: 14,
+		fontStyle: "italic",
+		marginBottom: 20,
+		textAlign: "center",
+	},
+	infoPriceContainer: {
+		alignSelf: "center",
+		backgroundColor: "#667eea",
+		paddingHorizontal: 20,
+		paddingVertical: 8,
+		borderRadius: 20,
+		marginVertical: 10,
+	},
+	infoPriceText: {
+		color: "#fff",
+		fontSize: 20,
+		fontWeight: "700",
+	},
+	infoOptionsOneLine: {
+		fontSize: 15,
+		color: "#555",
+		textAlign: "center",
+		marginTop: 15,
+		fontStyle: "italic",
+	},
+	infoAllergensContainer: {
+		marginTop: 15,
+		paddingTop: 15,
+		borderTopWidth: 1,
+		borderTopColor: "#e0e0e0",
+	},
+	modalCloseButton: {
+		backgroundColor: "#4CAF50",
+		paddingVertical: 12,
+		paddingHorizontal: 40,
+		borderRadius: 10,
+	},
+	modalCloseText: {
+		color: "#fff",
+		fontWeight: "bold",
+		fontSize: 16,
+	},
+	// Options produit
+	optionsContainer: {
+		width: "100%",
+		marginTop: 20,
+		marginBottom: 15,
+	},
+	optionsTitle: {
+		fontSize: 16,
+		fontWeight: "700",
+		color: "#333",
+		marginBottom: 12,
+	},
+	optionItem: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		alignItems: "center",
+		paddingVertical: 12,
+		paddingHorizontal: 15,
+		borderRadius: 10,
+		backgroundColor: "#f5f5f5",
+		marginBottom: 8,
+		borderWidth: 2,
+		borderColor: "transparent",
+	},
+	optionItemSelected: {
+		backgroundColor: "#E8F5E9",
+		borderColor: "#4CAF50",
+	},
+	optionLeft: {
+		flexDirection: "row",
+		alignItems: "center",
+		flex: 1,
+	},
+	optionRadio: {
+		fontSize: 20,
+		marginRight: 10,
+	},
+	optionName: {
+		fontSize: 15,
+		fontWeight: "500",
+		color: "#333",
+		flex: 1,
+	},
+	optionPrice: {
+		fontSize: 14,
+		fontWeight: "600",
+		color: "#4CAF50",
+	},
+	optionsLoading: {
+		paddingVertical: 20,
+	},
+	optionsLoadingText: {
+		fontSize: 14,
+		color: "#999",
+		textAlign: "center",
+	},
+	modalButtons: {
+		flexDirection: "row",
+		marginTop: 10,
+		gap: 10,
+		width: "100%",
+	},
+	modalButton: {
+		flex: 1,
+		paddingVertical: 15,
+		borderRadius: 10,
+		alignItems: "center",
+		justifyContent: "center",
+	},
+	modalCancelButton: {
+		backgroundColor: "#9E9E9E",
+	},
+	modalAddButton: {
+		backgroundColor: "#4CAF50",
+	},
+	modalCancelText: {
+		color: "#fff",
+		fontWeight: "bold",
+		fontSize: 16,
+	},
+	modalAddText: {
+		color: "#fff",
+		fontWeight: "bold",
+		fontSize: 16,
+	},
+	center: {
+		justifyContent: "center",
+		alignItems: "center",
+	},
+});
+
+export default appStyles;

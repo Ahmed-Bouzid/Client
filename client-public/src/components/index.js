@@ -1,17 +1,23 @@
-// src/components/index.js
-// ============ Export centralisé de tous les composants ============
+/**
+ * Components - Index Global
+ * 
+ * Export central de tous les composants du nouveau design system
+ */
 
-// 📦 Menu
-export { MenuItems, AddOn } from "./menu";
+// UI Components
+export { Button } from './ui/Button';
+export { Input } from './ui/Input';
+export { Card } from './ui/Card';
+export { Badge } from './ui/Badge';
+export { Background } from './ui/Background';
+export { BottomSheet } from './ui/BottomSheet';
 
-// 🛒 Order
-export { OrderList } from "./order";
+// Food Components
+export { FoodCard } from './food/FoodCard';
+export { CategoryPill } from './food/CategoryPill';
 
-// 💬 Messaging
-export { MessagingBubble } from "./messaging";
+// Cart Components
+export { CartItem } from './cart/CartItem';
 
-// 🧩 Common
-export { AllergenBadge } from "./common";
-
-// 🧾 Receipt
-export { ReceiptTicket, ReceiptModal } from "./receipt";
+// Navigation Components
+export { BottomNav } from './navigation/BottomNav';

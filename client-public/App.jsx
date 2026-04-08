@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { API_BASE_URL } from "./src/config/api";
 import { Resto_id_key } from "./src/config/restaurantConfig";
-import JoinOrCreateTable from "./src/screens/JoinOrCreateTable";
-import Menu from "./src/screens/Menu";
+import WelcomeScreen from "./src/screens/WelcomeScreen";
+import Menu from "./src/screens/Menu"; // Ancien menu (backup)
+import MenuScreen from "./src/screens/MenuScreen"; // 🎨 NOUVEAU design
+import OrderScreen from "./src/screens/OrderScreen"; // 🎨 NOUVEAU design orders
 import AddOn from "./src/components/menu/AddOn";
 import Payment from "./src/screens/Payment";
 import OrderSummary from "./src/screens/OrderSummary";
@@ -17,17 +19,27 @@ import { useRestrictionStore } from "./src/stores/useRestrictionStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getUrlParams } from "./src/utils/getUrlParams";
 import { Platform, View, StyleSheet } from "react-native";
+import { ThemeProvider } from "./src/theme"; // 🎨 NOUVEAU: Theme Provider
 
 export default function App() {
+	// Wrapper with ThemeProvider
+	return (
+		<ThemeProvider>
+			<AppContent />
+		</ThemeProvider>
+	);
+}
+
+function AppContent() {
 	const [step, setStep] = useState("join"); // join, menu, addOn, orders, payment
 	const [reservationId, setReservationId] = useState("");
 	const [clientId, setClientId] = useState("");
 	const [tableNumber, setTableNumber] = useState(null);
 
 	// En production, tableId et restaurantId viennent du QR code (URL param)
-	// null = pas de fallback hardcodé
-	const DEFAULT_TABLE_ID = null;
-	const DEFAULT_RESTAURANT_ID = Resto_id_key; // null en production, valeur dev depuis .env
+	// 🔧 DEV: tableId et restaurantId hardcodés pour test
+	const DEFAULT_TABLE_ID = "69712a9fb51d8fe131410236";
+	const DEFAULT_RESTAURANT_ID = "6970ef6594abf8bacd9d804d";
 
 	// Stores
 	const {
@@ -75,9 +87,13 @@ export default function App() {
 			// Persister dans AsyncStorage pour que les stores y aient accès
 			if (urlRestaurantId) {
 				await AsyncStorage.setItem("restaurantId", urlRestaurantId);
+			} else if (DEFAULT_RESTAURANT_ID) {
+				await AsyncStorage.setItem("restaurantId", DEFAULT_RESTAURANT_ID);
 			}
 			if (urlTableId) {
 				await AsyncStorage.setItem("tableId", urlTableId);
+			} else if (DEFAULT_TABLE_ID) {
+				await AsyncStorage.setItem("tableId", DEFAULT_TABLE_ID);
 			}
 
 			await initTable(finalTableId, finalRestaurantId);
@@ -118,23 +134,22 @@ export default function App() {
 	const handleJoinTable = async (
 		clientName,
 		reservationId,
-		tableId,
-		tableNumber,
-		clientId,
+		tableIdParam,
+		tableNumberParam,
+		clientIdParam,
 	) => {
 		try {
 			// ⭐ Stocker toutes les infos
 			setUserName(clientName);
 			setReservationId(reservationId);
-			setTableNumber(tableNumber);
-			setClientId(clientId);
+			setTableNumber(tableNumberParam);
+			setClientId(clientIdParam);
 
-			// Appeler joinTable du store (si nécessaire)
-			await joinTable(
-				clientName,
-				tableId || DEFAULT_TABLE_ID,
-				restaurantId || DEFAULT_RESTAURANT_ID,
-			);
+			// ⭐ Mettre à jour le store avec les infos (sans rappeler /client/token)
+			// Le token a déjà été obtenu dans WelcomeScreen
+			const { setTable } = useClientTableStore.getState();
+			await setTable(tableIdParam || DEFAULT_TABLE_ID, restaurantId || DEFAULT_RESTAURANT_ID);
+			useClientTableStore.setState({ userName: clientName });
 
 			resetOrder();
 			await clearCart();
@@ -254,7 +269,33 @@ export default function App() {
 		setStep("orders");
 	};
 
-	// Navigation vers le paiement
+	// Navigation vers le paiement (depuis OrderScreen)
+	const handlePayNow = async () => {
+		if (!reservationId) {
+			showAlert("Erreur", "Aucune réservation active", [{ text: "OK" }]);
+			return;
+		}
+
+		// Soumettre la commande au serveur d'abord
+		try {
+			await submitOrder();
+			
+			// Puis charger les commandes et naviguer vers payment
+			await useOrderStore
+				.getState()
+				.fetchOrdersByReservation(reservationId, clientId);
+
+			// Passer à l'écran de paiement
+			setStep("payment");
+		} catch (error) {
+			console.error("❌ Erreur soumission commande:", error);
+			showAlert("Erreur", "Impossible de soumettre la commande", [
+				{ text: "OK" },
+			]);
+		}
+	};
+
+	// Navigation vers le paiement (ancien flow)
 	const navigateToPayment = async () => {
 		if (!reservationId) {
 			showAlert("Erreur", "Aucune réservation active", [{ text: "OK" }]);
@@ -334,35 +375,28 @@ export default function App() {
 				edges={["top", "left", "right"]}
 			>
 				{step === "join" && (
-					<JoinOrCreateTable
+					<WelcomeScreen
 						tableId={tableId || DEFAULT_TABLE_ID}
 						tableNumber={tableNumber}
-						onJoin={handleJoinTable}
+						onJoin={({ reservationId, clientId, userName }) => {
+							handleJoinTable(userName, reservationId, tableId || DEFAULT_TABLE_ID, tableNumber, clientId);
+						}}
 					/>
 				)}
 
 				{step === "menu" && (
-					<Menu
+					<MenuScreen
 						userName={userName}
-						restaurantId={restaurantId || DEFAULT_RESTAURANT_ID} // ✨ NOUVEAU : Pour charger la config dynamique
-						tableNumber={tableNumber}
+						restaurantId={restaurantId || DEFAULT_RESTAURANT_ID}
+						tableId={tableId || DEFAULT_TABLE_ID}
+						reservationId={reservationId}
 						clientId={clientId}
-						orders={currentOrder}
+						tableNumber={tableNumber}
 						onAdd={handleAddOrder}
 						onValidate={handleValidateOrder}
-						onPay={handlePaymentSuccess}
-						onUpdateQuantity={handleUpdateQuantity}
-						hasActiveOrder={hasActiveOrder}
-						onNavigateToPayment={navigateToPayment}
 						onNavigateToOrders={handleValidateOrder}
-						navigation={{
-							navigate: (screen, params) => {
-								// Simuler navigation pour Menu
-								if (screen === "Payment") {
-									setStep("payment");
-								}
-							},
-						}}
+						onNavigateToPayment={navigateToPayment}
+						onBack={() => setStep("join")}
 					/>
 				)}
 
@@ -375,12 +409,26 @@ export default function App() {
 				)}
 
 				{step === "orders" && (
-					<OrderSummary
-						allOrders={allOrders}
-						currentOrder={currentOrder}
-						onUpdateQuantity={handleUpdateQuantity}
-						onSubmitOrder={submitOrder}
-						onBackToMenu={() => setStep("menu")}
+					<OrderScreen
+					allOrders={allOrders}
+					orderId={activeOrderId}
+					clientId={clientId}
+					reservationId={reservationId}
+					restaurantId={restaurantId || DEFAULT_RESTAURANT_ID}
+					tableId={tableId || DEFAULT_TABLE_ID}
+					tableNumber={tableNumber}
+					userName={userName}
+						onBack={() => setStep("menu")}
+						onPayNow={handlePayNow}
+						onSuccess={handlePaymentSuccess}
+						onReservationClosed={() => setStep("join")}
+						onSplitWithOthers={() => showAlert("Split", "Fonctionnalité à venir", [{ text: "OK" }])}
+						onCancelOrder={() => {
+							showAlert("Annuler", "Voulez-vous vraiment annuler la commande ?", [
+								{ text: "Non" },
+								{ text: "Oui", onPress: () => setStep("menu") }
+							]);
+						}}
 					/>
 				)}
 

@@ -1,0 +1,535 @@
+/**
+ * MenuScreen - Page du menu (nouveau design Foodmood)
+ */
+
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Platform,
+  StatusBar,
+  FlatList,
+  Image,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import useProductStore from "../stores/useProductStore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// Image placeholder
+const PANINI_IMAGE = require("../../assets/images/menu/image-fond/panini.png");
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔧 DONNÉES MOCK - À remplacer par API plus tard
+// ═══════════════════════════════════════════════════════════════════════════
+const MOCK_CATEGORIES = [
+  { id: "entrees", name: "Entrées" },
+  { id: "sandwiches", name: "Sandwichs" }, // Remplacé "Plats" par "Sandwichs" pour la vraie catégorie
+  { id: "pizzas", name: "Pizzas" },
+  { id: "desserts", name: "Desserts" },
+  { id: "boissons", name: "Boissons" },
+  { id: "cafes", name: "Cafés" },
+];
+
+const MOCK_PRODUCTS = [
+  {
+    _id: "1",
+    name: "Panini Poulet",
+    description: "Poulet grillé, mozzarella, tomates séchées, pesto",
+    calories: 580,
+    price: 12.50,
+    categoryId: "sandwiches",
+  },
+  {
+    _id: "2",
+    name: "Panini Végétarien",
+    description: "Légumes grillés, fromage de chèvre, roquette",
+    calories: 450,
+    price: 10.00,
+    categoryId: "sandwiches",
+  },
+  {
+    _id: "3",
+    name: "Panini Classique",
+    description: "Jambon, emmental, salade, tomates fraîches",
+    calories: 520,
+    price: 9.50,
+    categoryId: "sandwiches",
+  },
+  {
+    _id: "4",
+    name: "Frites Maison",
+    description: "Frites croustillantes au sel de mer",
+    calories: 320,
+    price: 4.00,
+    categoryId: "entrees",
+  },
+  {
+    _id: "5",
+    name: "Salade César",
+    description: "Laitue romaine, parmesan, croûtons, sauce césar",
+    calories: 380,
+    price: 8.50,
+    categoryId: "entrees",
+  },
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔒 CONFIG - Couleurs du design
+// ═══════════════════════════════════════════════════════════════════════════
+const COLORS = {
+  background: "#FFFFFF",
+  accent: "#E8734A",
+  text: "#2D3142",
+  textLight: "#666666",
+  cardBg: "#FFFFFF",
+  inputBg: "#F5F5F5",
+  backimage: "#763f00",
+};
+
+export default function MenuScreen({
+  restaurantId,
+  onBack = () => {},
+  onNavigateToOrders = () => {},
+  onAdd = () => {},
+}) {
+  // States
+  const [selectedCategory, setSelectedCategory] = useState("sandwich"); // Directement sandwich
+  const [quantities, setQuantities] = useState({});
+  const [cart, setCart] = useState({});
+  
+  // Store - comme Menu.jsx
+  const products = useProductStore((state) => state.products);
+  const fetchProducts = useProductStore((state) => state.fetchProducts);
+  
+  // Charger les produits - EXACTEMENT comme Menu.jsx
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const clientToken = await AsyncStorage.getItem("clientToken");
+        if (clientToken) {
+          await fetchProducts(clientToken);
+        } else {
+          console.warn("⚠️ Client doit rejoindre une table d'abord");
+        }
+      } catch (error) {
+        console.error("❌ Error loading products:", error);
+      }
+    };
+    loadProducts();
+  }, []);
+
+  // Catégories + produits filtrés - comme Menu.jsx  
+  const sandwichProducts = products.filter((p) => {
+    const category = p.category?.toLowerCase() || p.categoryName?.toLowerCase() || '';
+    return category.includes('sandwich') || category.includes('panini');
+  });
+
+  // Mix avec les mock pour les autres catégories
+  const categories = [
+    { id: "entrees", name: "Entrées" },
+    { id: "sandwich", name: "Sandwichs" },
+    { id: "pizzas", name: "Pizzas" },
+    { id: "desserts", name: "Desserts" },
+    { id: "boissons", name: "Boissons" },
+    { id: "cafes", name: "Cafés" },
+  ];
+
+  const filteredProducts = selectedCategory === "sandwich" 
+    ? [...MOCK_PRODUCTS, ...sandwichProducts] 
+    : MOCK_PRODUCTS.filter(p => p.categoryId === selectedCategory);
+  const totalItems = cartItems.reduce((sum, [_, qty]) => sum + qty, 0);
+
+  // Quantité pour un produit
+  const getQuantity = (productId) => quantities[productId] || 1;
+
+  // Modifier quantité
+  const updateQuantity = (productId, delta) => {
+    setQuantities(prev => ({
+      ...prev,
+      [productId]: Math.max(1, (prev[productId] || 1) + delta),
+    }));
+  };
+
+  // Ajouter au panier
+  const addToCart = (product) => {
+    const qty = getQuantity(product._id);
+    setCart(prev => ({
+      ...prev,
+      [product._id]: (prev[product._id] || 0) + qty,
+    }));
+    setQuantities(prev => ({ ...prev, [product._id]: 1 }));
+    onAdd({ ...product, quantity: qty });
+  };
+
+  // Render catégorie
+  const renderCategory = (category) => {
+    const isSelected = selectedCategory === category.id;
+    return (
+      <TouchableOpacity
+        key={category.id}
+        style={[styles.categoryTab, isSelected && styles.categoryTabSelected]}
+        onPress={() => setSelectedCategory(category.id)}
+      >
+        <Text style={[styles.categoryText, isSelected && styles.categoryTextSelected]}>
+          {category.name}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  // Render carte produit
+  const renderProduct = ({ item }) => {
+    const qty = getQuantity(item._id);
+
+    return (
+      <View style={styles.productCard}>
+        {/* Image produit (rond) */}
+        <View style={styles.productImageContainer}>
+          <Image source={PANINI_IMAGE} style={styles.productImage} resizeMode="cover" />
+        </View>
+
+        {/* Infos */}
+        <View style={styles.productInfo}>
+          <Text style={styles.productName}>{item.name}</Text>
+          <Text style={styles.productDescription} numberOfLines={2}>
+            {item.description}
+          </Text>
+
+          {/* Calories */}
+          <View style={styles.caloriesRow}>
+            <Ionicons name="flame-outline" size={14} color={COLORS.accent} />
+            <Text style={styles.caloriesText}>{item.calories} calories</Text>
+          </View>
+
+          {/* Prix + Quantité */}
+          <View style={styles.priceRow}>
+            <Text style={styles.productPrice}>{item.price.toFixed(2)}€</Text>
+
+            <View style={styles.quantitySelector}>
+              <TouchableOpacity
+                style={styles.quantityBtn}
+                onPress={() => updateQuantity(item._id, -1)}
+              >
+                <Text style={styles.quantityBtnText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.quantityValue}>{qty}</Text>
+              <TouchableOpacity
+                style={styles.quantityBtn}
+                onPress={() => updateQuantity(item._id, 1)}
+              >
+                <Text style={styles.quantityBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Bouton Add to cart */}
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => addToCart(item)}
+          >
+            <Text style={styles.addButtonText}>Ajouter</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={onBack}>
+          <Ionicons name="chevron-back" size={24} color={COLORS.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Menu</Text>
+      </View>
+
+      {/* Catégories */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.categoriesScroll}
+        contentContainerStyle={styles.categoriesContent}
+      >
+        {categories.map(renderCategory)}
+      </ScrollView>
+
+      {/* Liste produits */}
+      <FlatList
+        data={filteredProducts}
+        renderItem={renderProduct}
+        keyExtractor={(item) => item._id}
+        contentContainerStyle={styles.productsList}
+        showsVerticalScrollIndicator={false}
+      />
+
+      {/* Barre du bas */}
+      {totalItems > 0 && (
+        <View style={styles.bottomBar}>
+          <View style={styles.cartPreview}>
+            <View style={styles.cartIcon}>
+              <Ionicons name="cart" size={22} color="#FFF" />
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{totalItems}</Text>
+              </View>
+            </View>
+            <View>
+              <Text style={styles.totalLabel}>TOTAL</Text>
+              <Text style={styles.totalValue}>{totalAmount.toFixed(2)}€</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.placeOrderBtn} onPress={onNavigateToOrders}>
+            <Text style={styles.placeOrderText}>Commander</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔒 STYLES
+// ═══════════════════════════════════════════════════════════════════════════
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  // Header
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: Platform.OS === "ios" ? 60 : StatusBar.currentHeight + 16,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: COLORS.inputBg,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginLeft: 16,
+  },
+
+  // Catégories
+  categoriesScroll: {
+    maxHeight: 50,
+  },
+  categoriesContent: {
+    paddingHorizontal: 20,
+    gap: 24,
+  },
+  categoryTab: {
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  categoryTabSelected: {
+    borderBottomColor: COLORS.accent,
+  },
+  categoryText: {
+    fontSize: 16,
+    color: COLORS.textLight,
+    fontWeight: "500",
+  },
+  categoryTextSelected: {
+    color: COLORS.text,
+    fontWeight: "700",
+  },
+
+  // Liste produits
+  productsList: {
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 120,
+  },
+
+  // Carte produit
+  productCard: {
+    flexDirection: "row",
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 20,
+    marginBottom: 24,
+    padding: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  productImageContainer: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    overflow: "hidden",
+    marginRight: 12,
+    marginTop: -20,
+    marginLeft: -20,
+    backgroundColor: COLORS.backimage,
+  },
+  productImage: {
+    width: "95%",
+    height: "100%",
+    bottom: -5,
+    right: -5,
+  },
+  productInfo: {
+    flex: 1,
+  },
+  productName: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 4,
+  },
+  productDescription: {
+    fontSize: 13,
+    color: COLORS.textLight,
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  caloriesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 8,
+  },
+  caloriesText: {
+    fontSize: 12,
+    color: COLORS.textLight,
+  },
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  productPrice: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: COLORS.accent,
+  },
+  quantitySelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.inputBg,
+    borderRadius: 20,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  quantityBtn: {
+    width: 28,
+    height: 28,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  quantityBtnText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  quantityValue: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginHorizontal: 10,
+  },
+  addButton: {
+    backgroundColor: COLORS.accent,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: "center",
+  },
+  addButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFF",
+  },
+
+  // Barre du bas
+  bottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFF",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingBottom: Platform.OS === "ios" ? 30 : 14,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  cartPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  cartIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: COLORS.text,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  cartBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.accent,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cartBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#FFF",
+  },
+  totalLabel: {
+    fontSize: 10,
+    color: COLORS.textLight,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+  totalValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+  placeOrderBtn: {
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 22,
+  },
+  placeOrderText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFF",
+  },
+});
