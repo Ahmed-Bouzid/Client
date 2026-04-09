@@ -37,9 +37,7 @@ function AppContent() {
 	const [tableNumber, setTableNumber] = useState(null);
 
 	// En production, tableId et restaurantId viennent du QR code (URL param)
-	// 🔧 DEV: tableId et restaurantId hardcodés pour test
-	const DEFAULT_TABLE_ID = "69712a9fb51d8fe131410236";
-	const DEFAULT_RESTAURANT_ID = "6970ef6594abf8bacd9d804d";
+	// Pas d'ID hardcodé - l'app doit être scannée via QR code
 
 	// Stores
 	const {
@@ -80,20 +78,16 @@ function AppContent() {
 			// 🌐 Sur web : lire restaurantId + tableId depuis l'URL (/r/[restaurantId]/[tableId])
 			const { restaurantId: urlRestaurantId, tableId: urlTableId } = getUrlParams();
 
-			// Priorité : URL > env var (null en prod sans URL)
-			const finalRestaurantId = urlRestaurantId || DEFAULT_RESTAURANT_ID;
-			const finalTableId = urlTableId || DEFAULT_TABLE_ID;
+			// IDs viennent uniquement de l'URL (QR code)
+			const finalRestaurantId = urlRestaurantId || null;
+			const finalTableId = urlTableId || null;
 
 			// Persister dans AsyncStorage pour que les stores y aient accès
 			if (urlRestaurantId) {
 				await AsyncStorage.setItem("restaurantId", urlRestaurantId);
-			} else if (DEFAULT_RESTAURANT_ID) {
-				await AsyncStorage.setItem("restaurantId", DEFAULT_RESTAURANT_ID);
 			}
 			if (urlTableId) {
 				await AsyncStorage.setItem("tableId", urlTableId);
-			} else if (DEFAULT_TABLE_ID) {
-				await AsyncStorage.setItem("tableId", DEFAULT_TABLE_ID);
 			}
 
 			await initTable(finalTableId, finalRestaurantId);

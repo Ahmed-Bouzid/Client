@@ -21,7 +21,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#FF8C42"
-      }
+      },
+      "package": "com.warai.sunnygoclient"
     },
     "web": {
       "bundler": "metro",
@@ -40,6 +41,11 @@
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e842aaae-163a-4142-a561-3d7a128c5ce1"
+      }
+    }
   }
 }
