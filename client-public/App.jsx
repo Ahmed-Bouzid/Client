@@ -9,6 +9,8 @@ import OrderScreen from "./src/screens/OrderScreen"; // 🎨 NOUVEAU design orde
 import AddOn from "./src/components/menu/AddOn";
 import Payment from "./src/screens/Payment";
 import OrderSummary from "./src/screens/OrderSummary";
+import AdminUnlockScreen from "./src/screens/AdminUnlockScreen"; // 🔐 Admin password
+import AdminSelectionScreen from "./src/screens/AdminSelectionScreen"; // 🔐 Restaurant + Table selection
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { useCustomAlert } from "./src/utils/customAlert";
 import { useClientTableStore } from "./src/stores/useClientTableStore";
@@ -30,11 +32,18 @@ export default function App() {
 	);
 }
 
+// ⭐ Default IDs (utilisés en fallback si pas d'IDs en URL)
+const DEFAULT_TABLE_ID = "DEFAULT";
+const DEFAULT_RESTAURANT_ID = "DEFAULT";
+
 function AppContent() {
 	const [step, setStep] = useState("join"); // join, menu, addOn, orders, payment
 	const [reservationId, setReservationId] = useState("");
 	const [clientId, setClientId] = useState("");
 	const [tableNumber, setTableNumber] = useState(null);
+	
+	// 🔐 Admin unlock flow
+	const [adminMode, setAdminMode] = useState(null); // null, "locked", "unlocked"
 
 	// En production, tableId et restaurantId viennent du QR code (URL param)
 	// Pas d'ID hardcodé - l'app doit être scannée via QR code
@@ -72,6 +81,22 @@ function AppContent() {
 
 	const { showAlert, AlertComponent } = useCustomAlert();
 
+	// 🔐 Initialisation admin mode au démarrage
+	useEffect(() => {
+		const checkAdminMode = () => {
+			const { restaurantId: urlRestaurantId, tableId: urlTableId } = getUrlParams();
+			
+			// Si pas d'IDs, on affiche le mode admin (mot de passe)
+			if (!urlRestaurantId || !urlTableId) {
+				setAdminMode("locked");
+			} else {
+				setAdminMode(null);
+			}
+		};
+		
+		checkAdminMode();
+	}, []);
+
 	// Initialisation au démarrage
 	useEffect(() => {
 		const initialize = async () => {
@@ -81,6 +106,11 @@ function AppContent() {
 			// IDs viennent uniquement de l'URL (QR code)
 			const finalRestaurantId = urlRestaurantId || null;
 			const finalTableId = urlTableId || null;
+
+			// ⭐ Si pas d'IDs, on ne fait rien (mode admin)
+			if (!finalRestaurantId || !finalTableId) {
+				return;
+			}
 
 			// Persister dans AsyncStorage pour que les stores y aient accès
 			if (urlRestaurantId) {
@@ -368,78 +398,94 @@ function AppContent() {
 				style={{ flex: 1, backgroundColor: "whitesmoke" }}
 				edges={["top", "left", "right"]}
 			>
-				{step === "join" && (
-					<WelcomeScreen
-						tableId={tableId || DEFAULT_TABLE_ID}
-						tableNumber={tableNumber}
-						onJoin={({ reservationId, clientId, userName }) => {
-							handleJoinTable(userName, reservationId, tableId || DEFAULT_TABLE_ID, tableNumber, clientId);
-						}}
+				{/* 🔐 Mode Admin: écran de déverrouillage */}
+				{adminMode === "locked" && (
+					<AdminUnlockScreen
+						onUnlock={() => setAdminMode("unlocked")}
 					/>
 				)}
 
-				{step === "menu" && (
-					<MenuScreen
-						userName={userName}
-						restaurantId={restaurantId || DEFAULT_RESTAURANT_ID}
-						tableId={tableId || DEFAULT_TABLE_ID}
-						reservationId={reservationId}
-						clientId={clientId}
-						tableNumber={tableNumber}
-						onAdd={handleAddOrder}
-						onValidate={handleValidateOrder}
-						onNavigateToOrders={handleValidateOrder}
-						onNavigateToPayment={navigateToPayment}
-						onBack={() => setStep("join")}
-					/>
+				{/* 🔐 Mode Admin: sélection restaurant + table */}
+				{adminMode === "unlocked" && (
+					<AdminSelectionScreen />
 				)}
 
-				{step === "addOn" && (
-					<AddOn
-						currentOrders={currentOrder}
-						onComplete={handleAddOnComplete}
-						onBack={() => setStep("menu")}
-					/>
-				)}
+				{/* 👥 Mode Normal: app client */}
+				{adminMode === null && (
+					<>
+						{step === "join" && (
+							<WelcomeScreen
+								tableId={tableId || DEFAULT_TABLE_ID}
+								tableNumber={tableNumber}
+								onJoin={({ reservationId, clientId, userName }) => {
+									handleJoinTable(userName, reservationId, tableId || DEFAULT_TABLE_ID, tableNumber, clientId);
+								}}
+							/>
+						)}
 
-				{step === "orders" && (
-					<OrderScreen
-					allOrders={allOrders}
-					orderId={activeOrderId}
-					clientId={clientId}
-					reservationId={reservationId}
-					restaurantId={restaurantId || DEFAULT_RESTAURANT_ID}
-					tableId={tableId || DEFAULT_TABLE_ID}
-					tableNumber={tableNumber}
-					userName={userName}
-						onBack={() => setStep("menu")}
-						onPayNow={handlePayNow}
-						onSuccess={handlePaymentSuccess}
-						onReservationClosed={() => setStep("join")}
-						onSplitWithOthers={() => showAlert("Split", "Fonctionnalité à venir", [{ text: "OK" }])}
-						onCancelOrder={() => {
-							showAlert("Annuler", "Voulez-vous vraiment annuler la commande ?", [
-								{ text: "Non" },
-								{ text: "Oui", onPress: () => setStep("menu") }
-							]);
-						}}
-					/>
-				)}
+						{step === "menu" && (
+							<MenuScreen
+								userName={userName}
+								restaurantId={restaurantId || DEFAULT_RESTAURANT_ID}
+								tableId={tableId || DEFAULT_TABLE_ID}
+								reservationId={reservationId}
+								clientId={clientId}
+								tableNumber={tableNumber}
+								onAdd={handleAddOrder}
+								onValidate={handleValidateOrder}
+								onNavigateToOrders={handleValidateOrder}
+								onNavigateToPayment={navigateToPayment}
+								onBack={() => setStep("join")}
+							/>
+						)}
 
-				{step === "payment" && (
-					<Payment
-						allOrders={allOrders}
-						orderId={activeOrderId}
-						// ⭐⭐ AJOUTEZ CES PROPS ⭐⭐
-						reservationId={reservationId}
-						tableId={tableId || DEFAULT_TABLE_ID}
-						tableNumber={tableNumber}
-						clientId={clientId}
-						userName={userName}
-						onSuccess={handlePaymentSuccess}
-						onBack={() => setStep("menu")}
-						onReservationClosed={() => setStep("join")}
-					/>
+						{step === "addOn" && (
+							<AddOn
+								currentOrders={currentOrder}
+								onComplete={handleAddOnComplete}
+								onBack={() => setStep("menu")}
+							/>
+						)}
+
+						{step === "orders" && (
+							<OrderScreen
+							allOrders={allOrders}
+							orderId={activeOrderId}
+							clientId={clientId}
+							reservationId={reservationId}
+							restaurantId={restaurantId || DEFAULT_RESTAURANT_ID}
+							tableId={tableId || DEFAULT_TABLE_ID}
+							tableNumber={tableNumber}
+							userName={userName}
+								onBack={() => setStep("menu")}
+								onPayNow={handlePayNow}
+								onSuccess={handlePaymentSuccess}
+								onReservationClosed={() => setStep("join")}
+								onSplitWithOthers={() => showAlert("Split", "Fonctionnalité à venir", [{ text: "OK" }])}
+								onCancelOrder={() => {
+									showAlert("Annuler", "Voulez-vous vraiment annuler la commande ?", [
+										{ text: "Non" },
+										{ text: "Oui", onPress: () => setStep("menu") }
+									]);
+								}}
+							/>
+						)}
+
+						{step === "payment" && (
+							<Payment
+								allOrders={allOrders}
+								orderId={activeOrderId}
+								reservationId={reservationId}
+								tableId={tableId || DEFAULT_TABLE_ID}
+								tableNumber={tableNumber}
+								clientId={clientId}
+								userName={userName}
+								onSuccess={handlePaymentSuccess}
+								onBack={() => setStep("menu")}
+								onReservationClosed={() => setStep("join")}
+							/>
+						)}
+					</>
 				)}
 
 				<AlertComponent />
