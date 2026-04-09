@@ -45,6 +45,8 @@ export default function WelcomeScreen({
 }) {
   const { theme } = useTheme();
   
+  console.log("👋 [WelcomeScreen] Montage/remount avec props:", { tableId, tableNumber });
+  
   // ═══════════════════════════════════════════════════════════════════════════
   // 🔒 RESTAURANT CONFIG - Seules ces valeurs changent selon le restaurant
   // ═══════════════════════════════════════════════════════════════════════════
@@ -90,6 +92,8 @@ export default function WelcomeScreen({
   
   // Stores
   const { restaurantId } = useClientTableStore();
+  console.log("👋 [WelcomeScreen] Store restaurantId:", restaurantId);
+  
   const restaurantName = useRestaurantStore((state) => state.name);
   const fetchRestaurantInfo = useRestaurantStore((state) => state.fetchRestaurantInfo);
   
@@ -256,6 +260,11 @@ export default function WelcomeScreen({
   
   // Handle join table - LOGIQUE COMPLÈTE DE RÉSERVATION
   const handleContinueWithEmail = async () => {
+    console.log("📝 [WelcomeScreen] handleContinueWithEmail appelé");
+    console.log("   - name:", name.trim());
+    console.log("   - tableId (prop):", tableId);
+    console.log("   - restaurantId (store):", restaurantId);
+    
     if (!name.trim()) {
       setError("Veuillez entrer votre nom");
       return;
@@ -278,7 +287,12 @@ export default function WelcomeScreen({
       // ⭐ Récupérer restaurantId (store ou AsyncStorage)
       const finalRestaurantId = restaurantId || (await AsyncStorage.getItem("restaurantId"));
       
+      console.log("🔍 [JOIN] IDs résolus:");
+      console.log("   - finalRestaurantId:", finalRestaurantId);
+      console.log("   - tableId:", tableId);
+      
       if (!finalRestaurantId) {
+        console.error("❌ [JOIN] Restaurant ID manquant!");
         setError("Restaurant non identifié.");
         setLoading(false);
         return;
@@ -291,12 +305,16 @@ export default function WelcomeScreen({
         finalRestaurantId,
       );
       
+      console.log("✅ [JOIN] Token client généré");
+      
       // ⭐ Récupérer ou créer clientId
       let clientId = await AsyncStorage.getItem("clientId");
       if (!clientId) {
         clientId = RNUUID.v4();
         await AsyncStorage.setItem("clientId", clientId);
       }
+      
+      console.log("✅ [JOIN] ClientId:", clientId);
       
       const body = {
         clientName: name.trim(),
@@ -306,6 +324,8 @@ export default function WelcomeScreen({
         reservationDate: new Date().toISOString(),
         reservationTime: `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`,
       };
+      
+      console.log("📤 [JOIN] Envoi réservation:", JSON.stringify(body, null, 2));
       
       const response = await fetch(
         `${API_CONFIG.BASE_URL}/reservations/client/reservations`,
@@ -318,16 +338,22 @@ export default function WelcomeScreen({
         },
       );
       
+      console.log("📥 [JOIN] Réponse reçue - Status:", response.status);
+      
       const text = await response.text();
+      console.log("📥 [JOIN] Réponse texte:", text);
       
       let data;
       try {
         data = JSON.parse(text);
       } catch {
+        console.error("❌ [JOIN] Erreur parsing JSON:", text);
         Alert.alert("Erreur", "Réponse serveur inattendue.");
         setLoading(false);
         return;
       }
+      
+      console.log("📥 [JOIN] Réponse JSON parsée:", data);
       
       if (!response.ok) {
         console.error("❌ [JOIN] Réponse non-OK:", response.status, data.message);
@@ -336,8 +362,12 @@ export default function WelcomeScreen({
         return;
       }
       
+      console.log("✅ [JOIN] Réponse OK reçue");
+      
       const reservationObj = data.reservation || data;
       const reservationId = reservationObj._id;
+      
+      console.log("✅ [JOIN] Reservation ID:", reservationId);
       
       if (!reservationId) {
         Alert.alert("Erreur", "Aucun ID de réservation retourné.");
@@ -355,6 +385,7 @@ export default function WelcomeScreen({
       await AsyncStorage.setItem("currentClientId", clientId);
       
       // ⭐ Appeler onJoin avec un objet (format attendu par App.jsx)
+      console.log("🎉 [JOIN] Succès! Appel onJoin callback");
       onJoin?.({
         reservationId: reservationId,
         clientId: clientId,
@@ -362,6 +393,7 @@ export default function WelcomeScreen({
       });
       
     } catch (error) {
+      console.error("❌ [JOIN] Exception:", error);
       setError("Une erreur est survenue. Veuillez réessayer.");
     } finally {
       setLoading(false);
@@ -588,7 +620,7 @@ export default function WelcomeScreen({
             </Text>
             
             <Text style={[styles.restaurantNameBig, fontLoaded && { fontFamily: 'DXNacky' }]}>
-              Cucina{'\n'}Di{'\n'}Nini
+              {restaurantName ? restaurantName.split(' ').join('\n') : "Restaurant"}
             </Text>
           </View>
           

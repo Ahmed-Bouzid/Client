@@ -44,6 +44,7 @@ function AppContent() {
 	
 	// 🔐 Admin unlock flow
 	const [adminMode, setAdminMode] = useState(null); // null, "locked", "unlocked"
+	const [forceRefresh, setForceRefresh] = useState(0); // Force remount après admin
 
 	// En production, tableId et restaurantId viennent du QR code (URL param)
 	// Pas d'ID hardcodé - l'app doit être scannée via QR code
@@ -83,13 +84,26 @@ function AppContent() {
 
 	// 🔐 Initialisation admin mode au démarrage
 	useEffect(() => {
-		const checkAdminMode = () => {
+		const checkAdminMode = async () => {
+			console.log("🔐 [App] Vérification mode admin au démarrage");
 			const { restaurantId: urlRestaurantId, tableId: urlTableId } = getUrlParams();
+			const storedRestaurantId = await AsyncStorage.getItem("restaurantId");
+			const storedTableId = await AsyncStorage.getItem("tableId");
 			
-			// Si pas d'IDs, on affiche le mode admin (mot de passe)
-			if (!urlRestaurantId || !urlTableId) {
+			console.log("   - URL restaurantId:", urlRestaurantId);
+			console.log("   - URL tableId:", urlTableId);
+			console.log("   - Stored restaurantId:", storedRestaurantId);
+			console.log("   - Stored tableId:", storedTableId);
+			
+			// Si pas d'IDs (URL ou AsyncStorage), on affiche le mode admin (mot de passe)
+			if (!urlRestaurantId && !storedRestaurantId) {
+				console.log("   → Mode admin LOCKED (pas de restaurantId)");
+				setAdminMode("locked");
+			} else if (!urlTableId && !storedTableId) {
+				console.log("   → Mode admin LOCKED (pas de tableId)");
 				setAdminMode("locked");
 			} else {
+				console.log("   → Mode normal (IDs trouvés)");
 				setAdminMode(null);
 			}
 		};
@@ -100,17 +114,29 @@ function AppContent() {
 	// Initialisation au démarrage
 	useEffect(() => {
 		const initialize = async () => {
+			console.log("🚀 [App] Initialisation au démarrage");
 			// 🌐 Sur web : lire restaurantId + tableId depuis l'URL (/r/[restaurantId]/[tableId])
 			const { restaurantId: urlRestaurantId, tableId: urlTableId } = getUrlParams();
 
-			// IDs viennent uniquement de l'URL (QR code)
-			const finalRestaurantId = urlRestaurantId || null;
-			const finalTableId = urlTableId || null;
+			// 🔐 Vérifier AsyncStorage d'abord (fallback du mode admin)
+			const storedRestaurantId = await AsyncStorage.getItem("restaurantId");
+			const storedTableId = await AsyncStorage.getItem("tableId");
+
+			// IDs: URL > AsyncStorage > null
+			const finalRestaurantId = urlRestaurantId || storedRestaurantId || null;
+			const finalTableId = urlTableId || storedTableId || null;
+
+			console.log("   - URL: restaurantId=", urlRestaurantId, "tableId=", urlTableId);
+			console.log("   - Stored: restaurantId=", storedRestaurantId, "tableId=", storedTableId);
+			console.log("   - Final: restaurantId=", finalRestaurantId, "tableId=", finalTableId);
 
 			// ⭐ Si pas d'IDs, on ne fait rien (mode admin)
 			if (!finalRestaurantId || !finalTableId) {
+				console.log("   → IDs manquants, mode admin sera affichéreturn");
 				return;
 			}
+
+			console.log("✅ [App] Initialisation des stores avec:", { finalRestaurantId, finalTableId });
 
 			// Persister dans AsyncStorage pour que les stores y aient accès
 			if (urlRestaurantId) {
@@ -162,6 +188,15 @@ function AppContent() {
 		tableNumberParam,
 		clientIdParam,
 	) => {
+		console.log("🎯 [App] handleJoinTable appelé:", {
+			clientName,
+			reservationId,
+			tableIdParam,
+			tableNumberParam,
+			clientIdParam,
+			currentRestaurantId: restaurantId,
+		});
+		
 		try {
 			// ⭐ Stocker toutes les infos
 			setUserName(clientName);
@@ -172,14 +207,16 @@ function AppContent() {
 			// ⭐ Mettre à jour le store avec les infos (sans rappeler /client/token)
 			// Le token a déjà été obtenu dans WelcomeScreen
 			const { setTable } = useClientTableStore.getState();
+			console.log("🎯 [App] Appel setTable avec:", { tableIdParam, restaurantId });
 			await setTable(tableIdParam || DEFAULT_TABLE_ID, restaurantId || DEFAULT_RESTAURANT_ID);
 			useClientTableStore.setState({ userName: clientName });
 
+			console.log("🎯 [App] Transition vers MenuScreen");
 			resetOrder();
 			await clearCart();
 			setStep("menu");
 		} catch (error) {
-			console.error("Erreur join table:", error);
+			console.error("❌ [App] Erreur join table:", error);
 		}
 	};
 
@@ -407,7 +444,26 @@ function AppContent() {
 
 				{/* 🔐 Mode Admin: sélection restaurant + table */}
 				{adminMode === "unlocked" && (
-					<AdminSelectionScreen />
+					<AdminSelectionScreen
+						onTableSelected={async (restaurantId, tableId) => {
+							console.log("📱 [App] onTableSelected callback reçu");
+							console.log("   - restaurantId:", restaurantId);
+							console.log("   - tableId:", tableId);
+							
+							// Initialiser les stores avec les nouveaux IDs
+							console.log("📱 [App] Appel initTable...");
+							await initTable(tableId, restaurantId);
+							console.log("✅ [App] initTable complété");
+							
+							// Forcer le remount de l'app
+							console.log("📱 [App] Remount avec forceRefresh++");
+							setForceRefresh(prev => prev + 1);
+							
+							// Sortir du mode admin
+							console.log("📱 [App] setAdminMode(null)");
+							setAdminMode(null);
+						}}
+					/>
 				)}
 
 				{/* 👥 Mode Normal: app client */}
@@ -415,6 +471,7 @@ function AppContent() {
 					<>
 						{step === "join" && (
 							<WelcomeScreen
+								key={forceRefresh}
 								tableId={tableId || DEFAULT_TABLE_ID}
 								tableNumber={tableNumber}
 								onJoin={({ reservationId, clientId, userName }) => {

@@ -91,14 +91,16 @@ const CATEGORY_UI_CONFIG = {
 const useProductStore = create((set, get) => ({
 	products: [],
 
-	fetchProducts: async (token) => {
-		// ✅ Accepte token en paramètre
+	fetchProducts: async (token, restaurantId) => {
+		// ✅ Accepte token et restaurantId en paramètre
 		try {
-			const products = await productService.fetchProducts(token);
+			console.log("📦 [ProductStore] Appel fetchProducts avec token:", token ? "oui" : "non", "restaurantId:", restaurantId);
+			const products = await productService.fetchProducts(token, restaurantId);
 			set({ products });
+			console.log("📦 [ProductStore] Store mis à jour avec", products.length, "produits");
 			return products;
 		} catch (err) {
-			console.error("❌ Error fetching products:", err);
+			console.error("❌ [ProductStore] Error fetching products:", err);
 			throw err;
 		}
 	},

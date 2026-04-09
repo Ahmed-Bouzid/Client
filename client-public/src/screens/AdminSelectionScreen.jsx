@@ -13,9 +13,10 @@ import {
 	Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config/api";
 
-export default function AdminSelectionScreen({ onConnect }) {
+export default function AdminSelectionScreen({ onConnect, onTableSelected }) {
 	const [restaurants, setRestaurants] = useState([]);
 	const [selectedRestaurant, setSelectedRestaurant] = useState(null);
 	const [tables, setTables] = useState([]);
@@ -26,23 +27,31 @@ export default function AdminSelectionScreen({ onConnect }) {
 	const [showQRModal, setShowQRModal] = useState(false);
 	const [selectedTable, setSelectedTable] = useState(null);
 	const [qrUrl, setQrUrl] = useState("");
+	
+	// 🔐 Table modal (pour React Native sans redirection)
+	const [showTableModal, setShowTableModal] = useState(false);
+	const [selectedTableForModal, setSelectedTableForModal] = useState(null);
 
 	useEffect(() => {
+		console.log("🏪 [AdminSelection] Montage du composant");
 		fetchRestaurants();
 	}, []);
 
 	const fetchRestaurants = async () => {
+		console.log("🏪 [AdminSelection] Chargement restaurants...");
 		try {
 			setLoading(true);
 			const response = await fetch(`${API_BASE_URL}/admin-auth/restaurants`);
 			if (response.ok) {
 				const data = await response.json();
+				console.log("✅ [AdminSelection] Restaurants chargés:", data);
 				setRestaurants(data);
 			} else {
+				console.warn("❌ [AdminSelection] Erreur chargement restaurants");
 				Alert.alert("Erreur", "Impossible de charger les restaurants");
 			}
 		} catch (error) {
-			console.error("Erreur:", error);
+			console.error("❌ [AdminSelection] Erreur réseau restaurants:", error);
 			Alert.alert("Erreur", "Erreur réseau");
 		} finally {
 			setLoading(false);
@@ -50,6 +59,7 @@ export default function AdminSelectionScreen({ onConnect }) {
 	};
 
 	const handleSelectRestaurant = async (restaurantId) => {
+		console.log("🏪 [AdminSelection] Restaurant sélectionné:", restaurantId);
 		setSelectedRestaurant(restaurantId);
 		setTables([]);
 
@@ -60,12 +70,14 @@ export default function AdminSelectionScreen({ onConnect }) {
 			);
 			if (response.ok) {
 				const data = await response.json();
+				console.log("✅ [AdminSelection] Tables chargées:", data);
 				setTables(data);
 			} else {
+				console.warn("❌ [AdminSelection] Erreur chargement tables");
 				Alert.alert("Erreur", "Impossible de charger les tables");
 			}
 		} catch (error) {
-			console.error("Erreur:", error);
+			console.error("❌ [AdminSelection] Erreur réseau tables:", error);
 			Alert.alert("Erreur", "Erreur réseau");
 		} finally {
 			setLoadingTables(false);
@@ -78,8 +90,9 @@ export default function AdminSelectionScreen({ onConnect }) {
 			if (Platform.OS === "web") {
 				window.location.href = `/r/${selectedRestaurant}/${tableId}`;
 			} else {
-				// Sur React Native, on ne peut pas rediriger
-				Alert.alert("Info", `Restaurant: ${selectedRestaurant}\nTable: ${tableId}`);
+				// Sur React Native, afficher une modal avec 2 boutons
+				setSelectedTableForModal(tableId);
+				setShowTableModal(true);
 			}
 		}
 	};
@@ -307,6 +320,71 @@ export default function AdminSelectionScreen({ onConnect }) {
 				</View>
 			</View>
 		</Modal>
+
+		{/* 🔐 Table Selection Modal (pour React Native) */}
+		<Modal
+			visible={showTableModal}
+			transparent={true}
+			animationType="slide"
+			onRequestClose={() => setShowTableModal(false)}
+		>
+			<View style={styles.modalContainer}>
+				<View style={styles.modalContent}>
+					<View style={styles.modalHeader}>
+						<Text style={styles.modalTitle}>Accès à la Table</Text>
+						<TouchableOpacity onPress={() => setShowTableModal(false)}>
+							<Ionicons name="close-circle" size={28} color="#333" />
+						</TouchableOpacity>
+					</View>
+
+					<Text style={styles.modalText}>
+						Voulez-vous accéder à cette table?
+					</Text>
+					<Text style={styles.modalSubText}>
+						Restaurant: {selectedRestaurant}
+						{"\n"}Table: {selectedTableForModal}
+					</Text>
+
+					<View style={styles.buttonGroup}>
+						<TouchableOpacity 
+							style={[styles.button, styles.secondaryButton]} 
+							onPress={() => setShowTableModal(false)}
+						>
+							<Text style={[styles.buttonText, styles.secondaryButtonText]}>OK</Text>
+						</TouchableOpacity>
+						<TouchableOpacity 
+							style={styles.button} 
+							onPress={async () => {
+								try {
+									console.log("🚪 [AdminSelection] Clic 'Ouvrir'");
+									console.log("   - Restaurant ID:", selectedRestaurant);
+									console.log("   - Table ID:", selectedTableForModal);
+									
+									// Sauvegarder les IDs en AsyncStorage
+									await AsyncStorage.setItem("restaurantId", selectedRestaurant);
+									await AsyncStorage.setItem("tableId", selectedTableForModal);
+									
+									console.log("✅ [AdminSelection] IDs sauvegardés en AsyncStorage");
+									
+									// Notifier App.jsx pour sortir du mode admin
+									setShowTableModal(false);
+									if (onTableSelected) {
+										console.log("🔄 [AdminSelection] Appel onTableSelected callback");
+										onTableSelected(selectedRestaurant, selectedTableForModal);
+									}
+								} catch (error) {
+									console.error("❌ [AdminSelection] Erreur Ouvrir:", error);
+									Alert.alert("Erreur", "Impossible de charger la table");
+								}
+							}}
+						>
+							<Ionicons name="open-outline" size={18} color="#fff" style={styles.buttonIcon} />
+							<Text style={styles.buttonText}>Ouvrir</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+			</View>
+		</Modal>
 		</>
 	);
 }
@@ -487,5 +565,18 @@ const styles = StyleSheet.create({
 	},
 	secondaryButtonText: {
 		color: "#333",
+	},
+	modalText: {
+		fontSize: 16,
+		color: "#333",
+		marginBottom: 15,
+		textAlign: "center",
+	},
+	modalSubText: {
+		fontSize: 14,
+		color: "#666",
+		marginBottom: 20,
+		textAlign: "center",
+		fontFamily: "monospace",
 	},
 });

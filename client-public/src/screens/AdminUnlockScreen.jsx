@@ -23,6 +23,7 @@ export default function AdminUnlockScreen({ onUnlock }) {
 			return;
 		}
 
+		console.log("🔐 [AdminUnlock] Tentative déverrouillage avec mot de passe");
 		setLoading(true);
 		try {
 			const response = await fetch(`${API_BASE_URL}/admin-auth/verify-password`, {
@@ -32,12 +33,14 @@ export default function AdminUnlockScreen({ onUnlock }) {
 			});
 
 			if (response.ok) {
+				console.log("✅ [AdminUnlock] Mot de passe correct!");
 				onUnlock();
 			} else {
+				console.warn("❌ [AdminUnlock] Mot de passe incorrect");
 				Alert.alert("Erreur", "Mot de passe incorrect");
 			}
 		} catch (error) {
-			console.error("Erreur:", error);
+			console.error("❌ [AdminUnlock] Erreur réseau:", error);
 			Alert.alert("Erreur", "Impossible de vérifier le mot de passe");
 		} finally {
 			setLoading(false);

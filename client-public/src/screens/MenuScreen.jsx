@@ -22,11 +22,13 @@ import * as Font from 'expo-font';
 import useProductStore from "../stores/useProductStore";
 import { useCartStore } from "../stores/useCartStore";
 import { useOrderStore } from "../stores/useOrderStore";
+import { useRestaurantStore } from "../stores/useRestaurantStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import OrderSummary from "./OrderSummary";
 import DietaryPreferences from "./DietaryPreferences";
 import AddOnFlow from "../components/menu/AddOnFlow";
 import { useStyleUpdates } from "../hooks/useSocketClient";
+import useTheme from "../hooks/useThemeNew"; // 🎨 NOUVEAU: Hook thème
 
 // Image placeholder
 const PANINI_IMAGE = require("../../assets/images/menu/image-fond/panini.png");
@@ -55,6 +57,15 @@ export default function MenuScreen({
   onNavigateToPayment = () => {},
   onAdd = () => {},
 }) {
+  console.log("📋 [MenuScreen] Montage avec props:", {
+    restaurantId,
+    tableId,
+    reservationId,
+    clientId,
+  });
+  
+  console.log("📋 [MenuScreen] restaurantId reçu:", restaurantId, "type:", typeof restaurantId);
+  
   // States
   const [selectedCategory, setSelectedCategory] = useState("sandwich");
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -68,6 +79,23 @@ export default function MenuScreen({
   const fetchProducts = useProductStore((state) => state.fetchProducts);
   const { cart, addItem, removeItem, updateQuantity: updateCartQuantity, getTotalItems, getTotalPrice, initCart } = useCartStore();
   const { currentOrder, addToOrder, updateOrderQuantity, fetchActiveOrder, submitOrder } = useOrderStore();
+  
+  // Store restaurant pour le nom
+  const restaurantName = useRestaurantStore((state) => state.name);
+  const fetchRestaurantInfo = useRestaurantStore((state) => state.fetchRestaurantInfo);
+  
+  // 🎨 NOUVEAU: Hook thème avec caching multi-level
+  const { 
+    colors: themeColors, 
+    gradients: themeGradients, 
+    getGradient,
+    getColor,
+    hasSandwichPattern,
+    bannerType,
+    loading: themeLoading,
+    error: themeError,
+    isReady: themeReady
+  } = useTheme(restaurantId);
   
   // États pour userName
   const [userName, setUserName] = useState(null);
@@ -104,6 +132,17 @@ export default function MenuScreen({
     loadFont();
   }, []);
 
+  // 🏪 Charger les infos du restaurant (nom, etc)
+  useEffect(() => {
+    console.log("📋 [MenuScreen] useEffect restaurantInfo - restaurantId:", restaurantId);
+    if (restaurantId) {
+      console.log("📋 [MenuScreen] Fetch restaurant info pour:", restaurantId);
+      fetchRestaurantInfo(restaurantId);
+    } else {
+      console.warn("⚠️ [MenuScreen] restaurantId est falsy dans useEffect restaurantInfo");
+    }
+  }, [restaurantId]);
+  
   // Init cart avec userName
   useEffect(() => {
     const initializeCart = async () => {
@@ -118,11 +157,15 @@ export default function MenuScreen({
   
   // Charger les produits - EXACTEMENT comme Menu.jsx
   useEffect(() => {
+    console.log("📋 [MenuScreen] useEffect produits - restaurantId:", restaurantId);
     const loadProducts = async () => {
       try {
         const clientToken = await AsyncStorage.getItem("clientToken");
+        console.log("📋 [MenuScreen] Chargement produits - restaurantId:", restaurantId, "token:", clientToken ? "oui" : "non");
         if (clientToken) {
-          await fetchProducts(clientToken);
+          console.log("📋 [MenuScreen] Appel fetchProducts avec restaurantId:", restaurantId);
+          await fetchProducts(clientToken, restaurantId);
+          console.log("✅ [MenuScreen] fetchProducts complété");
         } else {
           console.warn("⚠️ Client doit rejoindre une table d'abord");
         }
@@ -130,28 +173,68 @@ export default function MenuScreen({
         console.error("❌ Error loading products:", error);
       }
     };
-    loadProducts();
-  }, []);
+    if (restaurantId) {
+      loadProducts();
+    } else {
+      console.warn("⚠️ [MenuScreen] restaurantId est falsy dans useEffect produits");
+    }
+  }, [restaurantId]);
 
-  // Catégories avec leurs emojis
-  const categories = [
-    { id: "entrees", name: "Entrées", emoji: "🥗" },
-    { id: "sandwich", name: "Sandwichs", emoji: "🥪" },
-    { id: "pizzas", name: "Pizzas", emoji: "🍕" },
-    { id: "desserts", name: "Desserts", emoji: "🍰" },
-    { id: "boissons", name: "Boissons", emoji: "🥤" },
-    { id: "cafes", name: "Cafés", emoji: "☕" },
-  ];
+  // 🏷️ Générer les catégories dynamiquement depuis les produits
+  const getCategories = () => {
+    const uniqueCategories = new Set();
+    products.forEach((p) => {
+      if (p.category) {
+        uniqueCategories.add(p.category.toLowerCase());
+      }
+    });
+    
+    // Mapper les catégories à emojis
+    const categoryMap = {
+      "sandwich": { name: "Sandwichs", emoji: "🥪" },
+      "chicken": { name: "Poulet", emoji: "🍗" },
+      "entrees": { name: "Entrées", emoji: "🥗" },
+      "pizzas": { name: "Pizzas", emoji: "🍕" },
+      "desserts": { name: "Desserts", emoji: "🍰" },
+      "boissons": { name: "Boissons", emoji: "🥤" },
+      "cafes": { name: "Cafés", emoji: "☕" },
+      "autre": { name: "Autres", emoji: "🍽️" },
+      "drink": { name: "Boissons", emoji: "🥤" },
+      "hot": { name: "Chaud", emoji: "🔥" },
+    };
+    
+    const categories = Array.from(uniqueCategories).map((cat) => ({
+      id: cat,
+      name: categoryMap[cat]?.name || cat.charAt(0).toUpperCase() + cat.slice(1),
+      emoji: categoryMap[cat]?.emoji || "🍽️",
+    }));
+    
+    // Trier: sandwich en premier, puis par ordre alphabétique
+    return categories.sort((a, b) => {
+      if (a.id === "sandwich") return -1;
+      if (b.id === "sandwich") return 1;
+      return a.name.localeCompare(b.name);
+    });
+  };
+  
+  const categories = getCategories();
 
-  // Produits filtrés - mix API + mock
-  const sandwichProducts = products.filter((p) => {
-    const category = p.category?.toLowerCase() || '';
-    return category.includes('sandwich') || category.includes('autre'); // Les vrais sont en "autre"
+  // Catégories avec leurs emojis (ANCIEN CODE - SUPPRIMÉ)
+  // const categories = [
+  //   { id: "entrees", name: "Entrées", emoji: "🥗" },
+  //   { id: "sandwich", name: "Sandwichs", emoji: "🥪" },
+  //   { id: "pizzas", name: "Pizzas", emoji: "🍕" },
+  //   { id: "desserts", name: "Desserts", emoji: "🍰" },
+  //   { id: "boissons", name: "Boissons", emoji: "🥤" },
+  //   { id: "cafes", name: "Cafés", emoji: "☕" },
+  // ];
+
+  // Produits filtrés - utilise le selectedCategory pour filtrer
+  const filteredProducts = products.filter((p) => {
+    const pCategory = p.category?.toLowerCase() || '';
+    const selectedCat = selectedCategory.toLowerCase();
+    return pCategory === selectedCat;
   });
-
-  const filteredProducts = selectedCategory === "sandwich" 
-    ? sandwichProducts 
-    : products.filter((p) => p.category?.toLowerCase() === selectedCategory);
 
   // Tous les produits disponibles (seulement le store, plus de mocks)
   const allAvailableProducts = products;
@@ -371,7 +454,13 @@ export default function MenuScreen({
           </View>
         </View>
         
-        {/* Bannière avec motifs sandwich */}
+  // 🎨 Render Banner - Générique ou spécifique au restaurant
+  const renderBanner = () => {
+    const isCucinaRestaurant = restaurantId === '6970ef6594abf8bacd9d804d';
+    
+    if (isCucinaRestaurant) {
+      // 🟢 Bannière verte spécifique à Cucina Di Nini
+      return (
         <LinearGradient
           colors={["#146845", "#34311C", "#1F4D2E", "#146845"]}
           locations={[0, 0.35, 0.65, 1]}
@@ -379,7 +468,7 @@ export default function MenuScreen({
           end={{ x: 1, y: 1 }}
           style={styles.bannerGradient}
         >
-          {/* Motifs sandwich subtils */}
+          {/* Motifs sandwich subtils - CUCINA ONLY */}
           <View style={styles.sandwichPatterns}>
             {[...Array(5)].map((_, i) => (
               <View key={i} style={[styles.sandwichIcon, { 
@@ -407,7 +496,7 @@ export default function MenuScreen({
             <View style={styles.restaurantBanner}>
               <View style={styles.bannerContent}>
                 <Text style={[styles.restaurantName, fontLoaded && { fontFamily: 'DXNacky' }]}>
-                  Cucina Di Nini
+                  {restaurantName || "Restaurant"}
                 </Text>
                 <View style={styles.bannerDivider} />
                 <Text style={styles.menuSubtitle}>Menu</Text>
@@ -424,6 +513,49 @@ export default function MenuScreen({
             </TouchableOpacity>
           </View>
         </LinearGradient>
+      );
+    } else {
+      // 🔵 Bannière bleue générique pour tous les autres restaurants (utilise thème)
+      const bannerGradient = getGradient('primary') || ["#2563EB", "#1E40AF"];
+      
+      return (
+        <LinearGradient
+          colors={bannerGradient}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.bannerGradient}
+        >
+          {/* Navigation content */}
+          <View style={styles.nav}>
+            <TouchableOpacity style={styles.backBtn} onPress={onBack}>
+              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            
+            {/* Bannière restaurant centrée */}
+            <View style={styles.restaurantBanner}>
+              <View style={styles.bannerContent}>
+                <Text style={[styles.restaurantName, fontLoaded && { fontFamily: 'DXNacky' }]}>
+                  {restaurantName || "Restaurant"}
+                </Text>
+                <View style={styles.bannerDivider} />
+                <Text style={styles.menuSubtitle}>Menu</Text>
+              </View>
+            </View>
+            
+            {/* Bouton Allergies */}
+            <TouchableOpacity
+              style={styles.allergyButton}
+              onPress={() => setShowDietaryModal(true)}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="no-food" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      );
+    }
+  };
       </View>
 
       {/* Section principale */}
