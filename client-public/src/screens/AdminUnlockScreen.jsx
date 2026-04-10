@@ -33,8 +33,14 @@ export default function AdminUnlockScreen({ onUnlock }) {
 			});
 
 			if (response.ok) {
+				const data = await response.json();
+				if (!data?.token) {
+					Alert.alert("Erreur", "Réponse admin invalide");
+					return;
+				}
+
 				console.log("✅ [AdminUnlock] Mot de passe correct!");
-				onUnlock();
+				onUnlock(data.token);
 			} else {
 				console.warn("❌ [AdminUnlock] Mot de passe incorrect");
 				Alert.alert("Erreur", "Mot de passe incorrect");

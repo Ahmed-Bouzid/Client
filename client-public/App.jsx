@@ -44,6 +44,7 @@ function AppContent() {
 	
 	// 🔐 Admin unlock flow
 	const [adminMode, setAdminMode] = useState(null); // null, "locked", "unlocked"
+	const [adminUnlockToken, setAdminUnlockToken] = useState(null);
 	const [forceRefresh, setForceRefresh] = useState(0); // Force remount après admin
 
 	// En production, tableId et restaurantId viennent du QR code (URL param)
@@ -438,13 +439,17 @@ function AppContent() {
 				{/* 🔐 Mode Admin: écran de déverrouillage */}
 				{adminMode === "locked" && (
 					<AdminUnlockScreen
-						onUnlock={() => setAdminMode("unlocked")}
+						onUnlock={(token) => {
+							setAdminUnlockToken(token);
+							setAdminMode("unlocked");
+						}}
 					/>
 				)}
 
 				{/* 🔐 Mode Admin: sélection restaurant + table */}
 				{adminMode === "unlocked" && (
 					<AdminSelectionScreen
+						adminToken={adminUnlockToken}
 						onTableSelected={async (restaurantId, tableId) => {
 							console.log("📱 [App] onTableSelected callback reçu");
 							console.log("   - restaurantId:", restaurantId);
@@ -461,6 +466,7 @@ function AppContent() {
 							
 							// Sortir du mode admin
 							console.log("📱 [App] setAdminMode(null)");
+							setAdminUnlockToken(null);
 							setAdminMode(null);
 						}}
 					/>

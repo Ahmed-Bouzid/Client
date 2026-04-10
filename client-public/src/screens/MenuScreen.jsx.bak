@@ -508,9 +508,6 @@ export default function MenuScreen({
           </View>
         </LinearGradient>
       );
-    }
-  };
-
 
   return (
     <View style={styles.container}>
@@ -558,9 +555,8 @@ export default function MenuScreen({
             ))}
           </View>
         </View>
-        {/* Bannière dynamique selon le restaurant */}
-        {renderBanner()}
-
+        
+  };
       </View>
 
       {/* Section principale */}

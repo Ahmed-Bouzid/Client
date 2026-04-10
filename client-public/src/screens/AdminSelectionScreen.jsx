@@ -16,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config/api";
 
-export default function AdminSelectionScreen({ onConnect, onTableSelected }) {
+export default function AdminSelectionScreen({ onConnect, onTableSelected, adminToken }) {
 	const [restaurants, setRestaurants] = useState([]);
 	const [selectedRestaurant, setSelectedRestaurant] = useState(null);
 	const [tables, setTables] = useState([]);
@@ -39,14 +39,29 @@ export default function AdminSelectionScreen({ onConnect, onTableSelected }) {
 
 	const fetchRestaurants = async () => {
 		console.log("🏪 [AdminSelection] Chargement restaurants...");
+		if (!adminToken) {
+			setLoading(false);
+			Alert.alert("Session expirée", "Veuillez ressaisir le mot de passe admin");
+			return;
+		}
+
 		try {
 			setLoading(true);
-			const response = await fetch(`${API_BASE_URL}/admin-auth/restaurants`);
+			const response = await fetch(`${API_BASE_URL}/admin-auth/restaurants`, {
+				headers: {
+					Authorization: `Bearer ${adminToken}`,
+				},
+			});
 			if (response.ok) {
 				const data = await response.json();
 				console.log("✅ [AdminSelection] Restaurants chargés:", data);
 				setRestaurants(data);
 			} else {
+				if (response.status === 401 || response.status === 403) {
+					Alert.alert("Session expirée", "Veuillez ressaisir le mot de passe admin");
+					return;
+				}
+
 				console.warn("❌ [AdminSelection] Erreur chargement restaurants");
 				Alert.alert("Erreur", "Impossible de charger les restaurants");
 			}
@@ -64,15 +79,30 @@ export default function AdminSelectionScreen({ onConnect, onTableSelected }) {
 		setTables([]);
 
 		try {
+				if (!adminToken) {
+					Alert.alert("Session expirée", "Veuillez ressaisir le mot de passe admin");
+					return;
+				}
+
 			setLoadingTables(true);
 			const response = await fetch(
-				`${API_BASE_URL}/admin-auth/restaurants/${restaurantId}/tables`
+					`${API_BASE_URL}/admin-auth/restaurants/${restaurantId}/tables`,
+					{
+						headers: {
+							Authorization: `Bearer ${adminToken}`,
+						},
+					},
 			);
 			if (response.ok) {
 				const data = await response.json();
 				console.log("✅ [AdminSelection] Tables chargées:", data);
 				setTables(data);
 			} else {
+					if (response.status === 401 || response.status === 403) {
+						Alert.alert("Session expirée", "Veuillez ressaisir le mot de passe admin");
+						return;
+					}
+
 				console.warn("❌ [AdminSelection] Erreur chargement tables");
 				Alert.alert("Erreur", "Impossible de charger les tables");
 			}
