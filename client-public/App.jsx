@@ -9,6 +9,7 @@ import OrderScreen from "./src/screens/OrderScreen"; // 🎨 NOUVEAU design orde
 import AddOn from "./src/components/menu/AddOn";
 import Payment from "./src/screens/Payment";
 import OrderSummary from "./src/screens/OrderSummary";
+import OrderTrackingScreen from "./src/screens/OrderTrackingScreen";
 import AdminUnlockScreen from "./src/screens/AdminUnlockScreen"; // 🔐 Admin password
 import AdminSelectionScreen from "./src/screens/AdminSelectionScreen"; // 🔐 Restaurant + Table selection
 import { StripeProvider } from "@stripe/stripe-react-native";
@@ -37,7 +38,8 @@ const DEFAULT_TABLE_ID = "DEFAULT";
 const DEFAULT_RESTAURANT_ID = "DEFAULT";
 
 function AppContent() {
-	const [step, setStep] = useState("join"); // join, menu, addOn, orders, payment
+	const [step, setStep] = useState("join"); // join, menu, addOn, orders, payment, tracking
+	const [trackingOrderId, setTrackingOrderId] = useState("");
 	const [reservationId, setReservationId] = useState("");
 	const [clientId, setClientId] = useState("");
 	const [tableNumber, setTableNumber] = useState(null);
@@ -87,7 +89,19 @@ function AppContent() {
 	useEffect(() => {
 		const checkAdminMode = async () => {
 			console.log("🔐 [App] Vérification mode admin au démarrage");
-			const { restaurantId: urlRestaurantId, tableId: urlTableId } = getUrlParams();
+			const {
+				restaurantId: urlRestaurantId,
+				tableId: urlTableId,
+				orderId: urlOrderId,
+				isTrackingRoute,
+			} = getUrlParams();
+
+			if (isTrackingRoute && urlOrderId) {
+				setTrackingOrderId(urlOrderId);
+				setStep("tracking");
+				setAdminMode(null);
+				return;
+			}
 			const storedRestaurantId = await AsyncStorage.getItem("restaurantId");
 			const storedTableId = await AsyncStorage.getItem("tableId");
 			
@@ -117,7 +131,21 @@ function AppContent() {
 		const initialize = async () => {
 			console.log("🚀 [App] Initialisation au démarrage");
 			// 🌐 Sur web : lire restaurantId + tableId depuis l'URL (/r/[restaurantId]/[tableId])
-			const { restaurantId: urlRestaurantId, tableId: urlTableId } = getUrlParams();
+			const {
+				restaurantId: urlRestaurantId,
+				tableId: urlTableId,
+				orderId: urlOrderId,
+				isTrackingRoute,
+			} = getUrlParams();
+
+			if (isTrackingRoute && urlOrderId) {
+				setTrackingOrderId(urlOrderId);
+				setStep("tracking");
+				await initOrder();
+				await useAllergyStore.getState().init();
+				await useRestrictionStore.getState().init();
+				return;
+			}
 
 			// 🔐 Vérifier AsyncStorage d'abord (fallback du mode admin)
 			const storedRestaurantId = await AsyncStorage.getItem("restaurantId");
@@ -133,7 +161,7 @@ function AppContent() {
 
 			// ⭐ Si pas d'IDs, on ne fait rien (mode admin)
 			if (!finalRestaurantId || !finalTableId) {
-				console.log("   → IDs manquants, mode admin sera affichéreturn");
+				console.log("   → IDs manquants, mode admin sera affiché");
 				return;
 			}
 
@@ -171,6 +199,20 @@ function AppContent() {
 		};
 		initialize();
 	}, []);
+
+	const navigateToTracking = (orderId) => {
+		if (!orderId) return;
+
+		setTrackingOrderId(orderId);
+		setStep("tracking");
+
+		if (Platform.OS === "web" && typeof window !== "undefined") {
+			const targetPath = `/suivi/${orderId}`;
+			if (window.location.pathname !== targetPath) {
+				window.history.replaceState({}, "", targetPath);
+			}
+		}
+	};
 
 	// Initialiser le panier quand le userName change
 	// Pour une nouvelle connexion, on nettoie le panier précédent
@@ -234,14 +276,14 @@ function AppContent() {
 	};
 
 	// Handler pour soumettre la commande
-	const submitOrder = async () => {
+	const submitOrder = async ({ redirectToTracking = true } = {}) => {
 		if (currentOrder.length === 0) {
 			showAlert(
 				"Panier vide",
 				"Veuillez ajouter des articles avant de commander.",
 				[{ text: "OK" }],
 			);
-			return;
+			return null;
 		}
 
 		// ⭐ VÉRIFIER qu'on a les infos nécessaires
@@ -251,7 +293,7 @@ function AppContent() {
 				"Aucune réservation active. Veuillez rejoindre une table d'abord.",
 				[{ text: "OK" }],
 			);
-			return;
+			return null;
 		}
 
 		try {
@@ -282,28 +324,40 @@ function AppContent() {
 
 
 			// ⭐ ENVOYER TOUTES LES DONNÉES
-			await submitOrderToServer(orderData);
+			const createdOrder = await submitOrderToServer(orderData);
 
 			await clearCart();
+			const createdOrderId = createdOrder?._id || createdOrder?.id || null;
+
+			if (redirectToTracking && createdOrderId) {
+				navigateToTracking(createdOrderId);
+			}
 
 			showAlert(
 				"✅ Commande envoyée",
-				"Votre commande a été envoyée avec succès !",
+				redirectToTracking && createdOrderId
+					? "Votre commande est envoyée. Suivi en temps reel active."
+					: "Votre commande a été envoyée avec succès !",
 				[
 					{
 						text: "OK",
 						onPress: () => {
-							setStep("menu");
+							if (!redirectToTracking) {
+								setStep("menu");
+							}
 						},
 					},
 				],
 			);
+
+			return createdOrder;
 		} catch (error) {
 			console.error("Erreur création commande dans App.js:", error);
 			showAlert(
 				"Erreur",
 				error.message || "Erreur lors de la création de la commande",
 			);
+			return null;
 		}
 	};
 
@@ -340,7 +394,8 @@ function AppContent() {
 
 		// Soumettre la commande au serveur d'abord
 		try {
-			await submitOrder();
+			const createdOrder = await submitOrder({ redirectToTracking: false });
+			if (!createdOrder) return;
 			
 			// Puis charger les commandes et naviguer vers payment
 			await useOrderStore
@@ -546,6 +601,21 @@ function AppContent() {
 								onSuccess={handlePaymentSuccess}
 								onBack={() => setStep("menu")}
 								onReservationClosed={() => setStep("join")}
+							/>
+						)}
+
+						{step === "tracking" && !!trackingOrderId && (
+							<OrderTrackingScreen
+								orderId={trackingOrderId}
+								onBackToMenu={() => {
+									if (Platform.OS === "web" && typeof window !== "undefined") {
+										const nextPath = restaurantId && tableId
+											? `/r/${restaurantId}/${tableId}`
+											: "/";
+										window.history.replaceState({}, "", nextPath);
+									}
+									setStep("menu");
+								}}
 							/>
 						)}
 					</>

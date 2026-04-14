@@ -15,7 +15,10 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Utiliser Face ID pour déverrouiller l'accès administrateur rapidement et de façon sécurisée."
+      }
     },
     "android": {
       "adaptiveIcon": {

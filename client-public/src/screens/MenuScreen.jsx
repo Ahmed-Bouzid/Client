@@ -2,7 +2,7 @@
  * MenuScreen - Page du menu (nouveau design Foodmood)
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -15,9 +15,13 @@ import {
   Image,
   Alert,
   Modal,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import * as Font from 'expo-font';
 import useProductStore from "../stores/useProductStore";
 import { useCartStore } from "../stores/useCartStore";
@@ -66,13 +70,23 @@ export default function MenuScreen({
   
   console.log("📋 [MenuScreen] restaurantId reçu:", restaurantId, "type:", typeof restaurantId);
   
+  // 🍝 CUCINA: Détection restaurant
+  const isCucina = restaurantId === '6970ef6594abf8bacd9d804d';
+  
   // States
-  const [selectedCategory, setSelectedCategory] = useState("sandwich");
+  const [selectedCategory, setSelectedCategory] = useState(isCucina ? null : "sandwich");
   const [fontLoaded, setFontLoaded] = useState(false);
   const [showOrderSummary, setShowOrderSummary] = useState(false);
   const [showDietaryModal, setShowDietaryModal] = useState(false);
   const [addOnsModalVisible, setAddOnsModalVisible] = useState(false);
   const [currentProductWithAddOns, setCurrentProductWithAddOns] = useState(null);
+  
+  // 🔥 GRILLZ: Product Detail Modal
+  const [showProductDetail, setShowProductDetail] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [detailQty, setDetailQty] = useState(1);
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   
   // Stores - EXACTEMENT comme Menu.jsx
   const products = useProductStore((state) => state.products);
@@ -217,7 +231,15 @@ export default function MenuScreen({
     });
   };
   
-  const categories = getCategories();
+  // 🍝 CUCINA: Catégories fixes avec emojis italiens
+  const cucinaCategories = [
+    { id: "sandwich", name: "Sandwichs", emoji: "🥪" },
+    { id: "side", name: "Sides", emoji: "🍟" },
+    { id: "desserts", name: "Desserts", emoji: "🍰" },
+    { id: "boissons", name: "Boissons", emoji: "🥤" },
+  ];
+  
+  const categories = isCucina ? cucinaCategories : getCategories();
 
   // Catégories avec leurs emojis (ANCIEN CODE - SUPPRIMÉ)
   // const categories = [
@@ -231,6 +253,7 @@ export default function MenuScreen({
 
   // Produits filtrés - utilise le selectedCategory pour filtrer
   const filteredProducts = products.filter((p) => {
+    if (!selectedCategory) return false; // Aucune catégorie = pas de produits
     const pCategory = p.category?.toLowerCase() || '';
     const selectedCat = selectedCategory.toLowerCase();
     return pCategory === selectedCat;
@@ -338,9 +361,103 @@ export default function MenuScreen({
     }
   };
 
-  // Render category tab (avec ligne rouge)
+  // 🔥 GRILLZ: Fonction pour ouvrir la modale détail produit
+  const openProductDetail = (product) => {
+    setSelectedProduct(product);
+    setDetailQty(cart[product._id] || 1);
+    setShowProductDetail(true);
+    
+    // Reset animations
+    scaleAnim.setValue(0.8);
+    fadeAnim.setValue(0);
+    
+    // Lancer animations d'entrée
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+  
+  const closeProductDetail = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.8,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowProductDetail(false);
+      setSelectedProduct(null);
+    });
+  };
+  
+  const handleDetailAddToCart = () => {
+    if (selectedProduct) {
+      for (let i = 0; i < detailQty; i++) {
+        handleAddProduct(selectedProduct);
+      }
+      closeProductDetail();
+    }
+  };
+
+  // Render category tab
+  // 🔥 Le Grillz = Style tabs selon spec exacte
+  const isGrillzTheme = restaurantId === '695e4300adde654b80f6911a';
+  
   const renderCategory = (category) => {
     const isSelected = selectedCategory === category.id;
+    
+    if (isGrillzTheme) {
+      // 🔥 GRILLZ: Catégories avec underline indicator
+      return (
+        <TouchableOpacity
+          key={category.id}
+          onPress={() => setSelectedCategory(category.id)}
+          activeOpacity={0.7}
+          style={{ 
+            alignItems: 'center',
+            marginHorizontal: 14,
+            paddingVertical: 6,
+          }}
+        >
+          {/* TEXT */}
+          <Text style={{ 
+            color: isSelected ? '#FF8A50' : '#666',
+            fontSize: 15,
+            fontWeight: isSelected ? '600' : '400',
+          }}>
+            {category.name}
+          </Text>
+          
+          {/* ACTIVE INDICATOR - underline 2px, alignée sur largeur texte */}
+          {isSelected && (
+            <View style={{
+              height: 2,
+              backgroundColor: '#FF8A50',
+              alignSelf: 'center',
+              marginTop: 5,
+              width: '100%',
+            }} />
+          )}
+        </TouchableOpacity>
+      );
+    }
+    
+    // Style par défaut pour autres restos
     return (
       <TouchableOpacity
         key={category.id}
@@ -355,48 +472,176 @@ export default function MenuScreen({
     );
   };
 
-  // Render carte produit
+  // Render carte produit - 🔥 GRILLZ: Cards selon spec exacte
   const renderProduct = ({ item }) => {
     const qty = cart[item._id] || 0;
-
+    
+    if (isGrillzTheme) {
+      // 🔥 GRILLZ: Card spec complète
+      return (
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          backgroundColor: '#141414',
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderRadius: 14,
+          marginHorizontal: 6,
+          marginBottom: 12,
+        }}>
+          {/* IMAGE - Cliquable pour ouvrir le détail */}
+          <TouchableOpacity onPress={() => openProductDetail(item)} activeOpacity={0.8}>
+            <Image 
+              source={PANINI_IMAGE} 
+              style={{ 
+                width: 85, 
+                height: 85, 
+                borderRadius: 10,
+                marginRight: 14,
+                marginTop: 4,
+              }} 
+              resizeMode="cover" 
+            />
+          </TouchableOpacity>
+          
+          {/* CONTENT STACK - flex column */}
+          <View style={{ flex: 1 }}>
+            {/* ROW 1: TITLE + PRICE - Title cliquable */}
+            <View style={{ 
+              flexDirection: 'row', 
+              justifyContent: 'space-between', 
+              alignItems: 'flex-start', 
+              marginBottom: 6,
+            }}>
+              <TouchableOpacity onPress={() => openProductDetail(item)} activeOpacity={0.7} style={{ flex: 0.7 }}>
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 16,
+                  fontWeight: '600',
+                  marginRight: 8,
+                }} numberOfLines={2}>
+                  {item.name}
+                </Text>
+              </TouchableOpacity>
+              <Text style={{
+                color: '#FF8A50',
+                fontSize: 15,
+                fontWeight: '600',
+              }}>
+                {item.price?.toFixed(2) || '0.00'}€
+              </Text>
+            </View>
+            
+            {/* DESCRIPTION - 2 lignes pour compenser les calories supprimées */}
+            <Text style={{
+              color: '#777',
+              fontSize: 12,
+              lineHeight: 17,
+              marginBottom: 14,
+            }} numberOfLines={2}>
+              {item.description}
+            </Text>
+            
+            {/* ROW: QUANTITY + BUTTON */}
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+            }}>
+              {/* QUANTITY SELECTOR */}
+              <View style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: '#333',
+                borderRadius: 8,
+              }}>
+                <TouchableOpacity
+                  onPress={() => qty > 0 && handleRemoveProduct(item)}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="remove" size={14} color="#777" />
+                </TouchableOpacity>
+                
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 13,
+                  fontWeight: '500',
+                  marginHorizontal: 10,
+                  minWidth: 18,
+                  textAlign: 'center',
+                }}>
+                  {qty}
+                </Text>
+                
+                <TouchableOpacity
+                  onPress={() => handleAddProduct(item)}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="add" size={14} color="#777" />
+                </TouchableOpacity>
+              </View>
+              
+              {/* ADD TO CART BUTTON */}
+              <TouchableOpacity
+                onPress={() => handleAddProduct(item)}
+                style={{
+                  backgroundColor: '#D35400',
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: 10,
+                  height: 34,
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 12,
+                  fontWeight: '600',
+                }}>
+                  Add to cart
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    }
+    
+    // Style par défaut pour autres restos
     return (
       <View style={styles.productCard}>
-        {/* Image produit (rond) */}
         <View style={styles.productImageContainer}>
           <Image source={PANINI_IMAGE} style={styles.productImage} resizeMode="cover" />
         </View>
-
-        {/* Infos */}
         <View style={styles.productInfo}>
           <Text style={styles.productName}>{item.name}</Text>
           <Text style={styles.productDescription} numberOfLines={2}>
             {item.description}
           </Text>
-
-          {/* Prix + Boutons */}
           <View style={styles.priceRow}>
             <Text style={styles.price}>{item.price?.toFixed(2) || '0.00'}€</Text>
-            
             {qty === 0 ? (
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => handleAddProduct(item)}
-              >
+              <TouchableOpacity style={styles.addButton} onPress={() => handleAddProduct(item)}>
                 <Text style={styles.addButtonText}>Ajouter</Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.quantityControls}>
-                <TouchableOpacity
-                  style={styles.quantityBtn}
-                  onPress={() => handleRemoveProduct(item)}
-                >
+                <TouchableOpacity style={styles.quantityBtn} onPress={() => handleRemoveProduct(item)}>
                   <Ionicons name="remove" size={16} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={styles.quantityText}>{qty}</Text>
-                <TouchableOpacity
-                  style={styles.quantityBtn}
-                  onPress={() => handleAddProduct(item)}
-                >
+                <TouchableOpacity style={styles.quantityBtn} onPress={() => handleAddProduct(item)}>
                   <Ionicons name="add" size={16} color="#FFF" />
                 </TouchableOpacity>
               </View>
@@ -411,8 +656,45 @@ export default function MenuScreen({
   // 🎨 Render Banner - Générique ou spécifique au restaurant
   const renderBanner = () => {
     const isCucinaRestaurant = restaurantId === '6970ef6594abf8bacd9d804d';
+    const isGrillzRestaurant = restaurantId === '695e4300adde654b80f6911a';
     
-    if (isCucinaRestaurant) {
+    if (isGrillzRestaurant) {
+      // 🔥 HEADER selon spec exacte
+      return (
+        <View style={{
+          backgroundColor: '#0D0D0D',
+          height: 70,
+          paddingTop: 40,
+          paddingHorizontal: 18,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+        }}>
+          {/* BACK ICON - zone cliquable 44px */}
+          <TouchableOpacity 
+            onPress={onBack} 
+            style={{ 
+              width: 44, 
+              height: 44, 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              marginRight: 10,
+            }}
+          >
+            <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
+          
+          {/* TITRE "Food Menu" - 18px semi-bold */}
+          <Text style={{
+            color: '#FFFFFF',
+            fontSize: 18,
+            fontWeight: '500',
+          }}>
+            Food Menu
+          </Text>
+        </View>
+      );
+    } else if (isCucinaRestaurant) {
       // 🟢 Bannière verte spécifique à Cucina Di Nini
       return (
         <LinearGradient
@@ -512,102 +794,464 @@ export default function MenuScreen({
   };
 
 
-  return (
-    <View style={styles.container}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+  // 🔥 Le Grillz = thème dark complet
+  const isGrillz = restaurantId === '695e4300adde654b80f6911a';
+  const containerStyle = isGrillz 
+    ? [styles.container, { backgroundColor: '#1a1a1a' }]
+    : styles.container;
 
-      {/* Navigation avec fond décoratif audacieux */}
-      <View style={styles.navContainer}>
-        {/* Fond dégradé principal */}
-        <LinearGradient
-          colors={[COLORS.primary + "25", COLORS.accent + "20", COLORS.background]}
-          style={styles.headerGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        />
-        
-        {/* Formes organiques complexes */}
-        <View style={styles.decorativeElements}>
-          {/* Grande forme principale */}
-          <View style={styles.mainBlob} />
-          
-          {/* Formes secondaires */}
-          <View style={styles.secondaryBlob1} />
-          <View style={styles.secondaryBlob2} />
-          
-          {/* Accents colorés */}
+  // 🔥 BBQ Grill Lines Component - Lignes de grill visibles
+  const GrillLines = () => (
+    <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 150, overflow: 'hidden', zIndex: 1 }}>
+      {[...Array(15)].map((_, i) => (
+        <View key={i} style={{
+          position: 'absolute',
+          top: i * 10,
+          left: -20,
+          right: -20,
+          height: 3,
+          backgroundColor: '#FF6B35',
+          opacity: 0.3 - (i * 0.015),
+          transform: [{ rotate: '-3deg' }],
+        }} />
+      ))}
+    </View>
+  );
+  
+  // 🔥 BBQ Heat Glow Component - Plus visible
+  const HeatGlow = () => (
+    <LinearGradient
+      pointerEvents="none"
+      colors={['rgba(255, 107, 53, 0.35)', 'rgba(211, 84, 0, 0.15)', 'transparent']}
+      style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 250,
+        zIndex: 0,
+      }}
+      start={{ x: 0.5, y: 1 }}
+      end={{ x: 0.5, y: 0 }}
+    />
+  );
+  
+  // 🔥 BBQ Smoke/Heat waves (effet chaleur montante)
+  const HeatWaves = () => (
+    <View pointerEvents="none" style={{ position: 'absolute', top: 120, left: 0, right: 0, height: 60, zIndex: 1, opacity: 0.2 }}>
+      <LinearGradient
+        colors={['transparent', 'rgba(255, 140, 80, 0.3)', 'transparent']}
+        style={{ flex: 1 }}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+      />
+    </View>
+  );
+
+  return (
+    <View style={containerStyle}>
+      <StatusBar translucent backgroundColor="transparent" barStyle={isGrillz || isCucina ? "light-content" : "dark-content"} />
+
+      {/* 🔥 BBQ Effects - Seulement pour Le Grillz */}
+      {isGrillz && <GrillLines />}
+      {isGrillz && <HeatWaves />}
+
+      {/* 🍝 CUCINA: Layout personnalisé */}
+      {isCucina ? (
+        <View style={{ flex: 1, backgroundColor: '#1a1a1a' }}>
+          {/* Header Cucina - plein écran jusqu'en haut */}
           <LinearGradient
-            colors={[COLORS.accent, COLORS.accent + "80"]}
-            style={styles.accentBlob1}
+            colors={['#8B0000', '#B22222', '#CD5C5C']}
+            style={{
+              paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 10,
+              paddingBottom: 20,
+              paddingHorizontal: 16,
+            }}
+          >
+            {/* Navigation row */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <TouchableOpacity onPress={onBack} style={{ padding: 8 }}>
+                <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+              
+              <Text style={{ 
+                color: '#FFFFFF', 
+                fontSize: 22, 
+                fontWeight: '700',
+                letterSpacing: 1,
+              }}>
+                {restaurantName || "La Cucina Di Nini"}
+              </Text>
+              
+              <TouchableOpacity onPress={() => setShowDietaryModal(true)} style={{ padding: 8 }}>
+                <MaterialIcons name="no-food" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+          
+          {/* Catégories Cucina */}
+          <View style={{ backgroundColor: '#1a1a1a', paddingVertical: 12 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
+            >
+              {categories.map((category) => {
+                const isSelected = selectedCategory === category.id;
+                return (
+                  <TouchableOpacity
+                    key={category.id}
+                    onPress={() => setSelectedCategory(category.id)}
+                    style={{
+                      backgroundColor: isSelected ? '#B22222' : '#2a2a2a',
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <Text style={{ fontSize: 16 }}>{category.emoji}</Text>
+                    <Text style={{ 
+                      color: isSelected ? '#FFFFFF' : '#AAAAAA', 
+                      fontSize: 14, 
+                      fontWeight: isSelected ? '600' : '400' 
+                    }}>
+                      {category.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+          
+          {/* Contenu - Message ou Produits */}
+          {selectedCategory === null ? (
+            // Message commercial quand aucune catégorie
+            <View style={{ 
+              flex: 1, 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              paddingHorizontal: 40,
+            }}>
+              <Text style={{ fontSize: 50, marginBottom: 20 }}>🍝</Text>
+              <Text style={{ 
+                color: '#FFFFFF', 
+                fontSize: 24, 
+                fontWeight: '700',
+                textAlign: 'center',
+                marginBottom: 10,
+              }}>
+                Prêt à vous régaler ?
+              </Text>
+              <Text style={{ 
+                color: '#888888', 
+                fontSize: 16, 
+                textAlign: 'center',
+                lineHeight: 24,
+              }}>
+                Sélectionnez une catégorie pour découvrir nos délicieuses spécialités italiennes
+              </Text>
+            </View>
+          ) : (
+            // Liste des produits
+            <FlatList
+              data={filteredProducts}
+              renderItem={renderProduct}
+              keyExtractor={(item) => item._id}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 100 }}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', paddingTop: 60 }}>
+                  <Text style={{ color: '#666', fontSize: 16 }}>Aucun produit dans cette catégorie</Text>
+                </View>
+              }
+            />
+          )}
+          
+          {/* Barre panier Cucina */}
+          {totalItems > 0 && (
+            <View style={{
+              position: 'absolute',
+              bottom: 20,
+              left: 16,
+              right: 16,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#B22222',
+              paddingHorizontal: 20,
+              paddingVertical: 16,
+              borderRadius: 16,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 8,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 12,
+                }}>
+                  <Ionicons name="cart" size={20} color="#FFFFFF" />
+                </View>
+                <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '600' }}>
+                  {totalItems} article{totalItems > 1 ? 's' : ''}
+                </Text>
+              </View>
+              
+              <TouchableOpacity
+                onPress={handlePayPress}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  paddingHorizontal: 20,
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                }}
+              >
+                <Text style={{ color: '#B22222', fontSize: 15, fontWeight: '700' }}>
+                  {totalAmount.toFixed(2)}€ →
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      ) : (
+        // Layout par défaut (Grillz et autres)
+        <>
+      {/* Navigation avec fond décoratif audacieux */}
+      <View style={[styles.navContainer, isGrillz && { backgroundColor: 'transparent' }]}>
+        {/* Fond dégradé principal - caché pour Grillz */}
+        {!isGrillz && (
+          <LinearGradient
+            colors={[COLORS.primary + "25", COLORS.accent + "20", COLORS.background]}
+            style={styles.headerGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           />
-          
-          <LinearGradient
-            colors={[COLORS.primary, COLORS.primary + "60"]}
-            style={styles.accentBlob2}
-          />
-          
-          {/* Motif de points */}
-          <View style={styles.dotsPattern}>
-            {[...Array(8)].map((_, i) => (
-              <View key={i} style={[styles.dot, { 
-                top: (i % 3) * 15 + 10, 
-                left: Math.floor(i / 3) * 20 + 50 
-              }]} />
-            ))}
+        )}
+        
+        {/* Formes organiques complexes - cachées pour Grillz */}
+        {!isGrillz && (
+          <View style={styles.decorativeElements}>
+            {/* Grande forme principale */}
+            <View style={styles.mainBlob} />
+            
+            {/* Formes secondaires */}
+            <View style={styles.secondaryBlob1} />
+            <View style={styles.secondaryBlob2} />
+            
+            {/* Accents colorés */}
+            <LinearGradient
+              colors={[COLORS.accent, COLORS.accent + "80"]}
+              style={styles.accentBlob1}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            />
+            
+            <LinearGradient
+              colors={[COLORS.primary, COLORS.primary + "60"]}
+              style={styles.accentBlob2}
+            />
+            
+            {/* Motif de points */}
+            <View style={styles.dotsPattern}>
+              {[...Array(8)].map((_, i) => (
+                <View key={i} style={[styles.dot, { 
+                  top: (i % 3) * 15 + 10, 
+                  left: Math.floor(i / 3) * 20 + 50 
+                }]} />
+              ))}
+            </View>
           </View>
-        </View>
+        )}
         {/* Bannière dynamique selon le restaurant */}
         {renderBanner()}
 
       </View>
 
       {/* Section principale */}
-      <View style={styles.mainContainer}>
-        {/* Catégories horizontales */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesContainer}
-          style={styles.categoriesScroll}
-        >
-          {categories.map(renderCategory)}
-        </ScrollView>
+      <View style={[styles.mainContainer, isGrillz && { backgroundColor: '#0D0D0D' }]}>
+        {/* Catégories - CENTRÉES pour Grillz */}
+        {isGrillz ? (
+          <View style={{
+            backgroundColor: 'transparent',
+            paddingVertical: 10,
+            marginBottom: 14,
+          }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: 'center',
+                paddingHorizontal: 16,
+              }}
+            >
+              {categories.map(renderCategory)}
+            </ScrollView>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesContainer}
+            style={styles.categoriesScroll}
+          >
+            {categories.map(renderCategory)}
+          </ScrollView>
+        )}
 
-        {/* Liste des produits */}
-        <FlatList
-          data={filteredProducts}
-          renderItem={renderProduct}
-          keyExtractor={(item) => item._id}
-          contentContainerStyle={styles.productsContainer}
-          showsVerticalScrollIndicator={false}
-        />
+        {/* Liste des produits - avec effet BBQ pour Grillz */}
+        {isGrillz ? (
+          <View style={{ flex: 1, backgroundColor: '#0D0D0D' }}>
+            {/* Effet BBQ - lueur orange en haut */}
+            <LinearGradient
+              pointerEvents="none"
+              colors={['rgba(255, 107, 53, 0.2)', 'rgba(211, 84, 0, 0.08)', 'transparent']}
+              style={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                height: 150,
+                zIndex: 1,
+              }}
+            />
+            {/* Effet BBQ - lueur orange en bas */}
+            <LinearGradient
+              pointerEvents="none"
+              colors={['transparent', 'rgba(211, 84, 0, 0.1)', 'rgba(255, 80, 0, 0.2)']}
+              style={{ 
+                position: 'absolute', 
+                bottom: 0, 
+                left: 0, 
+                right: 0, 
+                height: 120,
+                zIndex: 1,
+              }}
+            />
+            <FlatList
+              data={filteredProducts}
+              renderItem={renderProduct}
+              keyExtractor={(item) => item._id}
+              contentContainerStyle={[styles.productsContainer, { paddingTop: 0 }]}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        ) : (
+          <FlatList
+            data={filteredProducts}
+            renderItem={renderProduct}
+            keyExtractor={(item) => item._id}
+            contentContainerStyle={styles.productsContainer}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </View>
 
-      {/* Barre du bas */}
+      {/* Barre du bas - Style identique à l'image de référence pour Le Grillz */}
       {totalItems > 0 && (
-        <View style={styles.bottomBar}>
-          <View style={styles.cartPreview}>
-            <View style={styles.cartIcon}>
-              <Ionicons name="cart" size={22} color="#FFF" />
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{totalItems}</Text>
+        isGrillz ? (
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: '#121212',
+            marginHorizontal: 16,
+            marginBottom: 20,
+            paddingHorizontal: 20,
+            paddingVertical: 16,
+            borderRadius: 20,
+            // Floating card effect
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 12,
+            elevation: 10,
+          }}>
+            {/* Gauche: Icône panier dans cercle + Total */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {/* Cercle avec icône panier */}
+              <View style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: '#D35400',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 14,
+              }}>
+                <Ionicons name="cart" size={22} color="#FFFFFF" />
+                {/* Badge quantité */}
+                <View style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -4,
+                  backgroundColor: '#FFFFFF',
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Text style={{ color: '#D35400', fontSize: 11, fontWeight: '700' }}>{totalItems}</Text>
+                </View>
+              </View>
+              
+              {/* Textes */}
+              <View>
+                <Text style={{ color: '#777', fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase' }}>Total Amount</Text>
+                <Text style={{ color: '#FF8A50', fontSize: 20, fontWeight: '700' }}>{totalAmount.toFixed(2)}€</Text>
               </View>
             </View>
-            <View>
-              <Text style={styles.totalLabel}>TOTAL</Text>
-              <Text style={styles.totalValue}>{totalAmount.toFixed(2)}€</Text>
-            </View>
-          </View>
 
-          <TouchableOpacity 
-            style={styles.placeOrderBtn} 
-            onPress={handlePayPress}
-          >
-            <Text style={styles.placeOrderText}>Commander</Text>
-          </TouchableOpacity>
-        </View>
+            {/* Droite: Bouton Place order - très arrondi */}
+            <TouchableOpacity 
+              onPress={handlePayPress}
+              activeOpacity={0.8}
+              style={{
+                backgroundColor: '#D35400',
+                paddingHorizontal: 24,
+                paddingVertical: 14,
+                borderRadius: 30,
+              }}
+            >
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '600',
+              }}>
+                Place order
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.bottomBar}>
+            <View style={styles.cartPreview}>
+              <View style={styles.cartIcon}>
+                <Ionicons name="cart" size={22} color="#FFF" />
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{totalItems}</Text>
+                </View>
+              </View>
+              <View>
+                <Text style={styles.totalLabel}>TOTAL</Text>
+                <Text style={styles.totalValue}>{totalAmount.toFixed(2)}€</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.placeOrderBtn} onPress={handlePayPress}>
+              <Text style={styles.placeOrderText}>Commander</Text>
+            </TouchableOpacity>
+          </View>
+        )
       )}
 
       {/* Modal OrderSummary */}
@@ -642,6 +1286,167 @@ export default function MenuScreen({
             setCurrentProductWithAddOns(null);
           }}
         />
+      )}
+      
+      {/* 🔥 GRILLZ: Modal Product Detail avec animation rotation */}
+      {isGrillz && (
+        <Modal
+          visible={showProductDetail}
+          transparent={true}
+          animationType="none"
+          onRequestClose={closeProductDetail}
+        >
+          <Animated.View style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.95)',
+            opacity: fadeAnim,
+          }}>
+            {/* Header avec bouton retour */}
+            <TouchableOpacity 
+              onPress={closeProductDetail}
+              style={{
+                position: 'absolute',
+                top: 100,
+                left: 16,
+                width: 44,
+                height: 44,
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10,
+              }}
+            >
+              <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
+            
+            {/* Contenu centré verticalement */}
+            <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24 }}>
+              {/* Image centrée */}
+              <Animated.View style={{
+                alignItems: 'center',
+                marginBottom: 30,
+                transform: [{ scale: scaleAnim }],
+              }}>
+                <Image 
+                  source={PANINI_IMAGE}
+                  style={{
+                    width: SCREEN_WIDTH * 0.65,
+                    height: SCREEN_WIDTH * 0.65,
+                    borderRadius: 20,
+                  }}
+                  resizeMode="cover"
+                />
+              </Animated.View>
+              
+              {/* Nom du produit */}
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 26,
+                fontWeight: '700',
+                marginBottom: 10,
+                textAlign: 'center',
+              }}>
+                {selectedProduct?.name}
+              </Text>
+              
+              {/* Description */}
+              <Text style={{
+                color: '#888',
+                fontSize: 14,
+                lineHeight: 22,
+                marginBottom: 20,
+                textAlign: 'center',
+              }} numberOfLines={3}>
+                {selectedProduct?.description}
+              </Text>
+              
+              {/* Prix */}
+              <Text style={{
+                color: '#FF8A50',
+                fontSize: 28,
+                fontWeight: '800',
+                marginBottom: 30,
+                textAlign: 'center',
+              }}>
+                {selectedProduct?.price?.toFixed(2) || '0.00'}€
+              </Text>
+              
+              {/* Quantity selector + Add to cart */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                {/* Quantity */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#1E1E1E',
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#333',
+                }}>
+                  <TouchableOpacity
+                    onPress={() => detailQty > 1 && setDetailQty(detailQty - 1)}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name="remove" size={20} color="#888" />
+                  </TouchableOpacity>
+                  
+                  <Text style={{
+                    color: '#FFFFFF',
+                    fontSize: 18,
+                    fontWeight: '600',
+                    marginHorizontal: 20,
+                    minWidth: 24,
+                    textAlign: 'center',
+                  }}>
+                    {detailQty}
+                  </Text>
+                  
+                  <TouchableOpacity
+                    onPress={() => setDetailQty(detailQty + 1)}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name="add" size={20} color="#888" />
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Add to cart button */}
+                <TouchableOpacity
+                  onPress={handleDetailAddToCart}
+                  style={{
+                    flex: 1,
+                    marginLeft: 16,
+                    backgroundColor: '#D35400',
+                    paddingVertical: 16,
+                    borderRadius: 14,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{
+                    color: '#FFFFFF',
+                    fontSize: 16,
+                    fontWeight: '600',
+                  }}>
+                    Add to cart
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Animated.View>
+        </Modal>
+      )}
+        </>
       )}
     </View>
   );
@@ -774,6 +1579,72 @@ const styles = StyleSheet.create({
     backgroundColor: "#D96018", // Hot cinnamon
     marginBottom: 1.5,
     marginHorizontal: 2,
+  },
+  // 🔥 STYLES BBQ GRILLZ
+  flamePatterns: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    overflow: "hidden",
+  },
+  flameIcon: {
+    position: "absolute",
+    width: 30,
+    height: 45,
+    alignItems: "center",
+  },
+  flameOuter: {
+    position: "absolute",
+    bottom: 0,
+    width: 30,
+    height: 40,
+    backgroundColor: "#FF4500",
+    borderRadius: 15,
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 2,
+    opacity: 0.6,
+  },
+  flameInner: {
+    position: "absolute",
+    bottom: 0,
+    width: 20,
+    height: 30,
+    backgroundColor: "#FF6B35",
+    borderRadius: 10,
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 2,
+    opacity: 0.8,
+  },
+  flameCore: {
+    position: "absolute",
+    bottom: 0,
+    width: 10,
+    height: 18,
+    backgroundColor: "#FFD700",
+    borderRadius: 5,
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 1,
+  },
+  grillPattern: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    opacity: 0.08,
+  },
+  grillLine: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: "#FFB347",
+  },
+  smokeEffect: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 30,
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
   // Bouton retour harmonisé avec palette
   backBtn: {

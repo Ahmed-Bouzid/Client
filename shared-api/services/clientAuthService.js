@@ -18,9 +18,10 @@ export const clientAuthService = {
 	 * @param {string} [clientName] - Pseudo du client (requis au join)
 	 * @param {string} [tableId]    - ID de la table (requis au join)
 	 * @param {string} [restaurantId] - ID du restaurant (requis au join)
+	 * @param {string} [clientId] - UUID client stable (optionnel, recommandé)
 	 * @returns {Promise<string|null>} JWT ou null si aucun token disponible
 	 */
-	async getClientToken(clientName, tableId, restaurantId) {
+	async getClientToken(clientName, tableId, restaurantId, clientId = null) {
 		try {
 			// Cas 1 : paramètres fournis → obtenir un nouveau JWT depuis le backend
 			if (clientName && restaurantId) {
@@ -31,6 +32,7 @@ export const clientAuthService = {
 						pseudo: clientName,
 						tableId: tableId || null,
 						restaurantId,
+						clientId,
 					}),
 				});
 

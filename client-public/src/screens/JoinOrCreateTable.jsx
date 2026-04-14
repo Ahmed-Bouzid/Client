@@ -382,14 +382,15 @@ export default function JoinOrCreateTable({
 				await AsyncStorage.setItem("clientPhone", phone.trim());
 			}
 
+			const clientId = await getOrCreateClientId();
+
 			// Générer un token client simple pour les commandes
 			const token = await clientAuthService.getClientToken(
 				name.trim(),
 				tableId,
 				restaurantId,
+				clientId,
 			);
-
-			const clientId = await getOrCreateClientId();
 
 			const finalRestaurantId =
 				restaurantId || (await AsyncStorage.getItem("restaurantId"));

@@ -13,28 +13,55 @@
 import { Platform } from "react-native";
 
 /**
- * Extrait restaurantId et tableId depuis window.location.pathname (web).
- * @returns {{ restaurantId: string|null, tableId: string|null }}
+ * Extrait restaurantId, tableId et orderId depuis window.location.pathname (web).
+ * @returns {{ restaurantId: string|null, tableId: string|null, orderId: string|null, isTrackingRoute: boolean }}
  */
 export const getUrlParams = () => {
 	if (Platform.OS !== "web" || typeof window === "undefined") {
-		return { restaurantId: null, tableId: null };
+		return {
+			restaurantId: null,
+			tableId: null,
+			orderId: null,
+			isTrackingRoute: false,
+		};
 	}
 
 	try {
 		const pathname = window.location.pathname; // ex: /r/[restaurantId]/[tableId]
+		const trackingMatch = pathname.match(/^\/suivi\/([^/]+)/);
+		if (trackingMatch) {
+			return {
+				restaurantId: null,
+				tableId: null,
+				orderId: trackingMatch[1] || null,
+				isTrackingRoute: true,
+			};
+		}
+
 		const match = pathname.match(/^\/r\/([^/]+)(?:\/([^/]+))?/);
 
 		if (!match) {
-			return { restaurantId: null, tableId: null };
+			return {
+				restaurantId: null,
+				tableId: null,
+				orderId: null,
+				isTrackingRoute: false,
+			};
 		}
 
 		return {
 			restaurantId: match[1] || null,
 			tableId: match[2] || null,
+			orderId: null,
+			isTrackingRoute: false,
 		};
 	} catch {
-		return { restaurantId: null, tableId: null };
+		return {
+			restaurantId: null,
+			tableId: null,
+			orderId: null,
+			isTrackingRoute: false,
+		};
 	}
 };
 

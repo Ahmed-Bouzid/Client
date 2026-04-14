@@ -70,8 +70,9 @@ export const useThemeStore = create((set, get) => {
         }
         
         // 2. Fetch from API
+        const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://api.sunnygo.app';
         const response = await fetch(
-          `/api/themes/restaurants/${restaurantId}/theme`
+          `${API_BASE}/api/themes/restaurants/${restaurantId}/theme`
         );
         
         if (!response.ok) {
