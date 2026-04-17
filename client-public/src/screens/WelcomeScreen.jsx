@@ -116,11 +116,11 @@ export default function WelcomeScreen({
   
   // 🔒 GRILLZ LOCKED VALUES - Valeurs responsive verrouillées
   const GRILLZ_RESPONSIVE = {
-    chicken1: { width: 280 * scale, height: 280 * scale, top: -30 * vScale, left: -50 * scale },
-    chicken2: { width: 240 * scale, height: 240 * scale, top: 20 * vScale, right: -60 * scale },
-    chicken3: { width: 240 * scale, height: 240 * scale, bottom: 280 * vScale, left: -110 * scale },
-    chicken4: { width: 260 * scale, height: 260 * scale, bottom: 160 * vScale, right: -130 * scale },
-    logo: { width: 400 * scale, height: 450 * scale, top: '28%' },
+    chicken1: { width: 224 * scale, height: 224 * scale, top: -30 * vScale, left: -50 * scale },
+    chicken2: { width: 192 * scale, height: 192 * scale, top: 20 * vScale, right: -60 * scale },
+    chicken3: { width: 192 * scale, height: 192 * scale, bottom: 280 * vScale, left: -110 * scale },
+    chicken4: { width: 208 * scale, height: 208 * scale, bottom: 160 * vScale, right: -130 * scale },
+    logo: { width: 340 * scale, height: 382 * scale, top: '28%' },
     bienvenue: { top: '26%', fontSize: 28 * scale },
   };
   
@@ -1772,10 +1772,9 @@ const styles = StyleSheet.create({
   // Bloc flottant qui monte avec le clavier
   floatingInputSection: {
     position: "absolute",
-    bottom: 120,
+    bottom: 70,
     left: 32,
     right: 32,
-    // Pas de background, pas de shadow, pas de bordure visible
   },
   
   // Social Button (single, full width)
