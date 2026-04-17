@@ -106,6 +106,24 @@ export default function WelcomeScreen({
   // Keyboard state
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   
+  // 📱 RESPONSIVE SCALING - Design basé sur iPhone 16 Pro Max (440x956)
+  // Ces valeurs sont utilisées pour que le design soit IDENTIQUE sur tous les appareils
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+  const DESIGN_WIDTH = 440;  // iPhone 16 Pro Max width
+  const DESIGN_HEIGHT = 956; // iPhone 16 Pro Max height
+  const scale = SCREEN_WIDTH / DESIGN_WIDTH;
+  const vScale = SCREEN_HEIGHT / DESIGN_HEIGHT;
+  
+  // 🔒 GRILLZ LOCKED VALUES - Valeurs responsive verrouillées
+  const GRILLZ_RESPONSIVE = {
+    chicken1: { width: 280 * scale, height: 280 * scale, top: -30 * vScale, left: -50 * scale },
+    chicken2: { width: 240 * scale, height: 240 * scale, top: 20 * vScale, right: -60 * scale },
+    chicken3: { width: 240 * scale, height: 240 * scale, bottom: 280 * vScale, left: -110 * scale },
+    chicken4: { width: 260 * scale, height: 260 * scale, bottom: 160 * vScale, right: -130 * scale },
+    logo: { width: 400 * scale, height: 450 * scale, top: '30%' },
+    bienvenue: { marginTop: 100 * vScale, fontSize: 28 * scale },
+  };
+  
   // Stores
   console.log("👋 [WelcomeScreen] Store restaurantId:", restaurantId);
   
@@ -756,6 +774,76 @@ export default function WelcomeScreen({
               </View>
             </View>
           )}
+          
+          {/* 🍗 4 Images de nourriture dans les coins - GRILLZ (RESPONSIVE + FADE) */}
+          {/* Image 1 - Haut gauche */}
+          <Animated.Image 
+            source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/chicken1.png")}
+            style={{
+              position: 'absolute',
+              top: GRILLZ_RESPONSIVE.chicken1.top,
+              left: GRILLZ_RESPONSIVE.chicken1.left,
+              width: GRILLZ_RESPONSIVE.chicken1.width,
+              height: GRILLZ_RESPONSIVE.chicken1.height,
+              transform: [{ rotate: '15deg' }],
+              opacity: exitImage1Anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 0],
+              }),
+            }}
+            resizeMode="contain"
+          />
+          {/* Image 2 - Haut droit */}
+          <Animated.Image 
+            source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/chicken2.png")}
+            style={{
+              position: 'absolute',
+              top: GRILLZ_RESPONSIVE.chicken2.top,
+              right: GRILLZ_RESPONSIVE.chicken2.right,
+              width: GRILLZ_RESPONSIVE.chicken2.width,
+              height: GRILLZ_RESPONSIVE.chicken2.height,
+              transform: [{ rotate: '-10deg' }],
+              opacity: exitImage2Anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 0],
+              }),
+            }}
+            resizeMode="contain"
+          />
+          {/* Image 3 - Bas gauche */}
+          <Animated.Image 
+            source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/chicken3.png")}
+            style={{
+              position: 'absolute',
+              bottom: GRILLZ_RESPONSIVE.chicken3.bottom,
+              left: GRILLZ_RESPONSIVE.chicken3.left,
+              width: GRILLZ_RESPONSIVE.chicken3.width,
+              height: GRILLZ_RESPONSIVE.chicken3.height,
+              transform: [{ rotate: '25deg' }],
+              opacity: exitImage3Anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 0],
+              }),
+            }}
+            resizeMode="contain"
+          />
+          {/* Image 4 - Bas droit */}
+          <Animated.Image 
+            source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/chicken4.png")}
+            style={{
+              position: 'absolute',
+              bottom: GRILLZ_RESPONSIVE.chicken4.bottom,
+              right: GRILLZ_RESPONSIVE.chicken4.right,
+              width: GRILLZ_RESPONSIVE.chicken4.width,
+              height: GRILLZ_RESPONSIVE.chicken4.height,
+              transform: [{ rotate: '-20deg' }],
+              opacity: exitImage4Anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 0],
+              }),
+            }}
+            resizeMode="contain"
+          />
         
         {/* Contenu sans scroll */}
         <Animated.View
@@ -849,19 +937,22 @@ export default function WelcomeScreen({
             />
           </Animated.View>
           
-          {/* Logo + Restaurant Name avec animations de sortie */}
-          <View style={[styles.logoContainer, { marginTop: 180 }]}>
+          {/* Logo + Restaurant Name avec animations de sortie (RESPONSIVE) */}
+          <View style={[styles.logoContainer, { 
+            marginTop: GRILLZ_RESPONSIVE.bienvenue.marginTop,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }]}>
+            {/* 🔒 Bienvenue - position verrouillée (RESPONSIVE) */}
             <Animated.Text style={[styles.welcomeText, { 
               color: '#FF8A50',
-              marginBottom: -30, 
-              fontSize: 28, 
-              letterSpacing: 6, 
+              fontSize: GRILLZ_RESPONSIVE.bienvenue.fontSize, 
+              letterSpacing: 6 * scale, 
               textTransform: 'uppercase',
               fontFamily: fontLoaded ? RESTAURANT_CONFIG.font.family : undefined,
               textShadowColor: 'rgba(0, 0, 0, 0.9)',
-              textShadowOffset: { width: 0, height: 4 },
-              textShadowRadius: 12,
-              top: -100,
+              textShadowOffset: { width: 0, height: 4 * scale },
+              textShadowRadius: 12 * scale,
               opacity: exitTextAnim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [1, 0],
@@ -869,20 +960,24 @@ export default function WelcomeScreen({
             }]}>
               Bienvenue chez
             </Animated.Text>
-            
-            <Animated.Image
-              source={RESTAURANT_CONFIG.logo}
-              style={[styles.logoImage, { 
-                width: 460, 
-                height: 460,
-                opacity: exitLogoAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 0],
-                }),
-              }]}
-              resizeMode="contain"
-            />
           </View>
+          
+          {/* 🔥 Logo Grillz - position absolute, indépendant du texte (RESPONSIVE) */}
+          <Animated.Image
+            source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/logo.png")}
+            style={{ 
+              position: 'absolute',
+              top: GRILLZ_RESPONSIVE.logo.top,
+              alignSelf: 'center',
+              width: GRILLZ_RESPONSIVE.logo.width, 
+              height: GRILLZ_RESPONSIVE.logo.height,
+              opacity: exitLogoAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 0],
+              }),
+            }}
+            resizeMode="contain"
+          />
         </Animated.View>
         
         {/* 🔥 GRILLZ: Floating Input Section avec animations de sortie */}
@@ -1054,6 +1149,38 @@ export default function WelcomeScreen({
           >
             <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
           </TouchableOpacity>
+
+          {/* 🔄 REPRISE DE SESSION - si session active détectée (CUCINA) */}
+          {existingSession && (
+            <View style={styles.resumeSessionCard}>
+              <View style={styles.resumeSessionContent}>
+                <Ionicons name="refresh" size={28} color="#F87171" />
+                <View style={styles.resumeSessionText}>
+                  <Text style={styles.resumeSessionTitle}>Session en cours</Text>
+                  <Text style={styles.resumeSessionSubtitle}>
+                    Reprendre la commande de{" "}
+                    <Text style={{ fontWeight: "700" }}>{existingSession.clientName}</Text> ?
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.resumeSessionButtons}>
+                <TouchableOpacity
+                  style={styles.resumeBtn}
+                  onPress={handleResumeSession}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.resumeBtnText}>Reprendre</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.resumeBtnSecondary}
+                  onPress={handleNewSession}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.resumeBtnSecondaryText}>Nouvelle session</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
           
           {/* 🍕 4 Images de nourriture dans les coins */}
           {/* Image 1 - Haut gauche */}
@@ -1594,7 +1721,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     letterSpacing: 2,
     textTransform: "uppercase",
-     top: -110,
+     top: -200,
   },
   restaurantNameBig: {
     textAlign: "center",

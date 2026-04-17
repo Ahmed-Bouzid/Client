@@ -72,9 +72,10 @@ export default function MenuScreen({
   
   // 🍝 CUCINA: Détection restaurant
   const isCucina = restaurantId === '6970ef6594abf8bacd9d804d';
+  const isGrillz = restaurantId === '695e4300adde654b80f6911a';
   
-  // States
-  const [selectedCategory, setSelectedCategory] = useState(isCucina ? null : "sandwich");
+  // States - Cucina et Grillz commencent sans catégorie sélectionnée (message commercial)
+  const [selectedCategory, setSelectedCategory] = useState((isCucina || isGrillz) ? null : "sandwich");
   const [fontLoaded, setFontLoaded] = useState(false);
   const [showOrderSummary, setShowOrderSummary] = useState(false);
   const [showDietaryModal, setShowDietaryModal] = useState(false);
@@ -231,14 +232,15 @@ export default function MenuScreen({
     });
   };
   
-  // 🍝 CUCINA: Catégories fixes avec emojis italiens
+  // 🍝 CUCINA: Catégories fixes
   const cucinaCategories = [
-    { id: "sandwich", name: "Sandwichs", emoji: "🥪" },
-    { id: "side", name: "Sides", emoji: "🍟" },
-    { id: "desserts", name: "Desserts", emoji: "🍰" },
+    { id: "panini", name: "Panini", emoji: "🥪" },
+    { id: "sides", name: "Sides", emoji: "🍟" },
+    { id: "dessert", name: "Dessert", emoji: "🍰" },
     { id: "boissons", name: "Boissons", emoji: "🥤" },
   ];
   
+  // Cucina = catégories fixes, autres = dynamiques
   const categories = isCucina ? cucinaCategories : getCategories();
 
   // Catégories avec leurs emojis (ANCIEN CODE - SUPPRIMÉ)
@@ -618,9 +620,10 @@ export default function MenuScreen({
       );
     }
     
-    // Style par défaut pour autres restos
-    return (
-      <View style={styles.productCard}>
+    // Style par défaut pour autres restos (Cucina inclus)
+    // Si Cucina: wrap dans TouchableOpacity pour ouvrir la modale
+    const CardContent = (
+      <>
         <View style={styles.productImageContainer}>
           <Image source={PANINI_IMAGE} style={styles.productImage} resizeMode="cover" />
         </View>
@@ -648,6 +651,26 @@ export default function MenuScreen({
             )}
           </View>
         </View>
+      </>
+    );
+    
+    // Cucina: carte cliquable pour ouvrir la modale détail
+    if (isCucina) {
+      return (
+        <TouchableOpacity 
+          style={styles.productCard} 
+          onPress={() => openProductDetail(item)}
+          activeOpacity={0.8}
+        >
+          {CardContent}
+        </TouchableOpacity>
+      );
+    }
+    
+    // Autres restos: carte non cliquable
+    return (
+      <View style={styles.productCard}>
+        {CardContent}
       </View>
     );
   };
@@ -722,8 +745,11 @@ export default function MenuScreen({
             ))}
           </View>
           
-          {/* Navigation content */}
-          <View style={styles.nav}>
+          {/* Navigation content - Cucina: plus de padding */}
+          <View style={[styles.nav, { 
+            paddingTop: Platform.OS === 'ios' ? 70 : (StatusBar.currentHeight || 24) + 30,
+            paddingBottom: 25,
+          }]}>
             <TouchableOpacity style={styles.backBtn} onPress={onBack}>
               <Ionicons name="arrow-back" size={24} color="#FCF7DE" />
             </TouchableOpacity>
@@ -794,11 +820,23 @@ export default function MenuScreen({
   };
 
 
-  // 🔥 Le Grillz = thème dark complet
-  const isGrillz = restaurantId === '695e4300adde654b80f6911a';
-  const containerStyle = isGrillz 
-    ? [styles.container, { backgroundColor: '#1a1a1a' }]
-    : styles.container;
+  // 🔥 Le Grillz = thème dark complet (isGrillz défini en haut)
+  
+  // Style du container - Cucina utilise tout l'écran
+  let containerStyle = styles.container;
+  if (isGrillz) {
+    containerStyle = [styles.container, { backgroundColor: '#1a1a1a' }];
+  } else if (isCucina) {
+    // Position absolute pour couvrir tout l'écran comme WelcomeScreen
+    containerStyle = { 
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: '#146845',
+    };
+  }
 
   // 🔥 BBQ Grill Lines Component - Lignes de grill visibles
   const GrillLines = () => (
@@ -856,180 +894,14 @@ export default function MenuScreen({
       {isGrillz && <GrillLines />}
       {isGrillz && <HeatWaves />}
 
-      {/* 🍝 CUCINA: Layout personnalisé */}
-      {isCucina ? (
-        <View style={{ flex: 1, backgroundColor: '#1a1a1a' }}>
-          {/* Header Cucina - plein écran jusqu'en haut */}
-          <LinearGradient
-            colors={['#8B0000', '#B22222', '#CD5C5C']}
-            style={{
-              paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 10,
-              paddingBottom: 20,
-              paddingHorizontal: 16,
-            }}
-          >
-            {/* Navigation row */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <TouchableOpacity onPress={onBack} style={{ padding: 8 }}>
-                <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-              
-              <Text style={{ 
-                color: '#FFFFFF', 
-                fontSize: 22, 
-                fontWeight: '700',
-                letterSpacing: 1,
-              }}>
-                {restaurantName || "La Cucina Di Nini"}
-              </Text>
-              
-              <TouchableOpacity onPress={() => setShowDietaryModal(true)} style={{ padding: 8 }}>
-                <MaterialIcons name="no-food" size={22} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
-          
-          {/* Catégories Cucina */}
-          <View style={{ backgroundColor: '#1a1a1a', paddingVertical: 12 }}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
-            >
-              {categories.map((category) => {
-                const isSelected = selectedCategory === category.id;
-                return (
-                  <TouchableOpacity
-                    key={category.id}
-                    onPress={() => setSelectedCategory(category.id)}
-                    style={{
-                      backgroundColor: isSelected ? '#B22222' : '#2a2a2a',
-                      paddingHorizontal: 16,
-                      paddingVertical: 10,
-                      borderRadius: 20,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    <Text style={{ fontSize: 16 }}>{category.emoji}</Text>
-                    <Text style={{ 
-                      color: isSelected ? '#FFFFFF' : '#AAAAAA', 
-                      fontSize: 14, 
-                      fontWeight: isSelected ? '600' : '400' 
-                    }}>
-                      {category.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-          
-          {/* Contenu - Message ou Produits */}
-          {selectedCategory === null ? (
-            // Message commercial quand aucune catégorie
-            <View style={{ 
-              flex: 1, 
-              justifyContent: 'center', 
-              alignItems: 'center',
-              paddingHorizontal: 40,
-            }}>
-              <Text style={{ fontSize: 50, marginBottom: 20 }}>🍝</Text>
-              <Text style={{ 
-                color: '#FFFFFF', 
-                fontSize: 24, 
-                fontWeight: '700',
-                textAlign: 'center',
-                marginBottom: 10,
-              }}>
-                Prêt à vous régaler ?
-              </Text>
-              <Text style={{ 
-                color: '#888888', 
-                fontSize: 16, 
-                textAlign: 'center',
-                lineHeight: 24,
-              }}>
-                Sélectionnez une catégorie pour découvrir nos délicieuses spécialités italiennes
-              </Text>
-            </View>
-          ) : (
-            // Liste des produits
-            <FlatList
-              data={filteredProducts}
-              renderItem={renderProduct}
-              keyExtractor={(item) => item._id}
-              contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 100 }}
-              showsVerticalScrollIndicator={false}
-              ListEmptyComponent={
-                <View style={{ alignItems: 'center', paddingTop: 60 }}>
-                  <Text style={{ color: '#666', fontSize: 16 }}>Aucun produit dans cette catégorie</Text>
-                </View>
-              }
-            />
-          )}
-          
-          {/* Barre panier Cucina */}
-          {totalItems > 0 && (
-            <View style={{
-              position: 'absolute',
-              bottom: 20,
-              left: 16,
-              right: 16,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: '#B22222',
-              paddingHorizontal: 20,
-              paddingVertical: 16,
-              borderRadius: 16,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 8,
-              elevation: 8,
-            }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{
-                  backgroundColor: 'rgba(255,255,255,0.2)',
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 12,
-                }}>
-                  <Ionicons name="cart" size={20} color="#FFFFFF" />
-                </View>
-                <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '600' }}>
-                  {totalItems} article{totalItems > 1 ? 's' : ''}
-                </Text>
-              </View>
-              
-              <TouchableOpacity
-                onPress={handlePayPress}
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  paddingHorizontal: 20,
-                  paddingVertical: 10,
-                  borderRadius: 12,
-                }}
-              >
-                <Text style={{ color: '#B22222', fontSize: 15, fontWeight: '700' }}>
-                  {totalAmount.toFixed(2)}€ →
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      ) : (
-        // Layout par défaut (Grillz et autres)
-        <>
       {/* Navigation avec fond décoratif audacieux */}
-      <View style={[styles.navContainer, isGrillz && { backgroundColor: 'transparent' }]}>
-        {/* Fond dégradé principal - caché pour Grillz */}
-        {!isGrillz && (
+      <View style={[
+        styles.navContainer, 
+        isGrillz && { backgroundColor: 'transparent' },
+        isCucina && { backgroundColor: '#146845' }
+      ]}>
+        {/* Fond dégradé principal - caché pour Grillz et Cucina */}
+        {!isGrillz && !isCucina && (
           <LinearGradient
             colors={[COLORS.primary + "25", COLORS.accent + "20", COLORS.background]}
             style={styles.headerGradient}
@@ -1038,8 +910,8 @@ export default function MenuScreen({
           />
         )}
         
-        {/* Formes organiques complexes - cachées pour Grillz */}
-        {!isGrillz && (
+        {/* Formes organiques complexes - cachées pour Grillz et Cucina */}
+        {!isGrillz && !isCucina && (
           <View style={styles.decorativeElements}>
             {/* Grande forme principale */}
             <View style={styles.mainBlob} />
@@ -1078,7 +950,11 @@ export default function MenuScreen({
       </View>
 
       {/* Section principale */}
-      <View style={[styles.mainContainer, isGrillz && { backgroundColor: '#0D0D0D' }]}>
+      <View style={[
+        styles.mainContainer, 
+        isGrillz && { backgroundColor: '#0D0D0D' },
+        isCucina && { backgroundColor: COLORS.background }
+      ]}>
         {/* Catégories - CENTRÉES pour Grillz */}
         {isGrillz ? (
           <View style={{
@@ -1144,6 +1020,40 @@ export default function MenuScreen({
               keyExtractor={(item) => item._id}
               contentContainerStyle={[styles.productsContainer, { paddingTop: 0 }]}
               showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                selectedCategory === null ? (
+                  <View style={{ 
+                    flex: 1, 
+                    justifyContent: 'center', 
+                    alignItems: 'center',
+                    paddingHorizontal: 40,
+                    paddingTop: 100,
+                  }}>
+                    <Image 
+                      source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/grilledchicken.png")}
+                      style={{ width: 120, height: 120, marginBottom: 20 }}
+                      resizeMode="contain"
+                    />
+                    <Text style={{ 
+                      color: '#FFFFFF', 
+                      fontSize: 24, 
+                      fontWeight: '700',
+                      textAlign: 'center',
+                      marginBottom: 10,
+                    }}>
+                      Prêt à vous régaler ?
+                    </Text>
+                    <Text style={{ 
+                      color: '#AAAAAA', 
+                      fontSize: 16, 
+                      textAlign: 'center',
+                      lineHeight: 24,
+                    }}>
+                      Sélectionnez une catégorie pour découvrir nos délicieux chickens et accompagnements
+                    </Text>
+                  </View>
+                ) : null
+              }
             />
           </View>
         ) : (
@@ -1153,6 +1063,36 @@ export default function MenuScreen({
             keyExtractor={(item) => item._id}
             contentContainerStyle={styles.productsContainer}
             showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              isCucina && selectedCategory === null ? (
+                <View style={{ 
+                  flex: 1, 
+                  justifyContent: 'center', 
+                  alignItems: 'center',
+                  paddingHorizontal: 40,
+                  paddingTop: 100,
+                }}>
+                  <Text style={{ fontSize: 50, marginBottom: 20 }}>🍝</Text>
+                  <Text style={{ 
+                    color: '#333', 
+                    fontSize: 24, 
+                    fontWeight: '700',
+                    textAlign: 'center',
+                    marginBottom: 10,
+                  }}>
+                    Prêt à vous régaler ?
+                  </Text>
+                  <Text style={{ 
+                    color: '#888888', 
+                    fontSize: 16, 
+                    textAlign: 'center',
+                    lineHeight: 24,
+                  }}>
+                    Sélectionnez une catégorie pour découvrir nos délicieuses spécialités italiennes
+                  </Text>
+                </View>
+              ) : null
+            }
           />
         )}
       </View>
@@ -1288,8 +1228,8 @@ export default function MenuScreen({
         />
       )}
       
-      {/* 🔥 GRILLZ: Modal Product Detail avec animation rotation */}
-      {isGrillz && (
+      {/* 🔥 GRILLZ & CUCINA: Modal Product Detail avec animation */}
+      {(isGrillz || isCucina) && (
         <Modal
           visible={showProductDetail}
           transparent={true}
@@ -1445,8 +1385,6 @@ export default function MenuScreen({
             </View>
           </Animated.View>
         </Modal>
-      )}
-        </>
       )}
     </View>
   );
