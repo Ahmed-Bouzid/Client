@@ -392,10 +392,13 @@ function AppContent() {
 			return;
 		}
 
-		// Soumettre la commande au serveur d'abord
 		try {
-			const createdOrder = await submitOrder({ redirectToTracking: false });
-			if (!createdOrder) return;
+			// If there is an in-progress cart, submit it first. If already submitted,
+			// skip submission and only navigate to payment with fetched orders.
+			if (currentOrder.length > 0) {
+				const createdOrder = await submitOrder({ redirectToTracking: false });
+				if (!createdOrder) return;
+			}
 			
 			// Puis charger les commandes et naviguer vers payment
 			await useOrderStore

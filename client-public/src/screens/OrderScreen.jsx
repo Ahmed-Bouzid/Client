@@ -380,6 +380,17 @@ export default function OrderScreen({
       return;
     }
 
+    // Web must use the dedicated Stripe web checkout flow (Payment screen).
+    // Keeping native PaymentSheet on web can bypass UI and create inconsistent behavior.
+    if (Platform.OS === "web") {
+      if (typeof onPayNow === "function") {
+        onPayNow();
+      } else {
+        Alert.alert("Paiement web", "Veuillez ouvrir l'écran de paiement.");
+      }
+      return;
+    }
+
     if (!initPaymentSheet || !presentPaymentSheet) {
       Alert.alert("Erreur", "Stripe non initialisé");
       return;
