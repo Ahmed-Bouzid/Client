@@ -488,8 +488,8 @@ function AppContent() {
 			{/* Sur web tablette/desktop, centrer le contenu et limiter la largeur */}
 			<View style={Platform.OS === "web" ? styles.webWrapper : { flex: 1 }}>
 			<SafeAreaView
-				style={{ flex: 1, backgroundColor: "whitesmoke" }}
-				edges={["top", "left", "right"]}
+				style={{ flex: 1, backgroundColor: Platform.OS === "web" ? "transparent" : "whitesmoke" }}
+				edges={Platform.OS === "web" ? [] : ["top", "left", "right"]}
 			>
 				{/* 🔐 Mode Admin: écran de déverrouillage */}
 				{adminMode === "locked" && (

@@ -120,7 +120,7 @@ export default function WelcomeScreen({
     chicken2: { width: 240 * scale, height: 240 * scale, top: 20 * vScale, right: -60 * scale },
     chicken3: { width: 240 * scale, height: 240 * scale, bottom: 280 * vScale, left: -110 * scale },
     chicken4: { width: 260 * scale, height: 260 * scale, bottom: 160 * vScale, right: -130 * scale },
-    logo: { width: 400 * scale, height: 450 * scale, top: '30%' },
+    logo: { width: 400 * scale, height: 450 * scale, top: '18%' },
     bienvenue: { marginTop: 100 * vScale, fontSize: 28 * scale },
   };
   
@@ -952,7 +952,7 @@ export default function WelcomeScreen({
           
         </Animated.View>
         
-        {/* 🔒 Bienvenue chez - HORS du content, comme les chickens (opacity: 1 au start) */}
+        {/* 🔒 Bienvenue chez - HORS du content, comme les chickens */}
         <View style={{
           position: 'absolute',
           top: GRILLZ_RESPONSIVE.bienvenue.marginTop,
@@ -962,6 +962,8 @@ export default function WelcomeScreen({
           zIndex: 20,
         }}>
           <Animated.Text style={[styles.welcomeText, { 
+            top: 0,
+            marginTop: 0,
             color: '#FF8A50',
             fontSize: GRILLZ_RESPONSIVE.bienvenue.fontSize, 
             letterSpacing: 6 * scale, 
@@ -979,7 +981,7 @@ export default function WelcomeScreen({
           </Animated.Text>
         </View>
           
-        {/* 🔥 Logo Grillz - HORS du content, comme les chickens (opacity: 1 au start) */}
+        {/* 🔥 Logo Grillz - HORS du content, comme les chickens */}
         <View style={{
           position: 'absolute',
           top: GRILLZ_RESPONSIVE.logo.top,

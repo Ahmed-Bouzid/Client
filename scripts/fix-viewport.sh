@@ -84,9 +84,11 @@ cat > "$DIST_HTML" << 'EOF'
       document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
       document.addEventListener('gestureend', function(e) { e.preventDefault(); });
       
-      // Prevent double-tap zoom
+      // Prevent double-tap zoom (but NOT on inputs/textareas)
       var lastTouchEnd = 0;
       document.addEventListener('touchend', function(e) {
+        var tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
         var now = Date.now();
         if (now - lastTouchEnd <= 300) { e.preventDefault(); }
         lastTouchEnd = now;
