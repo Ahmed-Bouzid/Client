@@ -1009,6 +1009,7 @@ export default function WelcomeScreen({
           style={[
             styles.floatingInputSection,
             {
+              zIndex: 50,
               opacity: exitInputAnim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [1, 0],
