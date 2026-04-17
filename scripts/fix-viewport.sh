@@ -30,10 +30,29 @@ cat > "$DIST_HTML" << 'EOF'
       #root { display: flex; height: 100%; flex: 1; }
       * { touch-action: pan-x pan-y; -webkit-touch-callout: none; }
       body { -webkit-user-select: none; user-select: none; }
-      input, textarea { -webkit-user-select: text; user-select: text; }
+      input, textarea { -webkit-user-select: text; user-select: text; touch-action: auto; }
       button, a, [role="button"] { touch-action: manipulation; }
       html { overscroll-behavior: none; position: fixed; width: 100%; height: 100%; }
     </style>
+    <script>
+      // 🔒 Prevent pinch zoom on iOS Safari (ignores user-scalable=no)
+      document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+      document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
+      document.addEventListener('gestureend', function(e) { e.preventDefault(); });
+      
+      // Prevent double-tap zoom
+      var lastTouchEnd = 0;
+      document.addEventListener('touchend', function(e) {
+        var now = Date.now();
+        if (now - lastTouchEnd <= 300) { e.preventDefault(); }
+        lastTouchEnd = now;
+      }, false);
+      
+      // Prevent pinch zoom via touch
+      document.addEventListener('touchmove', function(e) {
+        if (e.touches.length > 1) { e.preventDefault(); }
+      }, { passive: false });
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
@@ -49,4 +68,4 @@ fi
 
 echo "</body></html>" >> "$DIST_HTML"
 
-echo "✅ dist/index.html patched with anti-zoom viewport!"
+echo "✅ dist/index.html patched with anti-zoom viewport + JS!"
