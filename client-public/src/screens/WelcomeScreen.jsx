@@ -1061,8 +1061,6 @@ export default function WelcomeScreen({
                 onChangeText={setName}
                 autoCapitalize="words"
                 autoCorrect={false}
-                autoComplete="off"
-                textContentType="none"
               />
             </View>
           </View>
@@ -1087,8 +1085,6 @@ export default function WelcomeScreen({
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
                 autoCorrect={false}
-                autoComplete="off"
-                textContentType="none"
               />
             </View>
           </View>

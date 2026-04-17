@@ -34,30 +34,27 @@ cat > "$DIST_HTML" << 'EOF'
         padding: 0; 
         overflow: hidden; 
         overscroll-behavior: none;
-        background: transparent;
+        background: #000;
       }
-      html { 
-        overscroll-behavior: none; 
-        position: fixed; 
-        width: 100%; 
-        height: 100%;
-      }
-      /* #root remplit TOUT l'écran - pas de padding (l'app gère elle-même) */
-      #root { 
-        display: flex; 
-        flex: 1;
-        height: 100%;
-        min-height: 100vh;
-        min-height: 100dvh;
-        min-height: -webkit-fill-available;
-      }
-      * { -webkit-touch-callout: none; }
       body { 
         -webkit-user-select: none; 
         user-select: none;
         min-height: 100vh;
+        min-height: 100dvh;
         min-height: -webkit-fill-available;
+        overscroll-behavior: none;
       }
+      /* #root remplit TOUT l'écran */
+      #root { 
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      * { -webkit-touch-callout: none; }
       /* 🔒 Inputs MUST be fully interactive (Chrome + Safari) */
       input, textarea, select { 
         -webkit-user-select: text !important; 
