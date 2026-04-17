@@ -636,6 +636,6 @@ const styles = StyleSheet.create({
 		alignSelf: "center",
 		width: "100%",
 		maxWidth: 480,
-		backgroundColor: "whitesmoke",
+		backgroundColor: "transparent",
 	},
 });

@@ -120,8 +120,8 @@ export default function WelcomeScreen({
     chicken2: { width: 240 * scale, height: 240 * scale, top: 20 * vScale, right: -60 * scale },
     chicken3: { width: 240 * scale, height: 240 * scale, bottom: 280 * vScale, left: -110 * scale },
     chicken4: { width: 260 * scale, height: 260 * scale, bottom: 160 * vScale, right: -130 * scale },
-    logo: { width: 400 * scale, height: 450 * scale, top: '18%' },
-    bienvenue: { marginTop: 100 * vScale, fontSize: 28 * scale },
+    logo: { width: 400 * scale, height: 450 * scale, top: '28%' },
+    bienvenue: { top: '27%', fontSize: 28 * scale },
   };
   
   // Stores
@@ -955,7 +955,7 @@ export default function WelcomeScreen({
         {/* 🔒 Bienvenue chez - HORS du content, comme les chickens */}
         <View style={{
           position: 'absolute',
-          top: GRILLZ_RESPONSIVE.bienvenue.marginTop,
+          top: GRILLZ_RESPONSIVE.bienvenue.top,
           left: 0,
           right: 0,
           alignItems: 'center',

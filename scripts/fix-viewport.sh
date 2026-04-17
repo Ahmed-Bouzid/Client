@@ -34,7 +34,7 @@ cat > "$DIST_HTML" << 'EOF'
         padding: 0; 
         overflow: hidden; 
         overscroll-behavior: none;
-        background: #000;
+        background: transparent;
       }
       html { 
         overscroll-behavior: none; 
