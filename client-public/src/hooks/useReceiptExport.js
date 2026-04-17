@@ -1,6 +1,6 @@
 // hooks/useReceiptExport.js
 import { useCallback, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 
@@ -16,6 +16,35 @@ export const useReceiptExport = () => {
 		setIsExporting(true);
 
 		try {
+			if (Platform.OS === "web") {
+				try {
+					const dataUri = await captureRef(viewRef, {
+						format: "png",
+						quality: 1,
+						result: "data-uri",
+					});
+
+					const link = document.createElement("a");
+					link.href = dataUri;
+					link.download = `recu-${ticketId || Date.now()}.png`;
+					document.body.appendChild(link);
+					link.click();
+					document.body.removeChild(link);
+					setIsExporting(false);
+					return;
+				} catch (webError) {
+					console.warn("⚠️ Export image web indisponible, fallback impression", webError);
+					if (typeof window !== "undefined" && typeof window.print === "function") {
+						window.print();
+						setIsExporting(false);
+						return;
+					}
+					Alert.alert("Erreur", "Impossible d'exporter le reçu sur web.");
+					setIsExporting(false);
+					return;
+				}
+			}
+
 			// Capturer la vue en tant qu'image
 			const uri = await captureRef(viewRef, {
 				format: "png",

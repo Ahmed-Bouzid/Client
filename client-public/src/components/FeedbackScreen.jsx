@@ -200,11 +200,10 @@ export default function FeedbackScreen({
 					"❌ [FEEDBACK-SCREEN] Erreurs de validation côté client:",
 					validationErrors,
 				);
+				setCurrentStep("success");
 				Alert.alert(
-					"Erreur",
-					"Données invalides détectées côté client: " +
-						validationErrors.join(", "),
-					[{ text: "OK", onPress: () => setCurrentStep("success") }], // Continuer vers Google quand même
+					"Information",
+					"Certaines données sont incomplètes, mais vous pouvez continuer vers Google.",
 				);
 				setIsSubmitting(false);
 				return;
@@ -219,10 +218,10 @@ export default function FeedbackScreen({
 			console.error("❌ [FEEDBACK-SCREEN] Erreur soumission:", error);
 
 			// Même en cas d'erreur complète, on continue vers Google
+			setCurrentStep("success");
 			Alert.alert(
 				"Information",
 				"Une erreur technique s'est produite, mais vous pouvez toujours laisser votre avis sur Google.",
-				[{ text: "Continuer", onPress: () => setCurrentStep("success") }],
 			);
 		} finally {
 			setIsSubmitting(false);
@@ -275,6 +274,17 @@ export default function FeedbackScreen({
 				}
 				// ✅ SÉCURITÉ: Encoder l'ID pour éviter l'injection
 				finalUrl = `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
+			}
+
+			if (Platform.OS === "web" && typeof window !== "undefined") {
+				const popup = window.open(finalUrl, "_blank", "noopener,noreferrer");
+				if (!popup) {
+					window.location.href = finalUrl;
+				}
+				setTimeout(() => {
+					handleClose();
+				}, 300);
+				return;
 			}
 
 			// ✅ SÉCURITÉ: Vérifier que l'URL peut être ouverte
@@ -484,9 +494,9 @@ export default function FeedbackScreen({
 
 					<TouchableOpacity
 						style={styles.skipButton}
-						onPress={handleSubmitFeedback}
+						onPress={handleClose}
 					>
-						<Text style={styles.skipButtonText}>Quitter</Text>
+						<Text style={styles.skipButtonText}>Annuler</Text>
 					</TouchableOpacity>
 				</View>
 			</View>
@@ -579,7 +589,12 @@ export default function FeedbackScreen({
 			onRequestClose={handleClose}
 		>
 			<Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-				<BlurView intensity={20} tint="dark" style={styles.blurOverlay} />
+				<BlurView
+					intensity={20}
+					tint="dark"
+					style={styles.blurOverlay}
+					pointerEvents="none"
+				/>
 
 				<Animated.View
 					style={[
