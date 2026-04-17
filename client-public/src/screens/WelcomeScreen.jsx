@@ -651,16 +651,24 @@ export default function WelcomeScreen({
   // Si Grillz, on utilise ImageBackground avec overlay sombre
   // Position absolute pour passer PAR-DESSUS le SafeAreaView parent
   if (isGrillz) {
-    const { width: screenWidth } = Dimensions.get('window');
+    const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+    const isWeb = Platform.OS === 'web';
     
     return (
       <View style={{ 
-        position: 'absolute',
+        position: isWeb ? 'fixed' : 'absolute',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
+        // Sur web, utiliser height: 100% pour edge-to-edge
+        ...(isWeb ? { 
+          width: '100%', 
+          height: '100%',
+          minHeight: '100dvh', // Dynamic viewport height
+        } : {}),
         zIndex: 9999,
+        backgroundColor: '#000', // Fallback noir
       }}>
         {/* 🖼️ Menu preview en arrière-plan (visible quand les images se séparent) */}
         <ImageBackground 
@@ -786,6 +794,7 @@ export default function WelcomeScreen({
               width: GRILLZ_RESPONSIVE.chicken1.width,
               height: GRILLZ_RESPONSIVE.chicken1.height,
               transform: [{ rotate: '15deg' }],
+              zIndex: 2,
               opacity: exitImage1Anim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [1, 0],
@@ -803,6 +812,7 @@ export default function WelcomeScreen({
               width: GRILLZ_RESPONSIVE.chicken2.width,
               height: GRILLZ_RESPONSIVE.chicken2.height,
               transform: [{ rotate: '-10deg' }],
+              zIndex: 2,
               opacity: exitImage2Anim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [1, 0],
@@ -820,6 +830,7 @@ export default function WelcomeScreen({
               width: GRILLZ_RESPONSIVE.chicken3.width,
               height: GRILLZ_RESPONSIVE.chicken3.height,
               transform: [{ rotate: '25deg' }],
+              zIndex: 2,
               opacity: exitImage3Anim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [1, 0],
@@ -837,6 +848,7 @@ export default function WelcomeScreen({
               width: GRILLZ_RESPONSIVE.chicken4.width,
               height: GRILLZ_RESPONSIVE.chicken4.height,
               transform: [{ rotate: '-20deg' }],
+              zIndex: 2,
               opacity: exitImage4Anim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [1, 0],
@@ -853,6 +865,7 @@ export default function WelcomeScreen({
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
               flex: 1,
+              zIndex: 5,
             },
           ]}
         >
@@ -942,7 +955,7 @@ export default function WelcomeScreen({
             marginTop: GRILLZ_RESPONSIVE.bienvenue.marginTop,
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 10,
+            zIndex: 20,
           }]}>
             {/* 🔒 Bienvenue - position verrouillée (RESPONSIVE) */}
             <Animated.Text style={[styles.welcomeText, { 
@@ -970,7 +983,7 @@ export default function WelcomeScreen({
             left: 0,
             right: 0,
             alignItems: 'center',
-            zIndex: 5,
+            zIndex: 15,
           }}>
             <Animated.Image
               source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/logo.png")}
@@ -1037,13 +1050,15 @@ export default function WelcomeScreen({
             ]}>
               <Ionicons name="person-outline" size={20} color="#FF8A50" style={styles.inputIconMain} />
               <TextInput
-                style={[styles.textInputMain, { color: '#FFFFFF' }]}
+                style={[styles.textInputMain, { color: '#FFFFFF', backgroundColor: 'transparent' }]}
                 placeholder="Votre nom"
                 placeholderTextColor="#777"
                 value={name}
                 onChangeText={setName}
                 autoCapitalize="words"
                 autoCorrect={false}
+                autoComplete="off"
+                textContentType="none"
               />
             </View>
           </View>
@@ -1061,13 +1076,15 @@ export default function WelcomeScreen({
             ]}>
               <Ionicons name="call-outline" size={20} color="#FF8A50" style={styles.inputIconMain} />
               <TextInput
-                style={[styles.textInputMain, { color: '#FFFFFF' }]}
+                style={[styles.textInputMain, { color: '#FFFFFF', backgroundColor: 'transparent' }]}
                 placeholder="Votre téléphone"
                 placeholderTextColor="#777"
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
                 autoCorrect={false}
+                autoComplete="off"
+                textContentType="none"
               />
             </View>
           </View>
