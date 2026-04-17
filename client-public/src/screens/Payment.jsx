@@ -10,6 +10,7 @@ import {
 	Animated,
 	Dimensions,
 	Platform,
+	Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -27,6 +28,7 @@ import FeedbackScreen from "../components/FeedbackScreen"; // 🌟 Feedback & Av
 import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 API Feedback
 import { buildSafeTheme, DEFAULT_THEME } from "../theme/defaultTheme";
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
+import WebStripeCheckout from "../components/payment/WebStripeCheckout";
 
 const { width, height } = Dimensions.get("window");
 
@@ -227,6 +229,9 @@ export default function Payment({
 	// 🌟 États pour le feedback & avis Google
 	const [showFeedback, setShowFeedback] = useState(false);
 	const [feedbackData, setFeedbackData] = useState(null);
+	const [webCheckoutVisible, setWebCheckoutVisible] = useState(false);
+	const [webCheckoutSecret, setWebCheckoutSecret] = useState(null);
+	const [webCheckoutContext, setWebCheckoutContext] = useState(null);
 
 	// 🚪 Écouter la fermeture de réservation et rediriger automatiquement
 	const restaurantId = useRestaurantStore((state) => state.id);
@@ -606,6 +611,108 @@ export default function Payment({
 		}, 300);
 	};
 
+	const finalizePaymentSuccess = async (
+		selectedOrders,
+		amountPaid,
+		paymentMethod,
+		paymentIntentIdValue,
+	) => {
+		// 3. Ajouter les articles aux paidItems
+		const newPaidItems = new Set(paidItems);
+		selectedOrders.forEach((item) => {
+			newPaidItems.add(getItemId(item));
+		});
+
+		// 4. Vérifier si paiement complet
+		const remainingItems = allOrders.filter(
+			(item) => !newPaidItems.has(getItemId(item)),
+		);
+		const isFullPayment = remainingItems.length === 0;
+
+		// 5. Si paiement complet → Fermer la réservation
+		let reservationClosed = false;
+		if (isFullPayment) {
+			if (reservationId) {
+				const closureResult = await closeReservationOnServer().catch((error) => {
+					console.error("❌ Erreur fermeture réservation:", error);
+					return { success: false, message: error.message };
+				});
+
+				if (closureResult && closureResult.success) {
+					reservationClosed = true;
+				} else {
+					Alert.alert(
+						"⚠️ Attention",
+						"Le paiement est effectué mais la fermeture de réservation a échoué. Veuillez contacter le serveur.",
+						[{ text: "OK" }],
+					);
+				}
+			}
+
+			if (reservationClosed) {
+				const storageKey = getStorageKey();
+				if (storageKey) {
+					await AsyncStorage.removeItem(storageKey);
+				}
+
+				await AsyncStorage.multiRemove([
+					"currentReservationId",
+					"currentTableId",
+					"currentTableNumber",
+					"currentClientName",
+				]);
+			}
+		}
+
+		// 6. Mettre à jour les stats (seulement si réservation PAS terminée)
+		let updatedStatus = null;
+		if (!isFullPayment || !reservationClosed) {
+			updatedStatus = await checkReservationClosure();
+		}
+
+		// 7. Calculer le reste à payer
+		const remainingAmount = remainingItems.reduce(
+			(sum, item) =>
+				sum + (parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1),
+			0,
+		);
+
+		// 8. Afficher le ticket de caisse
+		showReceiptTicket(
+			{
+				method: paymentMethod,
+				paymentIntentId: paymentIntentIdValue,
+			},
+			selectedOrders,
+		);
+
+		return {
+			updatedStatus,
+			remainingAmount,
+		};
+	};
+
+	const handleWebCheckoutSuccess = async (paymentIntentIdValue) => {
+		if (!webCheckoutContext) return;
+
+		try {
+			await finalizePaymentSuccess(
+				webCheckoutContext.selectedOrders,
+				webCheckoutContext.amountPaid,
+				"card",
+				paymentIntentIdValue || webCheckoutContext.paymentIntentId,
+			);
+			setWebCheckoutVisible(false);
+			setWebCheckoutSecret(null);
+			setWebCheckoutContext(null);
+		} catch (error) {
+			console.error("❌ Erreur finalisation paiement web:", error);
+			Alert.alert("Erreur", "Paiement validé mais finalisation incomplète.");
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	// 💳 Traitement du paiement
 	const handlePay = async (paymentMethod = "card") => {
 		if (selectedItems.size === 0) {
@@ -616,8 +723,11 @@ export default function Payment({
 			return;
 		}
 
-		// Vérifier que Stripe est bien initialisé
-		if (!initPaymentSheet || !presentPaymentSheet) {
+		// Vérifier que Stripe est bien initialisé (native uniquement)
+		if (
+			Platform.OS !== "web" &&
+			(!initPaymentSheet || !presentPaymentSheet)
+		) {
 			Alert.alert(
 				"Erreur",
 				"Stripe n'est pas correctement initialisé. Veuillez redémarrer l'application.",
@@ -679,6 +789,18 @@ export default function Payment({
 			setClientSecret(newClientSecret);
 			setPaymentIntentId(newPaymentIntentId);
 
+			if (Platform.OS === "web") {
+				setWebCheckoutSecret(newClientSecret);
+				setWebCheckoutContext({
+					selectedOrders,
+					amountPaid,
+					paymentIntentId: newPaymentIntentId,
+				});
+				setWebCheckoutVisible(true);
+				setLoading(false);
+				return;
+			}
+
 			// 2.6. Initialiser Payment Sheet
 			const { error: initError } = await initPaymentSheet({
 				paymentIntentClientSecret: newClientSecret,
@@ -719,91 +841,11 @@ export default function Payment({
 				return;
 			}
 
-			// 3. Ajouter les articles aux paidItems
-			const newPaidItems = new Set(paidItems);
-			selectedOrders.forEach((item) => {
-				newPaidItems.add(getItemId(item));
-			});
-
-			// 4. Vérifier si paiement complet
-			const remainingItems = allOrders.filter(
-				(item) => !newPaidItems.has(getItemId(item)),
-			);
-			const isFullPayment = remainingItems.length === 0;
-
-			// 5. Si paiement complet → Fermer la réservation
-			let reservationClosed = false;
-			if (isFullPayment) {
-				// Fermer la réservation sur le serveur
-				if (reservationId) {
-					const closureResult = await closeReservationOnServer().catch(
-						(error) => {
-							console.error("❌ Erreur fermeture réservation:", error);
-							return { success: false, message: error.message };
-						},
-					);
-
-					if (closureResult && closureResult.success) {
-						reservationClosed = true;
-					} else {
-						Alert.alert(
-							"⚠️ Attention",
-							"Le paiement est effectué mais la fermeture de réservation a échoué. Veuillez contacter le serveur.",
-							[{ text: "OK" }],
-						);
-					}
-				}
-
-				// ⚠️ Nettoyer AsyncStorage SEULEMENT si réservation fermée avec succès
-				if (reservationClosed) {
-					const storageKey = getStorageKey();
-					if (storageKey) {
-						await AsyncStorage.removeItem(storageKey);
-					}
-
-					await AsyncStorage.multiRemove([
-						"currentReservationId",
-						"currentTableId",
-						"currentTableNumber",
-						"currentClientName",
-					]);
-				}
-			}
-
-			// 6. Mettre à jour les stats (seulement si réservation PAS terminée)
-			let updatedStatus = null;
-			if (!isFullPayment || !reservationClosed) {
-				updatedStatus = await checkReservationClosure();
-			}
-
-			// 7. Calculer le reste à payer
-			const remainingAmount = remainingItems.reduce(
-				(sum, item) =>
-					sum +
-					(parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1),
-				0,
-			);
-
-			// 8. Afficher l'alerte de confirmation
-			const message =
-				`${selectedOrders.length} article(s) payé(s).\n\n` +
-				`💳 Montant payé: ${(amountPaid || 0).toFixed(2)}€\n` +
-				(updatedStatus
-					? `💰 Total payé: ${(parseFloat(updatedStatus?.totalPaid) || 0).toFixed(2)}€\n`
-					: "") +
-				(remainingAmount > 0
-					? `📋 Reste à payer: ${(remainingAmount || 0).toFixed(2)}€ (${
-							remainingItems.length
-						} article${remainingItems.length > 1 ? "s" : ""})`
-					: "✅ Tous les articles sont payés !");
-
-			// 🧾 Afficher le ticket de caisse au lieu d'un simple Alert
-			showReceiptTicket(
-				{
-					method: paymentMethod,
-					paymentIntentId: newPaymentIntentId,
-				},
+			await finalizePaymentSuccess(
 				selectedOrders,
+				amountPaid,
+				paymentMethod,
+				newPaymentIntentId,
 			);
 		} catch (error) {
 			console.error("❌ Erreur paiement:", error);
@@ -1325,11 +1367,76 @@ export default function Payment({
 					customerData={feedbackData.customerData}
 				/>
 			)}
+
+			{Platform.OS === "web" && webCheckoutVisible && !!webCheckoutSecret && (
+				<Modal
+					visible={webCheckoutVisible}
+					transparent
+					animationType="fade"
+					onRequestClose={() => {
+						setWebCheckoutVisible(false);
+						setWebCheckoutSecret(null);
+						setWebCheckoutContext(null);
+						setLoading(false);
+					}}
+				>
+					<View style={styles.webModalBackdrop}>
+						<View style={styles.webModalCard}>
+							<Text style={styles.webModalTitle}>Paiement sécurisé Stripe</Text>
+							<Text style={styles.webModalSubtitle}>
+								Entrez vos informations de carte pour finaliser le paiement.
+							</Text>
+							<WebStripeCheckout
+								clientSecret={webCheckoutSecret}
+								onSuccess={handleWebCheckoutSuccess}
+								onCancel={() => {
+									setWebCheckoutVisible(false);
+									setWebCheckoutSecret(null);
+									setWebCheckoutContext(null);
+									setLoading(false);
+								}}
+								onError={(message) => {
+									Alert.alert("Paiement", message || "Erreur Stripe web.");
+									setLoading(false);
+								}}
+							/>
+						</View>
+					</View>
+				</Modal>
+			)}
 		</LinearGradient>
 	);
 }
 
 const styles = StyleSheet.create({
+	webModalBackdrop: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.5)",
+		justifyContent: "center",
+		alignItems: "center",
+		padding: 16,
+	},
+	webModalCard: {
+		width: "100%",
+		maxWidth: 460,
+		backgroundColor: "#F8FAFC",
+		borderRadius: 14,
+		padding: 16,
+		borderWidth: 1,
+		borderColor: "#E2E8F0",
+	},
+	webModalTitle: {
+		fontSize: 18,
+		fontWeight: "700",
+		color: "#0F172A",
+		marginBottom: 6,
+	},
+	webModalSubtitle: {
+		fontSize: 13,
+		color: "#475569",
+		marginBottom: 12,
+	},
+
 	// 👥 CLIENT TOGGLE (Mes articles / Toute la table)
 	clientToggleRow: {
 		flexDirection: "row",
