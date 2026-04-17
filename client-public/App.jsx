@@ -631,6 +631,7 @@ function AppContent() {
 const styles = StyleSheet.create({
 	webWrapper: {
 		flex: 1,
+		height: "100%",
 		// Sur web, centrer le contenu et limiter à la largeur mobile (480px)
 		// pour un rendu optimal sur tablette et desktop
 		alignSelf: "center",
