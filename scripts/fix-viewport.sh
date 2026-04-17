@@ -26,7 +26,7 @@ cat > "$DIST_HTML" << 'EOF'
     <meta name="description" content="Commandez directement depuis votre table" />
     <link rel="icon" href="/favicon.ico" />
     <style id="expo-reset">
-      /* 📱 Edge-to-edge fullscreen (Dynamic Island + home bar) */
+      /* 📱 Edge-to-edge fullscreen */
       html, body { 
         height: 100%; 
         width: 100%; 
@@ -36,32 +36,36 @@ cat > "$DIST_HTML" << 'EOF'
         overscroll-behavior: none;
         background: #000;
       }
-      /* Safe area + extend to edges */
+      html { 
+        overscroll-behavior: none; 
+        position: fixed; 
+        width: 100%; 
+        height: 100%;
+      }
+      /* #root remplit TOUT l'écran - pas de padding (l'app gère elle-même) */
       #root { 
         display: flex; 
         flex: 1;
+        height: 100%;
         min-height: 100vh;
+        min-height: 100dvh;
         min-height: -webkit-fill-available;
-        padding-top: env(safe-area-inset-top);
-        padding-bottom: env(safe-area-inset-bottom);
-        padding-left: env(safe-area-inset-left);
-        padding-right: env(safe-area-inset-right);
-        box-sizing: border-box;
       }
-      * { touch-action: pan-x pan-y; -webkit-touch-callout: none; }
+      * { -webkit-touch-callout: none; }
       body { 
         -webkit-user-select: none; 
         user-select: none;
         min-height: 100vh;
         min-height: -webkit-fill-available;
       }
-      input, textarea { 
-        -webkit-user-select: text; 
-        user-select: text; 
-        touch-action: auto;
-        /* 🔒 Disable autofill styling */
+      /* 🔒 Inputs MUST be fully interactive (Chrome + Safari) */
+      input, textarea, select { 
+        -webkit-user-select: text !important; 
+        user-select: text !important; 
+        touch-action: auto !important;
         -webkit-appearance: none;
         appearance: none;
+        pointer-events: auto !important;
       }
       /* 🔒 Override Safari autofill yellow background */
       input:-webkit-autofill,
@@ -73,12 +77,6 @@ cat > "$DIST_HTML" << 'EOF'
         transition: background-color 5000s ease-in-out 0s;
       }
       button, a, [role="button"] { touch-action: manipulation; }
-      html { 
-        overscroll-behavior: none; 
-        position: fixed; 
-        width: 100%; 
-        height: 100%;
-      }
     </style>
     <script>
       // 🔒 Prevent pinch zoom on iOS Safari (ignores user-scalable=no)

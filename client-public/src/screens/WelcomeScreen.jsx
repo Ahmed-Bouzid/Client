@@ -950,55 +950,57 @@ export default function WelcomeScreen({
             />
           </Animated.View>
           
-          {/* Logo + Restaurant Name avec animations de sortie (RESPONSIVE) */}
-          <View style={[styles.logoContainer, { 
-            marginTop: GRILLZ_RESPONSIVE.bienvenue.marginTop,
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 20,
+        </Animated.View>
+        
+        {/* 🔒 Bienvenue chez - HORS du content, comme les chickens (opacity: 1 au start) */}
+        <View style={{
+          position: 'absolute',
+          top: GRILLZ_RESPONSIVE.bienvenue.marginTop,
+          left: 0,
+          right: 0,
+          alignItems: 'center',
+          zIndex: 20,
+        }}>
+          <Animated.Text style={[styles.welcomeText, { 
+            color: '#FF8A50',
+            fontSize: GRILLZ_RESPONSIVE.bienvenue.fontSize, 
+            letterSpacing: 6 * scale, 
+            textTransform: 'uppercase',
+            fontFamily: fontLoaded ? RESTAURANT_CONFIG.font.family : undefined,
+            textShadowColor: 'rgba(0, 0, 0, 0.9)',
+            textShadowOffset: { width: 0, height: 4 * scale },
+            textShadowRadius: 12 * scale,
+            opacity: exitTextAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 0],
+            }),
           }]}>
-            {/* 🔒 Bienvenue - position verrouillée (RESPONSIVE) */}
-            <Animated.Text style={[styles.welcomeText, { 
-              color: '#FF8A50',
-              fontSize: GRILLZ_RESPONSIVE.bienvenue.fontSize, 
-              letterSpacing: 6 * scale, 
-              textTransform: 'uppercase',
-              fontFamily: fontLoaded ? RESTAURANT_CONFIG.font.family : undefined,
-              textShadowColor: 'rgba(0, 0, 0, 0.9)',
-              textShadowOffset: { width: 0, height: 4 * scale },
-              textShadowRadius: 12 * scale,
-              opacity: exitTextAnim.interpolate({
+            Bienvenue chez
+          </Animated.Text>
+        </View>
+          
+        {/* 🔥 Logo Grillz - HORS du content, comme les chickens (opacity: 1 au start) */}
+        <View style={{
+          position: 'absolute',
+          top: GRILLZ_RESPONSIVE.logo.top,
+          left: 0,
+          right: 0,
+          alignItems: 'center',
+          zIndex: 15,
+        }}>
+          <Animated.Image
+            source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/logo.png")}
+            style={{ 
+              width: GRILLZ_RESPONSIVE.logo.width, 
+              height: GRILLZ_RESPONSIVE.logo.height,
+              opacity: exitLogoAnim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [1, 0],
               }),
-            }]}>
-              Bienvenue chez
-            </Animated.Text>
-          </View>
-          
-          {/* 🔥 Logo Grillz - wrapper centré (EXPO + WEB COMPATIBLE) */}
-          <View style={{
-            position: 'absolute',
-            top: GRILLZ_RESPONSIVE.logo.top,
-            left: 0,
-            right: 0,
-            alignItems: 'center',
-            zIndex: 15,
-          }}>
-            <Animated.Image
-              source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/logo.png")}
-              style={{ 
-                width: GRILLZ_RESPONSIVE.logo.width, 
-                height: GRILLZ_RESPONSIVE.logo.height,
-                opacity: exitLogoAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 0],
-                }),
-              }}
-              resizeMode="contain"
-            />
-          </View>
-        </Animated.View>
+            }}
+            resizeMode="contain"
+          />
+        </View>
         
         {/* 🔥 GRILLZ: Floating Input Section avec animations de sortie */}
         <Animated.View
