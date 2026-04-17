@@ -41,8 +41,9 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Ne pas intercepter les requêtes non-GET
+  // Ne pas intercepter les requêtes non-GET ou non-HTTP (ex: chrome-extension://)
   if (request.method !== "GET") return;
+  if (!url.protocol.startsWith("http")) return;
 
   // Appels API backend → Network-first (jamais cacher les réponses API sensibles)
   if (url.origin === API_ORIGIN) {
