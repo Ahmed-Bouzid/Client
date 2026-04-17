@@ -26,8 +26,8 @@ cat > "$DIST_HTML" << 'EOF'
     <meta name="description" content="Commandez directement depuis votre table" />
     <link rel="icon" href="/favicon.ico" />
     <style id="expo-reset">
-      html, body { height: 100%; width: 100%; margin: 0; padding: 0; overflow: hidden; overscroll-behavior: none; background-color: #000; }
-      #root { display: flex; height: 100%; flex: 1; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); box-sizing: border-box; }
+      html, body { height: 100%; width: 100%; margin: 0; padding: 0; overflow: hidden; overscroll-behavior: none; }
+      #root { display: flex; height: 100%; flex: 1; }
       * { touch-action: pan-x pan-y; -webkit-touch-callout: none; }
       body { -webkit-user-select: none; user-select: none; }
       input, textarea { -webkit-user-select: text; user-select: text; touch-action: auto; }

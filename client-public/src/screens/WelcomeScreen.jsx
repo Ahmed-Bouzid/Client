@@ -942,6 +942,7 @@ export default function WelcomeScreen({
             marginTop: GRILLZ_RESPONSIVE.bienvenue.marginTop,
             alignItems: 'center',
             justifyContent: 'center',
+            zIndex: 10,
           }]}>
             {/* 🔒 Bienvenue - position verrouillée (RESPONSIVE) */}
             <Animated.Text style={[styles.welcomeText, { 
@@ -962,15 +963,17 @@ export default function WelcomeScreen({
             </Animated.Text>
           </View>
           
-          {/* 🔥 Logo Grillz - position absolute, indépendant du texte (RESPONSIVE) */}
+          {/* 🔥 Logo Grillz - position absolute, centré horizontalement (WEB COMPATIBLE) */}
           <Animated.Image
             source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/logo.png")}
             style={{ 
               position: 'absolute',
               top: GRILLZ_RESPONSIVE.logo.top,
-              alignSelf: 'center',
+              left: '50%',
+              marginLeft: -GRILLZ_RESPONSIVE.logo.width / 2,
               width: GRILLZ_RESPONSIVE.logo.width, 
               height: GRILLZ_RESPONSIVE.logo.height,
+              zIndex: 5,
               opacity: exitLogoAnim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [1, 0],
