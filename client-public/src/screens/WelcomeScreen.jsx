@@ -963,24 +963,28 @@ export default function WelcomeScreen({
             </Animated.Text>
           </View>
           
-          {/* 🔥 Logo Grillz - position absolute, centré horizontalement (WEB COMPATIBLE) */}
-          <Animated.Image
-            source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/logo.png")}
-            style={{ 
-              position: 'absolute',
-              top: GRILLZ_RESPONSIVE.logo.top,
-              left: '50%',
-              marginLeft: -GRILLZ_RESPONSIVE.logo.width / 2,
-              width: GRILLZ_RESPONSIVE.logo.width, 
-              height: GRILLZ_RESPONSIVE.logo.height,
-              zIndex: 5,
-              opacity: exitLogoAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 0],
-              }),
-            }}
-            resizeMode="contain"
-          />
+          {/* 🔥 Logo Grillz - wrapper centré (EXPO + WEB COMPATIBLE) */}
+          <View style={{
+            position: 'absolute',
+            top: GRILLZ_RESPONSIVE.logo.top,
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+            zIndex: 5,
+          }}>
+            <Animated.Image
+              source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/logo.png")}
+              style={{ 
+                width: GRILLZ_RESPONSIVE.logo.width, 
+                height: GRILLZ_RESPONSIVE.logo.height,
+                opacity: exitLogoAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0],
+                }),
+              }}
+              resizeMode="contain"
+            />
+          </View>
         </Animated.View>
         
         {/* 🔥 GRILLZ: Floating Input Section avec animations de sortie */}
