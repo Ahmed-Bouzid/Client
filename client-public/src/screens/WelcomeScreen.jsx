@@ -121,7 +121,7 @@ export default function WelcomeScreen({
     chicken3: { width: 240 * scale, height: 240 * scale, bottom: 280 * vScale, left: -110 * scale },
     chicken4: { width: 260 * scale, height: 260 * scale, bottom: 160 * vScale, right: -130 * scale },
     logo: { width: 400 * scale, height: 450 * scale, top: '28%' },
-    bienvenue: { top: '27%', fontSize: 28 * scale },
+    bienvenue: { top: '26%', fontSize: 28 * scale },
   };
   
   // Stores
