@@ -31,6 +31,7 @@ import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
 import WebStripeCheckout from "../components/payment/WebStripeCheckout";
 
 const { width, height } = Dimensions.get("window");
+const GRILLZ_RESTAURANT_ID = "695e4300adde654b80f6911a";
 
 // 🎴 Premium Payment Item Card
 const PremiumPaymentItem = ({
@@ -239,7 +240,13 @@ export default function Payment({
 
 	// 🎨 Thème dynamique depuis la BDD, fallback DEFAULT_THEME
 	const { config } = useRestaurantConfig(restaurantId);
-	const theme = buildSafeTheme(config?.style, config?.styleKey);
+	const isGrillzTheme =
+		(config?.styleKey || "").toLowerCase() === "grillz" ||
+		restaurantId === GRILLZ_RESTAURANT_ID;
+	const theme = buildSafeTheme(
+		config?.style,
+		isGrillzTheme ? "grillz" : config?.styleKey,
+	);
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -859,7 +866,11 @@ export default function Payment({
 	if (!allOrders || allOrders.length === 0) {
 		return (
 			<LinearGradient
-				colors={theme.background || [theme.dark, theme.card]}
+				colors={
+					isGrillzTheme
+						? ["#0D0D0D", "#171717", "#0F0F0F"]
+						: theme.background || [theme.dark, theme.card]
+				}
 				style={styles.container}
 			>
 				<View style={styles.errorContainer}>
@@ -926,7 +937,11 @@ export default function Payment({
 
 	return (
 		<LinearGradient
-			colors={theme.background || [theme.dark, theme.card]}
+			colors={
+				isGrillzTheme
+					? ["#0D0D0D", "#171717", "#0F0F0F"]
+					: theme.background || [theme.dark, theme.card]
+			}
 			style={styles.container}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 1 }}
@@ -938,7 +953,10 @@ export default function Payment({
 					style={[styles.bgCircle, styles.bgCircle1]}
 				/>
 				<LinearGradient
-					colors={[...theme.success, "transparent"]}
+					colors={[
+						...(isGrillzTheme ? theme.accent : theme.success),
+						"transparent",
+					]}
 					style={[styles.bgCircle, styles.bgCircle2]}
 				/>
 			</View>
@@ -959,7 +977,7 @@ export default function Payment({
 					]}
 				>
 					<LinearGradient
-						colors={theme.success}
+						colors={isGrillzTheme ? theme.primary : theme.success}
 						style={styles.headerIcon}
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 1 }}
@@ -1028,11 +1046,12 @@ export default function Payment({
 								style={[
 									styles.clientToggleBtn,
 									!payForWholeTable && styles.clientToggleBtnActive,
+									isGrillzTheme && !payForWholeTable && styles.clientToggleBtnActiveGrillz,
 								]}
 								onPress={() => setPayForWholeTable(false)}
 								activeOpacity={0.8}
 							>
-								<MaterialIcons name="person" size={15} color={!payForWholeTable ? "#fff" : "#666"} />
+								<MaterialIcons name="person" size={15} color={!payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#666"} />
 								<Text style={[styles.clientToggleText, !payForWholeTable && styles.clientToggleTextActive]}>
 									Mes articles
 								</Text>
@@ -1041,6 +1060,7 @@ export default function Payment({
 								style={[
 									styles.clientToggleBtn,
 									payForWholeTable && styles.clientToggleBtnActive,
+									isGrillzTheme && payForWholeTable && styles.clientToggleBtnActiveGrillz,
 								]}
 								onPress={() =>
 									Alert.alert(
@@ -1054,7 +1074,7 @@ export default function Payment({
 								}
 								activeOpacity={0.8}
 							>
-								<MaterialIcons name="group" size={15} color={payForWholeTable ? "#fff" : "#666"} />
+								<MaterialIcons name="group" size={15} color={payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#666"} />
 								<Text style={[styles.clientToggleText, payForWholeTable && styles.clientToggleTextActive]}>
 									Toute la table
 								</Text>
@@ -1270,8 +1290,10 @@ export default function Payment({
 								<LinearGradient
 									colors={
 										isProcessing || selectedItems.size === 0
-											? ["#ccc", "#999"]
-											: theme.success
+											? ["#ccc", "#ccc"]
+											: isGrillzTheme
+												? [theme.primary, theme.primary]
+												: [theme.success, theme.success]
 									}
 									style={styles.payButton}
 									start={{ x: 0, y: 0 }}
@@ -1381,9 +1403,9 @@ export default function Payment({
 					}}
 				>
 					<View style={styles.webModalBackdrop}>
-						<View style={styles.webModalCard}>
-							<Text style={styles.webModalTitle}>Paiement sécurisé Stripe</Text>
-							<Text style={styles.webModalSubtitle}>
+						<View style={[styles.webModalCard, isGrillzTheme && styles.webModalCardGrillz]}>
+							<Text style={[styles.webModalTitle, isGrillzTheme && styles.webModalTitleGrillz]}>Paiement sécurisé Stripe</Text>
+							<Text style={[styles.webModalSubtitle, isGrillzTheme && styles.webModalSubtitleGrillz]}>
 								Entrez vos informations de carte pour finaliser le paiement.
 							</Text>
 							<WebStripeCheckout
@@ -1436,6 +1458,16 @@ const styles = StyleSheet.create({
 		color: "#475569",
 		marginBottom: 12,
 	},
+	webModalCardGrillz: {
+		backgroundColor: "#141414",
+		borderColor: "#3F3F46",
+	},
+	webModalTitleGrillz: {
+		color: "#F8FAFC",
+	},
+	webModalSubtitleGrillz: {
+		color: "#D4D4D8",
+	},
 
 	// 👥 CLIENT TOGGLE (Mes articles / Toute la table)
 	clientToggleRow: {
@@ -1457,6 +1489,9 @@ const styles = StyleSheet.create({
 	},
 	clientToggleBtnActive: {
 		backgroundColor: "#667eea",
+	},
+	clientToggleBtnActiveGrillz: {
+		backgroundColor: "#EA580C",
 	},
 	clientToggleText: {
 		fontSize: 13,

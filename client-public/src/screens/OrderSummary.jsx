@@ -27,6 +27,7 @@ export default function OrderSummary({
   onUpdateQuantity = () => {},
   onConfirm = () => {},
   onBackToMenu = () => {},
+  isGrillzTheme = false,
 }) {
   const total = currentOrder.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
 
@@ -55,15 +56,15 @@ export default function OrderSummary({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isGrillzTheme && styles.grillzContainer]}>
       {/* ═══════════════════════════════════════════════════════════
           HEADER
       ═══════════════════════════════════════════════════════════ */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBackToMenu} style={styles.backBtn}>
-          <MaterialIcons name="chevron-left" size={28} color="#1F2937" />
+          <MaterialIcons name="chevron-left" size={28} color={isGrillzTheme ? "#F59E0B" : "#1F2937"} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Récapitulatif</Text>
+        <Text style={[styles.headerTitle, isGrillzTheme && styles.grillzHeaderTitle]}>Récapitulatif</Text>
       </View>
 
       {/* ═══════════════════════════════════════════════════════════
@@ -71,12 +72,12 @@ export default function OrderSummary({
       ═══════════════════════════════════════════════════════════ */}
       <View style={styles.summarySection}>
         <View style={styles.summaryLeft}>
-          <Text style={styles.summaryText} numberOfLines={2}>
+          <Text style={[styles.summaryText, isGrillzTheme && styles.grillzSummaryText]} numberOfLines={2}>
             {summaryText || "Aucun article"}
           </Text>
-          <Text style={styles.summaryDate}>{dateText}</Text>
+          <Text style={[styles.summaryDate, isGrillzTheme && styles.grillzSummaryDate]}>{dateText}</Text>
         </View>
-        <Text style={styles.summaryPrice}>${total.toFixed(2)}</Text>
+        <Text style={[styles.summaryPrice, isGrillzTheme && styles.grillzSummaryPrice]}>${total.toFixed(2)}</Text>
       </View>
 
       {/* ═══════════════════════════════════════════════════════════
@@ -96,7 +97,7 @@ export default function OrderSummary({
             const itemPrice = (item.price || 0) * (item.quantity || 1);
 
             return (
-              <View key={item._id || index} style={styles.card}>
+              <View key={item._id || index} style={[styles.card, isGrillzTheme && styles.grillzCard]}>
                 <View style={styles.cardTop}>
                   {/* Image */}
                   <View style={styles.productImageContainer}>
@@ -109,8 +110,8 @@ export default function OrderSummary({
 
                   {/* Infos */}
                   <View style={styles.infoContainer}>
-                    <Text style={styles.productName}>{item.name}</Text>
-                    <Text style={styles.productPrice}>${itemPrice.toFixed(2)}</Text>
+                    <Text style={[styles.productName, isGrillzTheme && styles.grillzProductName]}>{item.name}</Text>
+                    <Text style={[styles.productPrice, isGrillzTheme && styles.grillzProductPrice]}>${itemPrice.toFixed(2)}</Text>
                   </View>
 
                   {/* Quantity controls */}
@@ -119,21 +120,21 @@ export default function OrderSummary({
                       style={styles.quantityBtn} 
                       onPress={() => handleQuantityChange(item, -1)}
                     >
-                      <MaterialIcons name="remove" size={20} color="#1F2937" />
+                      <MaterialIcons name="remove" size={20} color={isGrillzTheme ? "#F59E0B" : "#1F2937"} />
                     </TouchableOpacity>
-                    <Text style={styles.quantityText}>{item.quantity || 1}</Text>
+                    <Text style={[styles.quantityText, isGrillzTheme && styles.grillzQuantityText]}>{item.quantity || 1}</Text>
                     <TouchableOpacity 
                       style={styles.quantityBtn} 
                       onPress={() => handleQuantityChange(item, 1)}
                     >
-                      <MaterialIcons name="add" size={20} color="#1F2937" />
+                      <MaterialIcons name="add" size={20} color={isGrillzTheme ? "#F59E0B" : "#1F2937"} />
                     </TouchableOpacity>
                   </View>
                 </View>
 
                 {/* Description */}
                 {item.description && (
-                  <Text style={styles.productDescription} numberOfLines={2}>
+                  <Text style={[styles.productDescription, isGrillzTheme && styles.grillzProductDescription]} numberOfLines={2}>
                     {item.description}
                   </Text>
                 )}
@@ -147,15 +148,15 @@ export default function OrderSummary({
           FOOTER
       ═══════════════════════════════════════════════════════════ */}
       {currentOrder.length > 0 && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, isGrillzTheme && styles.grillzFooter]}>
           {/* Confirm button */}
-          <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm} activeOpacity={0.9}>
+          <TouchableOpacity style={[styles.confirmBtn, isGrillzTheme && styles.grillzConfirmBtn]} onPress={handleConfirm} activeOpacity={0.9}>
             <Text style={styles.confirmBtnText}>Confirmer la commande • ${total.toFixed(2)}</Text>
           </TouchableOpacity>
 
           {/* Back button */}
-          <TouchableOpacity style={styles.backButton} onPress={onBackToMenu} activeOpacity={0.9}>
-            <Text style={styles.backButtonText}>Retour au menu</Text>
+          <TouchableOpacity style={[styles.backButton, isGrillzTheme && styles.grillzBackButton]} onPress={onBackToMenu} activeOpacity={0.9}>
+            <Text style={[styles.backButtonText, isGrillzTheme && styles.grillzBackButtonText]}>Retour au menu</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -290,4 +291,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   backButtonText: { fontSize: 13, fontWeight: "500", color: "#9CA3AF" },
+
+  grillzContainer: { backgroundColor: "#0D0D0D" },
+  grillzHeaderTitle: { color: "#F8FAFC" },
+  grillzSummaryText: { color: "#F8FAFC" },
+  grillzSummaryDate: { color: "#A3A3A3" },
+  grillzSummaryPrice: { color: "#F97316" },
+  grillzCard: {
+    backgroundColor: "#1A1A1A",
+    borderWidth: 1,
+    borderColor: "#2A2A2A",
+  },
+  grillzProductName: { color: "#F8FAFC" },
+  grillzProductPrice: { color: "#F97316" },
+  grillzProductDescription: { color: "#A3A3A3" },
+  grillzQuantityText: { color: "#F8FAFC" },
+  grillzFooter: { backgroundColor: "#0D0D0D" },
+  grillzConfirmBtn: { backgroundColor: "#EA580C" },
+  grillzBackButton: { borderColor: "#3F3F46" },
+  grillzBackButtonText: { color: "#D4D4D8" },
 });

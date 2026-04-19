@@ -30,6 +30,7 @@ import logger from "../utils/secureLogger";
 
 const { width } = Dimensions.get("window");
 const PANINI_IMAGE = require("../../assets/images/menu/image-fond/panini.png");
+const GRILLZ_RESTAURANT_ID = "695e4300adde654b80f6911a";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROGRESS BAR
@@ -153,6 +154,7 @@ export default function OrderScreen({
   // Use orderId from props or from store
   const effectiveOrderId = orderId || storeOrderId;
   const effectiveRestaurantId = restaurantId || storeRestaurantId;
+  const isGrillzTheme = effectiveRestaurantId === GRILLZ_RESTAURANT_ID;
 
   // 🚪 Écouter fermeture réservation WebSocket
   useReservationStatus(effectiveRestaurantId, reservationId, onReservationClosed);
@@ -540,42 +542,42 @@ export default function OrderScreen({
   // RENDER
   // ═══════════════════════════════════════════════════════════════════════
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isGrillzTheme && styles.grillzContainer]}>
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <MaterialIcons name="chevron-left" size={28} color="#1F2937" />
+          <MaterialIcons name="chevron-left" size={28} color={isGrillzTheme ? "#F59E0B" : "#1F2937"} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Current Order</Text>
+        <Text style={[styles.headerTitle, isGrillzTheme && styles.grillzHeaderTitle]}>Ma commande en cours</Text>
       </View>
 
       {/* SUMMARY */}
       <View style={styles.summarySection}>
         <View style={styles.summaryLeft}>
-          <Text style={styles.summaryText} numberOfLines={2}>
-            {summaryText || "No items"}
+          <Text style={[styles.summaryText, isGrillzTheme && styles.grillzSummaryText]} numberOfLines={2}>
+            {summaryText || "Aucun article"}
           </Text>
-          <Text style={styles.summaryDate}>{dateText}</Text>
+          <Text style={[styles.summaryDate, isGrillzTheme && styles.grillzSummaryDate]}>{dateText}</Text>
         </View>
-        <Text style={styles.summaryPrice}>${total.toFixed(2)}</Text>
+        <Text style={[styles.summaryPrice, isGrillzTheme && styles.grillzSummaryPrice]}>${total.toFixed(2)}</Text>
       </View>
 
       {/* TOGGLE: Mes articles / Toute la table */}
       {otherClientsCount > 0 && (
-        <View style={styles.clientToggleRow}>
+        <View style={[styles.clientToggleRow, isGrillzTheme && styles.grillzClientToggleRow]}>
           <TouchableOpacity
-            style={[styles.clientToggleBtn, !payForWholeTable && styles.clientToggleBtnActive]}
+            style={[styles.clientToggleBtn, !payForWholeTable && styles.clientToggleBtnActive, isGrillzTheme && !payForWholeTable && styles.grillzClientToggleBtnActive]}
             onPress={() => setPayForWholeTable(false)}
             activeOpacity={0.8}
           >
-            <MaterialIcons name="person" size={16} color={!payForWholeTable ? "#fff" : "#6B7280"} />
+            <MaterialIcons name="person" size={16} color={!payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#6B7280"} />
             <Text style={[styles.clientToggleText, !payForWholeTable && styles.clientToggleTextActive]}>
               Mes articles
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.clientToggleBtn, payForWholeTable && styles.clientToggleBtnActive]}
+            style={[styles.clientToggleBtn, payForWholeTable && styles.clientToggleBtnActive, isGrillzTheme && payForWholeTable && styles.grillzClientToggleBtnActive]}
             onPress={() =>
               Alert.alert(
                 "Payer pour toute la table",
@@ -588,7 +590,7 @@ export default function OrderScreen({
             }
             activeOpacity={0.8}
           >
-            <MaterialIcons name="group" size={16} color={payForWholeTable ? "#fff" : "#6B7280"} />
+            <MaterialIcons name="group" size={16} color={payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#6B7280"} />
             <Text style={[styles.clientToggleText, payForWholeTable && styles.clientToggleTextActive]}>
               Toute la table ({otherClientsCount + items.length})
             </Text>
@@ -601,7 +603,7 @@ export default function OrderScreen({
         {items.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialIcons name="check-circle" size={80} color="#4ECDC4" />
-            <Text style={styles.emptyText}>All paid!</Text>
+            <Text style={[styles.emptyText, isGrillzTheme && styles.grillzEmptyText]}>Tout est payé !</Text>
           </View>
         ) : (
           items.map((item) => {
@@ -612,7 +614,7 @@ export default function OrderScreen({
             return (
               <TouchableOpacity
                 key={id}
-                style={[styles.card, isSelected && styles.cardSelected]}
+                style={[styles.card, isSelected && styles.cardSelected, isGrillzTheme && styles.grillzCard, isGrillzTheme && isSelected && styles.grillzCardSelected]}
                 onPress={() => toggleItem(item)}
                 activeOpacity={0.95}
               >
@@ -621,8 +623,8 @@ export default function OrderScreen({
                     <Image source={PANINI_IMAGE} style={styles.productImage} resizeMode="cover" />
                   </View>
                   <View style={styles.infoContainer}>
-                    <Text style={styles.productName}>{item.name}</Text>
-                    <Text style={styles.productPrice}>${itemPrice.toFixed(2)}</Text>
+                    <Text style={[styles.productName, isGrillzTheme && styles.grillzProductName]}>{item.name}</Text>
+                    <Text style={[styles.productPrice, isGrillzTheme && styles.grillzProductPrice]}>${itemPrice.toFixed(2)}</Text>
                   </View>
                   {/* Checkbox */}
                   <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
@@ -631,8 +633,8 @@ export default function OrderScreen({
                 </View>
                 <ProgressBar step={1} />
                 <View style={styles.timeRow}>
-                  <Text style={styles.timeLeft}>15 minutes left</Text>
-                  <Text style={styles.timeAvg}>40 mins on average</Text>
+                  <Text style={[styles.timeLeft, isGrillzTheme && styles.grillzTimeLeft]}>15 minutes restantes</Text>
+                  <Text style={[styles.timeAvg, isGrillzTheme && styles.grillzTimeAvg]}>40 min en moyenne</Text>
                 </View>
               </TouchableOpacity>
             );
@@ -642,25 +644,27 @@ export default function OrderScreen({
 
       {/* FOOTER */}
       {items.length > 0 && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, isGrillzTheme && styles.grillzFooter]}>
           <TouchableOpacity 
-            style={[styles.payBtn, loading && styles.payBtnDisabled]} 
+            style={[styles.payBtn, loading && styles.payBtnDisabled, isGrillzTheme && styles.grillzPayBtn]} 
             onPress={() => handlePay("card")} 
             activeOpacity={0.9}
             disabled={loading}
           >
             <Text style={styles.payBtnText}>
-              {loading ? "Paiement..." : `Pay now • $${selectedTotal.toFixed(2)}`}
+              {loading ? "Paiement..." : `Payer maintenant • $${selectedTotal.toFixed(2)}`}
             </Text>
           </TouchableOpacity>
 
           <View style={styles.btnRow}>
-            <TouchableOpacity style={styles.splitBtn} onPress={selectOneThird} activeOpacity={0.9}>
-              <Text style={styles.splitBtnText}>Split with others</Text>
-            </TouchableOpacity>
+            {!isGrillzTheme && (
+              <TouchableOpacity style={styles.splitBtn} onPress={selectOneThird} activeOpacity={0.9}>
+                <Text style={styles.splitBtnText}>Split with others</Text>
+              </TouchableOpacity>
+            )}
 
-            <TouchableOpacity style={styles.cancelBtn} onPress={onCancelOrder} activeOpacity={0.9}>
-              <Text style={styles.cancelBtnText}>Cancel Order</Text>
+            <TouchableOpacity style={[styles.cancelBtn, isGrillzTheme && styles.grillzCancelBtn]} onPress={onCancelOrder} activeOpacity={0.9}>
+              <Text style={[styles.cancelBtnText, isGrillzTheme && styles.grillzCancelBtnText]}>Annuler la commande</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -839,4 +843,27 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "700",
   },
+
+  grillzContainer: { backgroundColor: "#0D0D0D" },
+  grillzHeaderTitle: { color: "#F8FAFC" },
+  grillzSummaryText: { color: "#F8FAFC" },
+  grillzSummaryDate: { color: "#A3A3A3" },
+  grillzSummaryPrice: { color: "#F97316" },
+  grillzClientToggleRow: { backgroundColor: "#1A1A1A" },
+  grillzClientToggleBtnActive: { backgroundColor: "#EA580C" },
+  grillzEmptyText: { color: "#F8FAFC" },
+  grillzCard: {
+    backgroundColor: "#1A1A1A",
+    borderWidth: 1,
+    borderColor: "#2A2A2A",
+  },
+  grillzCardSelected: { borderColor: "#F97316" },
+  grillzProductName: { color: "#F8FAFC" },
+  grillzProductPrice: { color: "#F97316" },
+  grillzTimeLeft: { color: "#F97316" },
+  grillzTimeAvg: { color: "#A3A3A3" },
+  grillzFooter: { backgroundColor: "#0D0D0D" },
+  grillzPayBtn: { backgroundColor: "#EA580C" },
+  grillzCancelBtn: { borderColor: "#3F3F46" },
+  grillzCancelBtnText: { color: "#D4D4D8" },
 });

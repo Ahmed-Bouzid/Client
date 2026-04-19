@@ -1206,6 +1206,7 @@ export default function MenuScreen({
           onUpdateQuantity={handleQuantityChange}
           onConfirm={handleConfirmOrder}
           onBackToMenu={() => setShowOrderSummary(false)}
+          isGrillzTheme={isGrillz}
         />
       </Modal>
 
