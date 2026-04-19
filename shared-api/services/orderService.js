@@ -19,9 +19,11 @@ export const orderService = {
 		origin = "client",
 	}) {
 		try {
-			const token = await clientAuthService.getClientToken();
+			const headers = await clientAuthService.getAuthHeaders({
+				"Content-Type": "application/json",
+			});
 
-			if (!token) {
+			if (!headers) {
 				throw new Error(
 					"Session expirée. Veuillez vous reconnecter en scannant le QR code.",
 				);
@@ -29,10 +31,7 @@ export const orderService = {
 
 			const response = await fetch(`${API_CONFIG.BASE_URL}/orders/`, {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${token}`,
-				},
+				headers,
 				body: JSON.stringify({
 					tableId,
 					items,
@@ -71,13 +70,13 @@ export const orderService = {
 	 */
 	async getActiveOrder() {
 		try {
-			const token = await clientAuthService.getClientToken();
-			if (!token) {
+			const headers = await clientAuthService.getAuthHeaders();
+			if (!headers) {
 				return null;
 			}
 
 			const response = await fetch(`${API_CONFIG.BASE_URL}/orders/active`, {
-				headers: { Authorization: `Bearer ${token}` },
+				headers,
 			});
 
 			if (!response.ok) {
@@ -109,8 +108,10 @@ export const orderService = {
 	 */
 	async getOrdersByReservation(reservationId, clientId = null) {
 		try {
-			const token = await clientAuthService.getClientToken();
-			if (!token) {
+			const headers = await clientAuthService.getAuthHeaders({
+				"Content-Type": "application/json",
+			});
+			if (!headers) {
 				throw new Error("Token manquant");
 			}
 
@@ -121,10 +122,7 @@ export const orderService = {
 
 			const response = await fetch(url, {
 				method: "GET",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${token}`,
-				},
+				headers,
 			});
 
 			if (!response.ok) {
@@ -151,12 +149,90 @@ export const orderService = {
 	},
 
 	/**
+	 * Déclare un paiement au comptoir (fast-food)
+	 */
+	async declareCounterPayment(orderId) {
+		try {
+			const headers = await clientAuthService.getAuthHeaders({
+				"Content-Type": "application/json",
+			});
+			if (!headers) {
+				throw new Error("Token manquant");
+			}
+
+			const response = await fetch(
+				`${API_CONFIG.BASE_URL}/client-orders/${orderId}/counter-payment`,
+				{
+					method: "PUT",
+					headers,
+				},
+			);
+
+			if (!response.ok) {
+				let errorText = "Erreur lors de la déclaration";
+				try {
+					const errorData = await response.json();
+					errorText = errorData.message || errorText;
+				} catch (e) {
+					// pas du JSON
+				}
+				throw new Error(errorText);
+			}
+
+			return await response.json();
+		} catch (error) {
+			console.error("❌ Erreur déclaration paiement comptoir:", error);
+			throw error;
+		}
+	},
+
+	/**
+	 * Annule une commande
+	 */
+	async cancelOrder(orderId) {
+		try {
+			const headers = await clientAuthService.getAuthHeaders({
+				"Content-Type": "application/json",
+			});
+			if (!headers) {
+				throw new Error("Token manquant");
+			}
+
+			const response = await fetch(
+				`${API_CONFIG.BASE_URL}/client-orders/${orderId}/cancel`,
+				{
+					method: "PUT",
+					headers,
+				},
+			);
+
+			if (!response.ok) {
+				let errorText = "Erreur lors de l'annulation";
+				try {
+					const errorData = await response.json();
+					errorText = errorData.message || errorText;
+				} catch (e) {
+					// pas du JSON
+				}
+				throw new Error(errorText);
+			}
+
+			return await response.json();
+		} catch (error) {
+			console.error("❌ Erreur annulation commande:", error);
+			throw error;
+		}
+	},
+
+	/**
 	 * Marque une commande comme payée
 	 */
 	async markAsPaid(orderId) {
 		try {
-			const token = await clientAuthService.getClientToken();
-			if (!token) {
+			const headers = await clientAuthService.getAuthHeaders({
+				"Content-Type": "application/json",
+			});
+			if (!headers) {
 				throw new Error("Token manquant");
 			}
 
@@ -164,10 +240,7 @@ export const orderService = {
 				`${API_CONFIG.BASE_URL}/orders/${orderId}/mark-as-paid`,
 				{
 					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${token}`,
-					},
+					headers,
 				},
 			);
 

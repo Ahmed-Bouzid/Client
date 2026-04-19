@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureSessionStore } from "shared-api/utils/secureSessionStore";
 
 /**
  * Store Zustand pour gérer les restrictions alimentaires du client
@@ -17,7 +17,9 @@ export const useRestrictionStore = create((set, get) => ({
 	 */
 	init: async () => {
 		try {
-			const saved = await AsyncStorage.getItem("userRestrictions");
+			const saved = await secureSessionStore.getString(
+				secureSessionStore.keys.RESTRICTIONS,
+			);
 			if (saved) {
 				const restrictions = JSON.parse(saved);
 				set({
@@ -34,9 +36,9 @@ export const useRestrictionStore = create((set, get) => ({
 	 */
 	persist: async (restrictions) => {
 		try {
-			await AsyncStorage.setItem(
-				"userRestrictions",
-				JSON.stringify(restrictions),
+			await secureSessionStore.setJson(
+				secureSessionStore.keys.RESTRICTIONS,
+				restrictions,
 			);
 		} catch (error) {
 			console.error("❌ Erreur sauvegarde restrictions:", error);

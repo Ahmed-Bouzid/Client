@@ -1,13 +1,19 @@
 /**
- * WelcomeScreen - Page d'onboarding avec photos de plats
- * 
- * Design inspiré du template Foodmood:
- * - Photos de plats en haut
- * - Logo restaurant centré
- * - Slogan
- * - Boutons Continue (Facebook + Google)
- * - Bouton principal dark "Continue with Email"
- * - Lien "Already a member? Log in"
+ * ═══════════════════════════════════════════════════════════════
+ * WelcomeScreen.jsx — ÉTAPE 1 : PAGE D'ACCUEIL & CONNEXION CLIENT
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * Parcours client :
+ *   1. Affichage de la page d'accueil restaurant (logo, photos, ambiance)
+ *   2. Saisie du prénom et numéro de téléphone
+ *   3. Appel API : création/reprise de réservation + obtention du token client
+ *   4. Stockage des credentials (AsyncStorage) puis callback onJoin → MenuScreen
+ *
+ * Fonctionnalités secondaires :
+ *   - Détection de session existante → proposition de reprise
+ *   - Thème conditionnel par restaurant (Grillz, Cucina, défaut)
+ *   - Animations d'entrée/sortie selon le restaurant
+ *   - Chargement de polices custom
  */
 
 import React, { useState, useEffect, useRef } from "react";
@@ -39,18 +45,19 @@ import { useClientTableStore } from "../stores/useClientTableStore";
 import { useRestaurantStore } from "../stores/useRestaurantStore";
 import { clientAuthService } from "shared-api/services/clientAuthService.js";
 import { API_CONFIG } from "shared-api/config/apiConfig.js";
+import { secureSessionStore } from "shared-api/utils/secureSessionStore";
 import RNUUID from "react-native-uuid";
 
 import { getRestaurantAssets, getRestaurantFont } from "../utils/restaurantAssets";
+import useOrderLookup from "../hooks/useOrderLookup";
 
 export default function WelcomeScreen({
   tableId = null,
   tableNumber = null,
   onJoin = () => {},
+  onLookupOrder = () => {},
 }) {
   const { theme } = useTheme();
-  
-  console.log("👋 [WelcomeScreen] Montage/remount avec props:", { tableId, tableNumber });
   
   // ═══════════════════════════════════════════════════════════════════════════
   // 🔒 RESTAURANT CONFIG - Seules ces valeurs changent selon le restaurant
@@ -74,14 +81,41 @@ export default function WelcomeScreen({
   
   // States
   const [loading, setLoading] = useState(false);
-  const [showEmailForm, setShowEmailForm] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [fontLoaded, setFontLoaded] = useState(false);
   const [existingSession, setExistingSession] = useState(null);
-  const [participants, setParticipants] = useState([]);
-  const [creatorName, setCreatorName] = useState(null);
+  
+  // 🔍 Order lookup — détection auto quand le user tape # dans le champ téléphone
+  const orderLookup = useOrderLookup();
+  const isOrderLookupMode = phone.startsWith("#");
+  
+  // Gestion unifiée du champ téléphone / order number
+  const handlePhoneChange = (text) => {
+    if (text.startsWith("#") || (phone.startsWith("#") && text.length > 0)) {
+      // Mode lookup : déléguer le formatage au hook
+      orderLookup.setOrderNumber(text);
+    } else {
+      setPhone(text);
+    }
+  };
+  
+  // Sync le phone quand orderLookup.orderNumber change (auto-format)
+  React.useEffect(() => {
+    if (orderLookup.orderNumber) {
+      setPhone(orderLookup.orderNumber);
+    } else if (isOrderLookupMode) {
+      setPhone("");
+    }
+  }, [orderLookup.orderNumber]);
+  
+  const handleLookupOrder = async () => {
+    const result = await orderLookup.lookup();
+    if (result) {
+      onLookupOrder(result);
+    }
+  };
   
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -103,9 +137,6 @@ export default function WelcomeScreen({
   const bgLeftAnim = useRef(new Animated.Value(0)).current;
   const bgRightAnim = useRef(new Animated.Value(0)).current;
   
-  // Keyboard state
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-  
   // 📱 RESPONSIVE SCALING - Design basé sur iPhone 16 Pro Max (440x956)
   // Ces valeurs sont utilisées pour que le design soit IDENTIQUE sur tous les appareils
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -125,8 +156,6 @@ export default function WelcomeScreen({
   };
   
   // Stores
-  console.log("👋 [WelcomeScreen] Store restaurantId:", restaurantId);
-  
   const restaurantName = useRestaurantStore((state) => state.name);
   const fetchRestaurantInfo = useRestaurantStore((state) => state.fetchRestaurantInfo);
   
@@ -154,7 +183,8 @@ export default function WelcomeScreen({
     loadFont();
   }, [restaurantId, RESTAURANT_CONFIG.font]);
   
-  // 🔄 Vérifier si une session active existe (reconnexion auto)
+  // ── PARCOURS : détection session existante au démarrage ──
+  // Vérifie AsyncStorage pour proposer la reprise d'une session précédente
   useEffect(() => {
     if (!tableId) return;
     const checkExistingSession = async () => {
@@ -162,7 +192,9 @@ export default function WelcomeScreen({
         const savedTableId = await AsyncStorage.getItem("currentTableId");
         const savedReservationId = await AsyncStorage.getItem("currentReservationId");
         const savedClientName = await AsyncStorage.getItem("currentClientName");
-        const savedClientId = await AsyncStorage.getItem("currentClientId");
+        const savedClientId = await secureSessionStore.getString(
+          secureSessionStore.keys.CLIENT_ID,
+        );
         const savedTableNumber = await AsyncStorage.getItem("currentTableNumber");
 
         if (savedTableId === tableId && savedReservationId && savedClientName) {
@@ -172,7 +204,6 @@ export default function WelcomeScreen({
             clientId: savedClientId,
             tableNumber: savedTableNumber,
           });
-          setCreatorName(savedClientName);
         } else {
           setExistingSession(null);
         }
@@ -183,7 +214,7 @@ export default function WelcomeScreen({
     checkExistingSession();
   }, [tableId]);
 
-  // Handler pour reprendre la session existante
+  // ── PARCOURS : reprend une session existante (skip le formulaire) ──
   const handleResumeSession = async () => {
     if (!existingSession) return;
     setLoading(true);
@@ -191,7 +222,7 @@ export default function WelcomeScreen({
       onJoin({
         reservationId: existingSession.reservationId,
         clientId: existingSession.clientId,
-        clientName: existingSession.clientName,
+        userName: existingSession.clientName,
         tableNumber: existingSession.tableNumber,
         isResumed: true,
       });
@@ -209,9 +240,9 @@ export default function WelcomeScreen({
       "currentTableId",
       "currentReservationId", 
       "currentClientName",
-      "currentClientId",
       "currentTableNumber",
     ]);
+	await secureSessionStore.remove(secureSessionStore.keys.CLIENT_ID);
     setExistingSession(null);
     // Reste sur la page welcome, ne pas ouvrir le formulaire séparé
   };
@@ -270,7 +301,6 @@ export default function WelcomeScreen({
     const keyboardWillShow = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (e) => {
-        setKeyboardVisible(true);
         Animated.spring(keyboardAnim, {
           toValue: 1,
           tension: 100,
@@ -283,7 +313,6 @@ export default function WelcomeScreen({
     const keyboardWillHide = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => {
-        setKeyboardVisible(false);
         Animated.spring(keyboardAnim, {
           toValue: 0,
           tension: 100,
@@ -300,37 +329,34 @@ export default function WelcomeScreen({
   }, []);
   
   // Handle join table - LOGIQUE COMPLÈTE DE RÉSERVATION
+  // ── PARCOURS PRINCIPAL : connexion utilisateur ──
+  // 1. Valide prénom + tableId
+  // 2. Génère/récupère clientId (UUID stable)
+  // 3. Obtient un token client (JWT)
+  // 4. Crée/reprend une réservation via API
+  // 5. Stocke credentials dans AsyncStorage
+  // 6. Appelle onJoin() → App.jsx navigue vers MenuScreen
+  // ── PARCOURS PRINCIPAL : connexion utilisateur ──
+  // 1. Valide prénom + tableId
+  // 2. Génère/récupère clientId (UUID stable)
+  // 3. Obtient un token client (JWT)
+  // 4. Crée/reprend une réservation (POST /reservations/client/reservations)
+  // 5. Stocke credentials dans AsyncStorage
+  // 6. Appelle onJoin() → App.jsx navigue vers MenuScreen
   const handleContinueWithEmail = async () => {
-    console.log("📝 [WelcomeScreen] handleContinueWithEmail appelé");
-    console.log("   - name:", name.trim());
-    console.log("   - tableId (prop):", tableId);
-    console.log("   - restaurantId (store):", restaurantId);
-    
-    if (!name.trim()) {
-      setError("Veuillez entrer votre nom");
-      return;
-    }
-    
-    if (!tableId) {
-      console.error("❌ [JOIN] tableId manquant !");
-      setError("Table non identifiée.");
-      return;
-    }
     
     setError("");
     setLoading(true);
     
     try {
       // ⭐ Stocker tableId et pseudo
-      await AsyncStorage.setItem("pseudo", name.trim());
-      await AsyncStorage.setItem("tableId", tableId);
+      await AsyncStorage.multiSet([
+        ["pseudo", name.trim()],
+        ["tableId", tableId],
+      ]);
       
       // ⭐ Récupérer restaurantId (store ou AsyncStorage)
       const finalRestaurantId = restaurantId || (await AsyncStorage.getItem("restaurantId"));
-      
-      console.log("🔍 [JOIN] IDs résolus:");
-      console.log("   - finalRestaurantId:", finalRestaurantId);
-      console.log("   - tableId:", tableId);
       
       if (!finalRestaurantId) {
         console.error("❌ [JOIN] Restaurant ID manquant!");
@@ -340,13 +366,16 @@ export default function WelcomeScreen({
       }
 
       // ⭐ Récupérer ou créer clientId (UUID stable)
-      let clientId = await AsyncStorage.getItem("clientId");
+      let clientId = await secureSessionStore.getString(
+        secureSessionStore.keys.CLIENT_ID,
+      );
       if (!clientId) {
         clientId = RNUUID.v4();
-        await AsyncStorage.setItem("clientId", clientId);
+      await secureSessionStore.setString(
+        secureSessionStore.keys.CLIENT_ID,
+        String(clientId),
+      );
       }
-
-      console.log("✅ [JOIN] ClientId:", clientId);
       
       // Générer un token client simple pour les commandes
       const token = await clientAuthService.getClientToken(
@@ -355,8 +384,6 @@ export default function WelcomeScreen({
         finalRestaurantId,
         clientId,
       );
-      
-      console.log("✅ [JOIN] Token client généré");
       
       const body = {
         clientName: name.trim(),
@@ -418,13 +445,19 @@ export default function WelcomeScreen({
       }
       
       // ⭐ Stocker les infos importantes dans AsyncStorage
-      await AsyncStorage.setItem("currentReservationId", reservationId);
-      await AsyncStorage.setItem("currentTableId", tableId);
+      const storePairs = [
+        ["currentReservationId", reservationId],
+        ["currentTableId", tableId],
+        ["currentClientName", name.trim()],
+      ];
       if (tableNumber) {
-        await AsyncStorage.setItem("currentTableNumber", tableNumber.toString());
+        storePairs.push(["currentTableNumber", tableNumber.toString()]);
       }
-      await AsyncStorage.setItem("currentClientName", name.trim());
-      await AsyncStorage.setItem("currentClientId", clientId);
+      await AsyncStorage.multiSet(storePairs);
+		await secureSessionStore.setString(
+			secureSessionStore.keys.CLIENT_ID,
+			String(clientId),
+		);
       
       // ⭐ Appeler onJoin avec un objet (format attendu par App.jsx)
       console.log("🎉 [JOIN] Succès! Appel onJoin callback");
@@ -550,92 +583,6 @@ export default function WelcomeScreen({
       window.location.reload();
     }
   };
-  
-  // Si on affiche le formulaire
-  if (showEmailForm) {
-    return (
-      <View style={styles.container}>
-        <StatusBar
-          translucent
-          backgroundColor="transparent"
-          barStyle="dark-content"
-        />
-        
-        {/* Back button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => setShowEmailForm(false)}
-        >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text.primary} />
-        </TouchableOpacity>
-        
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
-        >
-          <ScrollView contentContainerStyle={styles.formContent} showsVerticalScrollIndicator={false}>
-            <Text style={[styles.formTitle, { ...theme.typography.styles.h2, color: theme.colors.text.primary }]}>
-              Rejoindre la Table {tableNumber || "?"}
-            </Text>
-            
-            <Text style={[styles.formSubtitle, { ...theme.typography.styles.body, color: theme.colors.text.secondary }]}>
-              Entrez vos informations pour continuer
-            </Text>
-            
-            {/* Name Input */}
-            <View style={styles.inputWrapper}>
-              <View style={[styles.inputContainer, { backgroundColor: "rgba(255,255,255,0.95)", borderColor: error ? theme.colors.error.main : "transparent" }]}>
-                <Ionicons name="person-outline" size={22} color={theme.colors.text.tertiary} style={styles.inputIcon} />
-                <TextInput
-                  style={[styles.textInput, { color: theme.colors.text.primary }]}
-                  placeholder="Votre nom"
-                  placeholderTextColor={theme.colors.text.tertiary}
-                  value={name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
-            
-            {/* Phone Input */}
-            <View style={styles.inputWrapper}>
-              <View style={[styles.inputContainer, { backgroundColor: "rgba(255,255,255,0.95)", borderColor: "transparent" }]}>
-                <Ionicons name="call-outline" size={22} color={theme.colors.text.tertiary} style={styles.inputIcon} />
-                <TextInput
-                  style={[styles.textInput, { color: theme.colors.text.primary }]}
-                  placeholder="Téléphone (optionnel)"
-                  placeholderTextColor={theme.colors.text.tertiary}
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
-            
-            {error ? (
-              <Text style={[styles.errorText, { color: theme.colors.error.main }]}>{error}</Text>
-            ) : null}
-            
-            {/* Continue Button */}
-            <Button
-              variant="primary"
-              size="large"
-              fullWidth
-              onPress={handleContinueWithEmail}
-              loading={loading}
-              disabled={loading || !name.trim()}
-              style={{ marginTop: 32 }}
-            >
-              {loading ? "Connexion..." : "Continuer →"}
-            </Button>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
-    );
-  }
   
   // Page d'onboarding principale
   // 🔥 LE GRILLZ = fond BBQ avec image poulet
@@ -1066,27 +1013,40 @@ export default function WelcomeScreen({
             </View>
           </View>
           
-          {/* Input Téléphone */}
+          {/* Input Téléphone / Order Lookup */}
           <View style={styles.inputRow}>
             <View style={[styles.googleButtonSquare, { opacity: 0 }]} />
             <View style={[
               styles.inputContainerInline, 
               { 
                 backgroundColor: '#1E1E1E', 
-                borderColor: '#D35400',
+                borderColor: isOrderLookupMode ? (orderLookup.isValid ? '#4CAF50' : '#D35400') : '#D35400',
                 marginRight: 62,
               }
             ]}>
-              <Ionicons name="call-outline" size={20} color="#FF8A50" style={styles.inputIconMain} />
+              <Ionicons 
+                name={isOrderLookupMode ? "receipt-outline" : "call-outline"} 
+                size={20} 
+                color={isOrderLookupMode ? (orderLookup.isValid ? '#4CAF50' : '#FF8A50') : '#FF8A50'} 
+                style={styles.inputIconMain} 
+              />
               <TextInput
                 style={[styles.textInputMain, { color: '#FFFFFF', backgroundColor: 'transparent' }]}
                 placeholder="Votre téléphone"
                 placeholderTextColor="#777"
                 value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
+                onChangeText={handlePhoneChange}
+                keyboardType={isOrderLookupMode ? "number-pad" : "phone-pad"}
                 autoCorrect={false}
+                maxLength={isOrderLookupMode ? 8 : undefined}
               />
+              {isOrderLookupMode && phone.length > 1 && (
+                <Ionicons
+                  name={orderLookup.isValid ? "checkmark-circle" : "close-circle"}
+                  size={20}
+                  color={orderLookup.isValid ? "#4CAF50" : "#FF6B6B"}
+                />
+              )}
             </View>
           </View>
           
@@ -1094,36 +1054,53 @@ export default function WelcomeScreen({
           {error ? (
             <Text style={[styles.errorText, { color: '#FF6B6B' }]}>{error}</Text>
           ) : null}
+          {orderLookup.error && isOrderLookupMode ? (
+            <Text style={[styles.errorText, { color: '#FF6B6B' }]}>{orderLookup.error}</Text>
+          ) : null}
           
-          {/* CTA Button - Déclenche l'animation */}
+          {/* CTA Button — switch entre "Rejoindre" et "Retrouver" selon le mode */}
           <TouchableOpacity
-            onPress={handleExitAnimation}
+            onPress={isOrderLookupMode ? handleLookupOrder : handleExitAnimation}
             activeOpacity={0.8}
-            disabled={!name.trim() || loading}
+            disabled={isOrderLookupMode ? (!orderLookup.isValid || orderLookup.loading) : (!name.trim() || loading)}
             style={{ marginTop: 16 }}
           >
             <LinearGradient
-              colors={['#D35400', '#E67E22']}
+              colors={isOrderLookupMode 
+                ? (orderLookup.isValid ? ['#D35400', '#E67E22'] : ['#444', '#555'])
+                : ['#D35400', '#E67E22']
+              }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={{
                 paddingVertical: 16,
                 borderRadius: 14,
                 alignItems: 'center',
-                opacity: name.trim() ? 1 : 0.5,
+                flexDirection: 'row',
+                justifyContent: 'center',
+                gap: 8,
+                opacity: isOrderLookupMode 
+                  ? (orderLookup.isValid && !orderLookup.loading ? 1 : 0.5)
+                  : (name.trim() ? 1 : 0.5),
                 shadowColor: '#FF5722',
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.4,
                 shadowRadius: 8,
               }}
             >
+              {isOrderLookupMode && (
+                <Ionicons name="search" size={18} color="#FFFFFF" />
+              )}
               <Text style={{
                 color: '#FFFFFF',
                 fontSize: 17,
                 fontWeight: '700',
                 letterSpacing: 0.5,
               }}>
-                {loading ? "Chargement..." : `Rejoindre la table ${tableNumber || ""}`}
+                {isOrderLookupMode
+                  ? (orderLookup.loading ? "Recherche..." : "Retrouver ma commande")
+                  : (loading ? "Chargement..." : `Rejoindre la table ${tableNumber || ""}`)
+                }
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -1969,5 +1946,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: "#6B7280",
+  },
+  
+  // ── OR Separator (Grillz order lookup) ──
+  orSeparator: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 16,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#333",
+  },
+  orText: {
+    color: "#666",
+    fontSize: 13,
+    fontWeight: "500",
+    marginHorizontal: 12,
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
 });

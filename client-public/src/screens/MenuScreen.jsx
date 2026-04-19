@@ -1,8 +1,24 @@
 /**
- * MenuScreen - Page du menu (nouveau design Foodmood)
+ * ═══════════════════════════════════════════════════════════════
+ * MenuScreen.jsx — ÉTAPE 2 : CONSULTATION MENU & CONSTITUTION DU PANIER
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * Parcours client :
+ *   1. Charge le menu complet depuis l'API (GET /products/restaurant/:id)
+ *   2. Affiche les catégories (pills) et les produits filtrés
+ *   3. L'utilisateur sélectionne des plats → ajout au panier (useOrderStore)
+ *   4. Gestion des add-ons (options produit) via modal AddOnFlow
+ *   5. Bouton "Commander" → ouvre OrderSummary (récapitulatif)
+ *   6. Validation → soumission commande (POST /orders) ou navigation fast-food
+ *
+ * Fonctionnalités secondaires :
+ *   - Thème conditionnel par restaurant (Grillz dark, Cucina vert, défaut)
+ *   - Modal détail produit (zoom image, description)
+ *   - Préférences alimentaires (allergènes, restrictions)
+ *   - WebSocket pour mise à jour du style en temps réel
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -24,10 +40,10 @@ import { LinearGradient } from "expo-linear-gradient";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import * as Font from 'expo-font';
 import useProductStore from "../stores/useProductStore";
-import { useCartStore } from "../stores/useCartStore";
 import { useOrderStore } from "../stores/useOrderStore";
 import { useRestaurantStore } from "../stores/useRestaurantStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { clientAuthService } from "shared-api/services/clientAuthService.js";
 import OrderSummary from "./OrderSummary";
 import DietaryPreferences from "./DietaryPreferences";
 import AddOnFlow from "../components/menu/AddOnFlow";
@@ -61,15 +77,6 @@ export default function MenuScreen({
   onNavigateToPayment = () => {},
   onAdd = () => {},
 }) {
-  console.log("📋 [MenuScreen] Montage avec props:", {
-    restaurantId,
-    tableId,
-    reservationId,
-    clientId,
-  });
-  
-  console.log("📋 [MenuScreen] restaurantId reçu:", restaurantId, "type:", typeof restaurantId);
-  
   // 🍝 CUCINA: Détection restaurant
   const isCucina = restaurantId === '6970ef6594abf8bacd9d804d';
   const isGrillz = restaurantId === '695e4300adde654b80f6911a';
@@ -92,11 +99,11 @@ export default function MenuScreen({
   // Stores - EXACTEMENT comme Menu.jsx
   const products = useProductStore((state) => state.products);
   const fetchProducts = useProductStore((state) => state.fetchProducts);
-  const { cart, addItem, removeItem, updateQuantity: updateCartQuantity, getTotalItems, getTotalPrice, initCart } = useCartStore();
-  const { currentOrder, addToOrder, updateOrderQuantity, fetchActiveOrder, submitOrder } = useOrderStore();
+  const { currentOrder, addToOrder, updateOrderQuantity, submitOrder, initCart, getTotalItems, getTotalPrice } = useOrderStore();
   
-  // Store restaurant pour le nom
+  // Store restaurant pour le nom + catégorie
   const restaurantName = useRestaurantStore((state) => state.name);
+  const restaurantCategory = useRestaurantStore((state) => state.category);
   const fetchRestaurantInfo = useRestaurantStore((state) => state.fetchRestaurantInfo);
   
   // 🎨 NOUVEAU: Hook thème avec caching multi-level
@@ -121,18 +128,13 @@ export default function MenuScreen({
   // Mettre à jour quand un nouveau style est appliqué en temps réel
   useEffect(() => {
     if (liveStyle && liveStyle.config) {
-      Alert.alert(
-        "🎨 Nouveau style",
-        "L'apparence du menu a été mise à jour !",
-        [{ text: "OK" }]
-      );
-      // Note: Pour appliquer dynamiquement, il faudrait un state de style
-      // et utiliser buildSafeTheme comme dans l'ancien Menu.jsx
+      console.log("🎨 [MenuScreen] Nouveau style reçu via WebSocket");
     }
   }, [liveStyle]);
 
-  // 🎨 Charger la police DXNacky
+  // 🎨 Charger la police DXNacky (Cucina uniquement)
   useEffect(() => {
+    if (!isCucina) return;
     const loadFont = async () => {
       try {
         await Font.loadAsync({
@@ -145,13 +147,11 @@ export default function MenuScreen({
       }
     };
     loadFont();
-  }, []);
+  }, [isCucina]);
 
   // 🏪 Charger les infos du restaurant (nom, etc)
   useEffect(() => {
-    console.log("📋 [MenuScreen] useEffect restaurantInfo - restaurantId:", restaurantId);
     if (restaurantId) {
-      console.log("📋 [MenuScreen] Fetch restaurant info pour:", restaurantId);
       fetchRestaurantInfo(restaurantId);
     } else {
       console.warn("⚠️ [MenuScreen] restaurantId est falsy dans useEffect restaurantInfo");
@@ -171,16 +171,13 @@ export default function MenuScreen({
   }, []);
   
   // Charger les produits - EXACTEMENT comme Menu.jsx
+  // ── PARCOURS : charge le menu complet depuis l'API ──
   useEffect(() => {
-    console.log("📋 [MenuScreen] useEffect produits - restaurantId:", restaurantId);
     const loadProducts = async () => {
       try {
-        const clientToken = await AsyncStorage.getItem("clientToken");
-        console.log("📋 [MenuScreen] Chargement produits - restaurantId:", restaurantId, "token:", clientToken ? "oui" : "non");
+		const clientToken = await clientAuthService.getClientToken();
         if (clientToken) {
-          console.log("📋 [MenuScreen] Appel fetchProducts avec restaurantId:", restaurantId);
           await fetchProducts(clientToken, restaurantId);
-          console.log("✅ [MenuScreen] fetchProducts complété");
         } else {
           console.warn("⚠️ Client doit rejoindre une table d'abord");
         }
@@ -241,77 +238,63 @@ export default function MenuScreen({
   ];
   
   // Cucina = catégories fixes, autres = dynamiques
-  const categories = isCucina ? cucinaCategories : getCategories();
-
-  // Catégories avec leurs emojis (ANCIEN CODE - SUPPRIMÉ)
-  // const categories = [
-  //   { id: "entrees", name: "Entrées", emoji: "🥗" },
-  //   { id: "sandwich", name: "Sandwichs", emoji: "🥪" },
-  //   { id: "pizzas", name: "Pizzas", emoji: "🍕" },
-  //   { id: "desserts", name: "Desserts", emoji: "🍰" },
-  //   { id: "boissons", name: "Boissons", emoji: "🥤" },
-  //   { id: "cafes", name: "Cafés", emoji: "☕" },
-  // ];
+  const categories = useMemo(
+    () => isCucina ? cucinaCategories : getCategories(),
+    [products, isCucina]
+  );
 
   // Produits filtrés - utilise le selectedCategory pour filtrer
-  const filteredProducts = products.filter((p) => {
-    if (!selectedCategory) return false; // Aucune catégorie = pas de produits
-    const pCategory = p.category?.toLowerCase() || '';
-    const selectedCat = selectedCategory.toLowerCase();
-    return pCategory === selectedCat;
-  });
+  const filteredProducts = useMemo(
+    () => products.filter((p) => {
+      if (!selectedCategory) return false;
+      const pCategory = p.category?.toLowerCase() || '';
+      const selectedCat = selectedCategory.toLowerCase();
+      return pCategory === selectedCat;
+    }),
+    [products, selectedCategory]
+  );
 
-  // Tous les produits disponibles (seulement le store, plus de mocks)
-  const allAvailableProducts = products;
-  
-  // Produits filtrés par catégorie (utilise le store)
-  const cartItems = allAvailableProducts.filter(p => cart[p._id] && cart[p._id] > 0);
-  
-  // Total du panier (utilise TOUS les produits, pas juste ceux du store)
+  // Total du panier (dérivé de currentOrder, source unique de vérité)
   const totalItems = getTotalItems();
-  const totalAmount = getTotalPrice(allAvailableProducts);
+  const totalAmount = getTotalPrice();
 
   // Handler pour ajouter un produit - Vérifie si a des addOns
-  const handleAddProduct = async (item) => {
-    // Si le produit a des add-ons, ouvrir le flow AddOn
+  // ── PARCOURS : ajoute un article au panier (ou ouvre le modal add-ons) ──
+  const handleAddProduct = (item) => {
     if (item.allowedAddOns && item.allowedAddOns.length > 0) {
       setCurrentProductWithAddOns(item);
       setAddOnsModalVisible(true);
       return;
     }
     
-    // Sinon ajout direct
+    // Sinon ajout direct (useOrderStore persiste automatiquement)
     addToOrder(item, userName);
-    await addItem(item._id, 1);
   };
 
   // Handler quand AddOn flow est complété
-  const handleAddOnComplete = async (finalItem) => {
+  const handleAddOnComplete = (finalItem) => {
     // finalItem contient selectedAddOns, addOnsTotal, finalPrice
     addToOrder(finalItem, userName);
-    await addItem(finalItem._id, 1);
     setAddOnsModalVisible(false);
     setCurrentProductWithAddOns(null);
   };
 
   // Handler pour retirer un produit
-  const handleRemoveProduct = async (item) => {
-    const currentQty = cart[item._id] || 0;
+  const handleRemoveProduct = (item) => {
+    const currentQty = currentOrder.find(o => o._id === item._id)?.quantity || 0;
     if (currentQty <= 1) {
       // Retirer complètement
       updateOrderQuantity(item, 0);
-      await removeItem(item._id, 1);
     } else {
       // Diminuer la quantité
       updateOrderQuantity(item, currentQty - 1);
-      await removeItem(item._id, 1);
     }
   };
 
-  // Handler pour commander - OUVRE OrderSummary
+  // ── PARCOURS : ouvre le récapitulatif (OrderSummary modal) avant envoi ──
   const handlePayPress = async () => {
     // Vérifier qu'il y a des articles dans la commande
-    if (currentOrder.length === 0 && getTotalItems() === 0) {
+    if (currentOrder.length === 0) {
       Alert.alert("Panier vide", "Veuillez ajouter des articles avant de commander.");
       return;
     }
@@ -319,31 +302,21 @@ export default function MenuScreen({
     setShowOrderSummary(true);
   };
 
-  // Handler pour modifier quantité depuis OrderSummary
-  const handleQuantityChange = async (item, newQuantity) => {
-    const currentQty = cart[item._id] || 0;
-    
-    if (newQuantity === 0) {
-      // Supprimer complètement
-      updateOrderQuantity(item, 0);
-      await removeItem(item._id, currentQty);
-    } else if (newQuantity > currentQty) {
-      // Augmenter
-      const diff = newQuantity - currentQty;
-      updateOrderQuantity(item, newQuantity);
-      await addItem(item._id, diff);
-    } else {
-      // Diminuer
-      const diff = currentQty - newQuantity;
-      updateOrderQuantity(item, newQuantity);
-      await removeItem(item._id, diff);
-    }
-  };
 
-  // Handler quand l'utilisateur confirme dans OrderSummary
+
+  // ── PARCOURS : confirme et soumet la commande ──
+  // Fast-food : skip BDD, navigue directement (10s d'annulation côté OrderScreen)
+  // Restaurant/foodtruck : submitOrder() en BDD puis navigation
   const handleConfirmOrder = async () => {
     try {
-      // 📤 Soumettre la commande au serveur
+      // 🍔 FAST-FOOD : ne pas envoyer en BDD immédiatement (délai 10s côté OrderScreen)
+      if (restaurantCategory === "fast-food") {
+        setShowOrderSummary(false);
+        onNavigateToOrders?.();
+        return;
+      }
+
+      // 📤 Soumettre la commande au serveur (restaurant classique / foodtruck)
       await submitOrder({
         tableId,
         restaurantId,
@@ -366,7 +339,7 @@ export default function MenuScreen({
   // 🔥 GRILLZ: Fonction pour ouvrir la modale détail produit
   const openProductDetail = (product) => {
     setSelectedProduct(product);
-    setDetailQty(cart[product._id] || 1);
+    setDetailQty(currentOrder.find(o => o._id === product._id)?.quantity || 1);
     setShowProductDetail(true);
     
     // Reset animations
@@ -409,8 +382,15 @@ export default function MenuScreen({
   
   const handleDetailAddToCart = () => {
     if (selectedProduct) {
-      for (let i = 0; i < detailQty; i++) {
-        handleAddProduct(selectedProduct);
+      const existing = currentOrder.find(o => o._id === selectedProduct._id);
+      const targetQty = (existing?.quantity || 0) + detailQty;
+      if (existing) {
+        updateOrderQuantity(selectedProduct, targetQty);
+      } else {
+        addToOrder(selectedProduct, userName);
+        if (detailQty > 1) {
+          updateOrderQuantity(selectedProduct, detailQty);
+        }
       }
       closeProductDetail();
     }
@@ -476,7 +456,7 @@ export default function MenuScreen({
 
   // Render carte produit - 🔥 GRILLZ: Cards selon spec exacte
   const renderProduct = ({ item }) => {
-    const qty = cart[item._id] || 0;
+    const qty = currentOrder.find(o => o._id === item._id)?.quantity || 0;
     
     if (isGrillzTheme) {
       // 🔥 GRILLZ: Card spec complète
@@ -1036,6 +1016,15 @@ export default function MenuScreen({
                     />
                     <Text style={{ 
                       color: '#FFFFFF', 
+                      fontSize: 30, 
+                      fontWeight: '700',
+                      textAlign: 'center',
+                      marginBottom: 6,
+                    }}>
+                      Bonjour {userName || 'vous'} !
+                    </Text>
+                    <Text style={{ 
+                      color: '#FFFFFF', 
                       fontSize: 24, 
                       fontWeight: '700',
                       textAlign: 'center',
@@ -1073,6 +1062,15 @@ export default function MenuScreen({
                   paddingTop: 100,
                 }}>
                   <Text style={{ fontSize: 50, marginBottom: 20 }}>🍝</Text>
+                  <Text style={{ 
+                    color: '#333', 
+                    fontSize: 30, 
+                    fontWeight: '700',
+                    textAlign: 'center',
+                    marginBottom: 6,
+                  }}>
+                    Bonjour {userName || 'vous'} !
+                  </Text>
                   <Text style={{ 
                     color: '#333', 
                     fontSize: 24, 
@@ -1203,7 +1201,7 @@ export default function MenuScreen({
       >
         <OrderSummary
           currentOrder={currentOrder}
-          onUpdateQuantity={handleQuantityChange}
+          onUpdateQuantity={updateOrderQuantity}
           onConfirm={handleConfirmOrder}
           onBackToMenu={() => setShowOrderSummary(false)}
           isGrillzTheme={isGrillz}

@@ -1,16 +1,46 @@
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * Payment.jsx — ÉTAPE 4 : PAIEMENT STRIPE, TICKET & AVIS GOOGLE
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * Parcours client :
+ *   1. Affiche les articles commandés avec sélection individuelle
+ *   2. L'utilisateur sélectionne les articles à payer (tout, partiel, 1/3)
+ *   3. Calcul du montant total sélectionné
+ *   4. Création d'un PaymentIntent Stripe (POST /payments/create-intent)
+ *   5. Affichage du Payment Sheet natif Stripe (saisie carte bancaire)
+ *   6. Confirmation du paiement → mise à jour des articles payés
+ *   7. Si paiement complet → fermeture de la réservation sur le serveur
+ *   8. Affichage du ticket de caisse (ReceiptModal)
+ *   9. Possibilité de télécharger/enregistrer le ticket
+ *  10. Pop-up avis Google (FeedbackScreen)
+ *  11. Reset session → retour page d'accueil
+ *
+ * Modes de paiement :
+ *   - Carte bancaire (Stripe Payment Sheet)
+ *   - Apple Pay (iOS uniquement)
+ *   - Web checkout (navigateur)
+ *   - Paiement au comptoir (fast-food uniquement)
+ *
+ * Fonctionnalités secondaires :
+ *   - Multi-clients : payer pour soi ou pour toute la table
+ *   - Articles payés persistés dans AsyncStorage (paidItems)
+ *   - Thème dynamique par restaurant
+ *   - Écoute fermeture de réservation (WebSocket)
+ */
 import React, { useState, useEffect, useRef } from "react";
 import {
-	View,
-	Text,
-	TouchableOpacity,
-	StyleSheet,
-	Alert,
-	ActivityIndicator,
-	ScrollView,
-	Animated,
-	Dimensions,
-	Platform,
-	Modal,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Modal,
+  Platform,
+  Dimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -29,6 +59,7 @@ import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 A
 import { buildSafeTheme, DEFAULT_THEME } from "../theme/defaultTheme";
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
 import WebStripeCheckout from "../components/payment/WebStripeCheckout";
+import { orderService } from "shared-api/services/orderService.js";
 
 const { width, height } = Dimensions.get("window");
 const GRILLZ_RESTAURANT_ID = "695e4300adde654b80f6911a";
@@ -236,7 +267,12 @@ export default function Payment({
 
 	// 🚪 Écouter la fermeture de réservation et rediriger automatiquement
 	const restaurantId = useRestaurantStore((state) => state.id);
+	const restaurantCategory = useRestaurantStore((state) => state.category);
 	useReservationStatus(restaurantId, reservationId, onReservationClosed);
+
+	// 🍔 Fast-food / foodtruck : déterminer si paiement au comptoir est disponible
+	const isFastFood = restaurantCategory === "fast-food";
+	const isFoodtruck = restaurantCategory === "foodtruck";
 
 	// 🎨 Thème dynamique depuis la BDD, fallback DEFAULT_THEME
 	const { config } = useRestaurantConfig(restaurantId);
@@ -252,6 +288,7 @@ export default function Payment({
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(30)).current;
 	const buttonScale = useRef(new Animated.Value(1)).current;
+	const paymentRequestInFlightRef = useRef(false);
 
 	useEffect(() => {
 		Animated.parallel([
@@ -470,7 +507,7 @@ export default function Payment({
 		setSelectedItems(newSelectedItems);
 	};
 
-	// 🚀 Fermer la réservation sur le serveur
+	// ── PARCOURS : ferme la réservation sur le serveur (PUT /reservations/client/:id/close) ──
 	const closeReservationOnServer = async () => {
 		if (!reservationId) {
 			return { success: false, message: "Aucun ID de réservation" };
@@ -572,7 +609,7 @@ export default function Payment({
 	};
 
 	/**
-	 * 🏠 Gère la fermeture du ticket et redirection
+	 * ── PARCOURS : à la fermeture du ticket, déclenche le feedback + avis Google ──
 	 */
 	const handleReceiptClose = () => {
 		setShowReceipt(false);
@@ -618,6 +655,7 @@ export default function Payment({
 		}, 300);
 	};
 
+	// ── PARCOURS : après paiement validé, met à jour paidItems, ferme réservation si complet ──
 	const finalizePaymentSuccess = async (
 		selectedOrders,
 		amountPaid,
@@ -689,6 +727,7 @@ export default function Payment({
 			{
 				method: paymentMethod,
 				paymentIntentId: paymentIntentIdValue,
+				last4: null,
 			},
 			selectedOrders,
 		);
@@ -720,8 +759,12 @@ export default function Payment({
 		}
 	};
 
-	// 💳 Traitement du paiement
+	// ── PARCOURS : crée PaymentIntent Stripe, affiche Payment Sheet, finalise le paiement ──
 	const handlePay = async (paymentMethod = "card") => {
+		if (paymentRequestInFlightRef.current) {
+			return;
+		}
+
 		if (selectedItems.size === 0) {
 			Alert.alert(
 				"Erreur",
@@ -746,6 +789,7 @@ export default function Payment({
 			return;
 		}
 
+		paymentRequestInFlightRef.current = true;
 		setLoading(true);
 
 		try {
@@ -858,8 +902,80 @@ export default function Payment({
 			console.error("❌ Erreur paiement:", error);
 			Alert.alert("Erreur", "Échec du paiement. Veuillez réessayer.");
 		} finally {
+			paymentRequestInFlightRef.current = false;
 			setLoading(false);
 		}
+	};
+
+	// ── PARCOURS : paiement au comptoir (fast-food uniquement, pas de Stripe) ──
+	const handleCounterPayment = async () => {
+		if (paymentRequestInFlightRef.current) {
+			return;
+		}
+
+		if (selectedItems.size === 0) {
+			Alert.alert(
+				"Erreur",
+				"Veuillez sélectionner au moins un article à payer",
+			);
+			return;
+		}
+
+		Alert.alert(
+			"Paiement au comptoir",
+			"Vous allez déclarer un paiement au comptoir. Présentez-vous au comptoir pour régler (espèces, carte, ticket restaurant…).",
+			[
+				{ text: "Annuler", style: "cancel" },
+				{
+					text: "Confirmer",
+					onPress: async () => {
+						paymentRequestInFlightRef.current = true;
+						setLoading(true);
+						try {
+							// Récupérer les orderIds uniques des articles sélectionnés
+							const selectedOrders = allOrders.filter((item) =>
+								selectedItems.has(getItemId(item)),
+							);
+							const uniqueOrderIds = [
+								...new Set(
+									selectedOrders
+										.map((item) => item.orderId)
+										.filter(Boolean),
+								),
+							];
+
+							// Déclarer le paiement au comptoir pour chaque commande
+							await Promise.all(
+								uniqueOrderIds.map((oid) =>
+									orderService.declareCounterPayment(oid),
+								),
+							);
+
+							Alert.alert(
+								"✅ Paiement au comptoir déclaré",
+								"Présentez-vous au comptoir pour régler votre commande. Le restaurateur sera informé.",
+								[
+									{
+										text: "OK",
+										onPress: () => onSuccess?.(),
+									},
+								],
+								{ cancelable: false },
+							);
+						} catch (error) {
+							console.error("❌ Erreur paiement comptoir:", error);
+							Alert.alert(
+								"Erreur",
+								error.message || "Impossible de déclarer le paiement au comptoir",
+							);
+						} finally {
+							paymentRequestInFlightRef.current = false;
+							setLoading(false);
+						}
+					},
+				},
+			],
+		);
 	};
 
 	// 🚨 Si pas de commandes à afficher
@@ -986,6 +1102,22 @@ export default function Payment({
 					</LinearGradient>
 					<Text style={styles.title}>Paiement</Text>
 					<Text style={styles.subtitle}>Sélectionnez les articles à payer</Text>
+
+					{/* 🍔 Bannière statut foodtruck / fast-food */}
+					{(isFoodtruck || isFastFood) && (
+						<View style={styles.statusBanner}>
+							<MaterialIcons
+								name={isFoodtruck ? "delivery-dining" : "restaurant"}
+								size={20}
+								color={isFoodtruck ? "#FF6B00" : "#4CAF50"}
+							/>
+							<Text style={styles.statusBannerText}>
+								{isFoodtruck
+									? "Commande reçue — Payez pour lancer la préparation"
+									: "Préparation en cours — Choisissez votre mode de paiement"}
+							</Text>
+						</View>
+					)}
 
 					{/* Boutons de sélection rapide */}
 					{availableItems.length > 0 && (
@@ -1344,6 +1476,37 @@ export default function Payment({
 									</LinearGradient>
 								</TouchableOpacity>
 							)}
+
+							{/* 🏪 Bouton Payer au comptoir (fast-food uniquement) */}
+							{isFastFood && (
+								<TouchableOpacity
+									onPress={handleCounterPayment}
+									disabled={isProcessing || selectedItems.size === 0}
+									activeOpacity={0.9}
+								>
+									<LinearGradient
+										colors={
+											isProcessing || selectedItems.size === 0
+												? ["#ccc", "#999"]
+												: ["#FF8C00", "#FF6B00"]
+										}
+										style={styles.payButton}
+										start={{ x: 0, y: 0 }}
+										end={{ x: 1, y: 0 }}
+									>
+										{isProcessing ? (
+											<ActivityIndicator color="#fff" />
+										) : (
+											<>
+												<MaterialIcons name="store" size={24} color="#fff" />
+												<Text style={styles.payButtonText}>
+													Payer au comptoir
+												</Text>
+											</>
+										)}
+									</LinearGradient>
+								</TouchableOpacity>
+							)}
 						</>
 					)}
 
@@ -1561,6 +1724,22 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		color: DEFAULT_THEME.textMuted,
 		marginTop: 4,
+	},
+	statusBanner: {
+		flexDirection: "row",
+		alignItems: "center",
+		backgroundColor: "rgba(255, 255, 255, 0.1)",
+		borderRadius: 10,
+		paddingVertical: 10,
+		paddingHorizontal: 14,
+		marginTop: 12,
+		gap: 10,
+	},
+	statusBannerText: {
+		fontSize: 13,
+		color: DEFAULT_THEME.textSecondary,
+		flex: 1,
+		lineHeight: 18,
 	},
 	// Error State
 	errorContainer: {

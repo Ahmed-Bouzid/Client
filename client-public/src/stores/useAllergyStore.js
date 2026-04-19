@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { secureSessionStore } from "shared-api/utils/secureSessionStore";
 
 /**
  * Store Zustand pour gérer les allergies de l'utilisateur client
@@ -17,7 +18,9 @@ export const useAllergyStore = create((set, get) => ({
 	 */
 	init: async () => {
 		try {
-			const saved = await AsyncStorage.getItem("userAllergenIds");
+			const saved = await secureSessionStore.getString(
+				secureSessionStore.keys.ALLERGENS,
+			);
 			if (saved) {
 				const ids = JSON.parse(saved);
 				set({ userAllergenIds: Array.isArray(ids) ? ids : [] });
@@ -32,7 +35,7 @@ export const useAllergyStore = create((set, get) => ({
 	 */
 	persist: async (ids) => {
 		try {
-			await AsyncStorage.setItem("userAllergenIds", JSON.stringify(ids));
+			await secureSessionStore.setJson(secureSessionStore.keys.ALLERGENS, ids);
 		} catch (error) {
 			console.error("❌ Erreur persist allergies:", error);
 		}
@@ -119,6 +122,7 @@ export const useAllergyStore = create((set, get) => ({
 	 */
 	clear: async () => {
 		try {
+			await secureSessionStore.remove(secureSessionStore.keys.ALLERGENS);
 			await AsyncStorage.removeItem("userAllergenIds");
 			set({ userAllergenIds: [], allergensCache: [] });
 		} catch (error) {

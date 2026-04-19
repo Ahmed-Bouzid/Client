@@ -2,37 +2,42 @@ import { API_BASE_URL } from "../config/api";
 import { clientAuthService } from "shared-api/services/clientAuthService";
 
 /**
- * Service Stripe CLIENT-END - Gestion des appels API paiement (clients publics)
+ * ═══════════════════════════════════════════════════════════════
+ * stripeService.js — SERVICE PAIEMENT STRIPE (CLIENT PUBLIC)
+ * ═══════════════════════════════════════════════════════════════
  *
- * Version AVEC token client (pour clients publics)
+ * Parcours client (étape paiement) :
+ *   - createPaymentIntent() → crée un PaymentIntent côté serveur
+ *   - Le clientSecret retourné alimente le Payment Sheet natif Stripe
+ *   - Authentification via token client (JWT)
  *
- * Fonctionnalités:
- * - Création de PaymentIntent
- * - Paiements fake (dev)
- * - Calculs montants + formatage
+ * Endpoints :
+ *   - POST /payments/create-intent → crée PaymentIntent
+ *   - POST /payments/fake → paiement test (dev uniquement)
  */
 class StripeService {
 	constructor() {
 		this.baseURL = `${API_BASE_URL}/payments`;
+		this.lastIntentRequestAt = 0;
+		this.intentCooldownMs = 1500;
 	}
 
 	/**
 	 * Helper pour effectuer les requêtes fetch AVEC token client
 	 */
 	async fetchWithAuth(url, options = {}) {
-		// ⭐ Récupérer le token client
-		const token = await clientAuthService.getClientToken();
-		if (!token) {
+		const headers = await clientAuthService.getAuthHeaders({
+			"Content-Type": "application/json",
+			...options.headers,
+		});
+
+		if (!headers) {
 			throw new Error("Token manquant.");
 		}
 
 		const response = await fetch(url, {
 			...options,
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${token}`,
-				...options.headers,
-			},
+			headers,
 		});
 
 		const data = await response.json();
@@ -65,6 +70,12 @@ class StripeService {
 		paymentMode = "client",
 	}) {
 		try {
+			const now = Date.now();
+			if (now - this.lastIntentRequestAt < this.intentCooldownMs) {
+				throw new Error("Paiement déjà en cours. Veuillez patienter.");
+			}
+			this.lastIntentRequestAt = now;
+
 			const data = await this.fetchWithAuth(`${this.baseURL}/create-intent`, {
 				method: "POST",
 				body: JSON.stringify({

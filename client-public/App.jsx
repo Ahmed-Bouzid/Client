@@ -1,31 +1,53 @@
-import React, { useState, useEffect } from "react";
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * App.jsx — ORCHESTRATEUR PRINCIPAL DU PARCOURS CLIENT
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * Machine à états (step) qui contrôle la navigation :
+ *   "join" → "menu" → "addOn" → "orders" → "payment" → "tracking"
+ *
+ * Responsabilités :
+ *   - Gère la connexion utilisateur (QR code / admin unlock)
+ *   - Initialise les stores (table, commande, allergies, restaurant)
+ *   - Route vers le bon écran selon le step actif
+ *   - Coordonne la soumission de commande, le paiement et le reset session
+ *   - Gère le mode fast-food (commande en attente locale avant envoi BDD)
+ *
+ * Parcours principal :
+ *   1. WelcomeScreen → saisie prénom/téléphone, rejoint une table
+ *   2. MenuScreen → consultation menu, ajout au panier
+ *   3. OrderScreen → récapitulatif commande, validation
+ *   4. Payment → paiement Stripe, ticket de caisse, avis Google
+ *   5. OrderTrackingScreen → suivi temps réel (polling + WebSocket)
+ *   6. Retour WelcomeScreen → nouveau cycle
+ * ═══════════════════════════════════════════════════════════════
+ */
+import React, { useState, useEffect, useRef } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { API_BASE_URL } from "./src/config/api";
-import { Resto_id_key } from "./src/config/restaurantConfig";
 import WelcomeScreen from "./src/screens/WelcomeScreen";
-import Menu from "./src/screens/Menu"; // Ancien menu (backup)
-import MenuScreen from "./src/screens/MenuScreen"; // 🎨 NOUVEAU design
-import OrderScreen from "./src/screens/OrderScreen"; // 🎨 NOUVEAU design orders
+import MenuScreen from "./src/screens/MenuScreen";
+import OrderScreen from "./src/screens/OrderScreen";
 import AddOn from "./src/components/menu/AddOn";
 import Payment from "./src/screens/Payment";
-import OrderSummary from "./src/screens/OrderSummary";
 import OrderTrackingScreen from "./src/screens/OrderTrackingScreen";
-import AdminUnlockScreen from "./src/screens/AdminUnlockScreen"; // 🔐 Admin password
-import AdminSelectionScreen from "./src/screens/AdminSelectionScreen"; // 🔐 Restaurant + Table selection
+import OrderDetailsScreen from "./src/screens/OrderDetailsScreen";
+import AdminUnlockScreen from "./src/screens/AdminUnlockScreen";
+import AdminSelectionScreen from "./src/screens/AdminSelectionScreen";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { useCustomAlert } from "./src/utils/customAlert";
 import { useClientTableStore } from "./src/stores/useClientTableStore";
 import { useOrderStore } from "./src/stores/useOrderStore";
-import { useCartStore } from "./src/stores/useCartStore";
 import { useAllergyStore } from "./src/stores/useAllergyStore";
 import { useRestrictionStore } from "./src/stores/useRestrictionStore";
+import { useRestaurantStore } from "./src/stores/useRestaurantStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getUrlParams } from "./src/utils/getUrlParams";
-import { Platform, View, StyleSheet } from "react-native";
-import { ThemeProvider } from "./src/theme"; // 🎨 NOUVEAU: Theme Provider
+import { Platform, View, StyleSheet, AppState } from "react-native";
+import { ThemeProvider } from "./src/theme";
+import { secureSessionStore } from "shared-api/utils/secureSessionStore";
 
 export default function App() {
-	// Wrapper with ThemeProvider
 	return (
 		<ThemeProvider>
 			<AppContent />
@@ -36,18 +58,31 @@ export default function App() {
 // ⭐ Default IDs (utilisés en fallback si pas d'IDs en URL)
 const DEFAULT_TABLE_ID = "DEFAULT";
 const DEFAULT_RESTAURANT_ID = "DEFAULT";
+const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
 
 function AppContent() {
-	const [step, setStep] = useState("join"); // join, menu, addOn, orders, payment, tracking
+	const appStateRef = useRef(AppState.currentState);
+	// ── PARCOURS CLIENT : état de navigation principal ──
+	const [step, setStep] = useState("join"); // join → menu → addOn → orders → payment → tracking → order-details
 	const [trackingOrderId, setTrackingOrderId] = useState("");
 	const [reservationId, setReservationId] = useState("");
 	const [clientId, setClientId] = useState("");
 	const [tableNumber, setTableNumber] = useState(null);
 	
+	// 🔍 Order lookup (Grillz: retrouver une commande par #XXX-XXX)
+	const [lookupOrderData, setLookupOrderData] = useState(null);
+	
 	// 🔐 Admin unlock flow
 	const [adminMode, setAdminMode] = useState(null); // null, "locked", "unlocked"
 	const [adminUnlockToken, setAdminUnlockToken] = useState(null);
 	const [forceRefresh, setForceRefresh] = useState(0); // Force remount après admin
+
+	// 🍔 Fast-food: commande en attente (pas encore en BDD)
+	const [fastFoodPending, setFastFoodPending] = useState(false);
+
+	// Restaurant category
+	const restaurantCategory = useRestaurantStore((state) => state.category);
+	const isFastFood = restaurantCategory === "fast-food";
 
 	// En production, tableId et restaurantId viennent du QR code (URL param)
 	// Pas d'ID hardcodé - l'app doit être scannée via QR code
@@ -73,22 +108,43 @@ function AppContent() {
 		updateOrderQuantity,
 		submitOrder: submitOrderToServer,
 		markAsPaid,
+		initCart,
+		clearCart,
 	} = useOrderStore();
 
-	const {
-		cart,
-		initCart,
-		addItem: addToCart,
-		updateQuantity: updateCartQuantity,
-		clearCart,
-	} = useCartStore();
-
 	const { showAlert, AlertComponent } = useCustomAlert();
+
+	const forceSecureLogout = async () => {
+		await secureSessionStore.clearSensitiveSession();
+		await AsyncStorage.multiRemove([
+			"currentReservationId",
+			"currentTableId",
+			"currentTableNumber",
+			"currentClientName",
+			"currentClientPhone",
+			"pseudo",
+			"tableId",
+			"restaurantId",
+			"clientPhone",
+			"clientToken",
+		]);
+
+		await useClientTableStore.getState().reset?.();
+		resetOrder();
+		await useOrderStore.getState().clearCart();
+		useAllergyStore.getState().clear?.();
+		useRestrictionStore.getState().clearRestrictions?.();
+
+		setReservationId(null);
+		setTableNumber(null);
+		setUserName("");
+		setClientId(null);
+		setStep("join");
+	};
 
 	// 🔐 Initialisation admin mode au démarrage
 	useEffect(() => {
 		const checkAdminMode = async () => {
-			console.log("🔐 [App] Vérification mode admin au démarrage");
 			const {
 				restaurantId: urlRestaurantId,
 				tableId: urlTableId,
@@ -105,20 +161,12 @@ function AppContent() {
 			const storedRestaurantId = await AsyncStorage.getItem("restaurantId");
 			const storedTableId = await AsyncStorage.getItem("tableId");
 			
-			console.log("   - URL restaurantId:", urlRestaurantId);
-			console.log("   - URL tableId:", urlTableId);
-			console.log("   - Stored restaurantId:", storedRestaurantId);
-			console.log("   - Stored tableId:", storedTableId);
-			
 			// Si pas d'IDs (URL ou AsyncStorage), on affiche le mode admin (mot de passe)
 			if (!urlRestaurantId && !storedRestaurantId) {
-				console.log("   → Mode admin LOCKED (pas de restaurantId)");
 				setAdminMode("locked");
 			} else if (!urlTableId && !storedTableId) {
-				console.log("   → Mode admin LOCKED (pas de tableId)");
 				setAdminMode("locked");
 			} else {
-				console.log("   → Mode normal (IDs trouvés)");
 				setAdminMode(null);
 			}
 		};
@@ -129,7 +177,6 @@ function AppContent() {
 	// Initialisation au démarrage
 	useEffect(() => {
 		const initialize = async () => {
-			console.log("🚀 [App] Initialisation au démarrage");
 			// 🌐 Sur web : lire restaurantId + tableId depuis l'URL (/r/[restaurantId]/[tableId])
 			const {
 				restaurantId: urlRestaurantId,
@@ -155,17 +202,10 @@ function AppContent() {
 			const finalRestaurantId = urlRestaurantId || storedRestaurantId || null;
 			const finalTableId = urlTableId || storedTableId || null;
 
-			console.log("   - URL: restaurantId=", urlRestaurantId, "tableId=", urlTableId);
-			console.log("   - Stored: restaurantId=", storedRestaurantId, "tableId=", storedTableId);
-			console.log("   - Final: restaurantId=", finalRestaurantId, "tableId=", finalTableId);
-
 			// ⭐ Si pas d'IDs, on ne fait rien (mode admin)
 			if (!finalRestaurantId || !finalTableId) {
-				console.log("   → IDs manquants, mode admin sera affiché");
 				return;
 			}
-
-			console.log("✅ [App] Initialisation des stores avec:", { finalRestaurantId, finalTableId });
 
 			// Persister dans AsyncStorage pour que les stores y aient accès
 			if (urlRestaurantId) {
@@ -200,6 +240,42 @@ function AppContent() {
 		initialize();
 	}, []);
 
+	useEffect(() => {
+		const subscription = AppState.addEventListener("change", async (nextState) => {
+			const previousState = appStateRef.current;
+
+			if (previousState === "active" && /inactive|background/.test(nextState)) {
+				await secureSessionStore.setString(
+					secureSessionStore.keys.APP_BACKGROUND_AT,
+					String(Date.now()),
+				);
+			}
+
+			if (/inactive|background/.test(previousState) && nextState === "active") {
+				const lastBackgroundRaw = await secureSessionStore.getString(
+					secureSessionStore.keys.APP_BACKGROUND_AT,
+				);
+				const lastBackgroundAt = Number(lastBackgroundRaw || 0);
+				const elapsed = Date.now() - lastBackgroundAt;
+
+				if (lastBackgroundAt && elapsed >= INACTIVITY_TIMEOUT_MS) {
+					await forceSecureLogout();
+					showAlert(
+						"Session expirée",
+						"Session fermée après 15 minutes d'inactivité.",
+						[{ text: "OK" }],
+					);
+				}
+			}
+
+			appStateRef.current = nextState;
+		});
+
+		return () => {
+			subscription.remove();
+		};
+	}, [showAlert]);
+
 	const navigateToTracking = (orderId) => {
 		if (!orderId) return;
 
@@ -231,15 +307,6 @@ function AppContent() {
 		tableNumberParam,
 		clientIdParam,
 	) => {
-		console.log("🎯 [App] handleJoinTable appelé:", {
-			clientName,
-			reservationId,
-			tableIdParam,
-			tableNumberParam,
-			clientIdParam,
-			currentRestaurantId: restaurantId,
-		});
-		
 		try {
 			// ⭐ Stocker toutes les infos
 			setUserName(clientName);
@@ -250,11 +317,9 @@ function AppContent() {
 			// ⭐ Mettre à jour le store avec les infos (sans rappeler /client/token)
 			// Le token a déjà été obtenu dans WelcomeScreen
 			const { setTable } = useClientTableStore.getState();
-			console.log("🎯 [App] Appel setTable avec:", { tableIdParam, restaurantId });
 			await setTable(tableIdParam || DEFAULT_TABLE_ID, restaurantId || DEFAULT_RESTAURANT_ID);
 			useClientTableStore.setState({ userName: clientName });
 
-			console.log("🎯 [App] Transition vers MenuScreen");
 			resetOrder();
 			await clearCart();
 			setStep("menu");
@@ -263,19 +328,18 @@ function AppContent() {
 		}
 	};
 
-	// Handler pour ajouter un article
-	const handleAddOrder = async (item) => {
+	// ── PARCOURS : ajoute un article au panier (persisté automatiquement dans AsyncStorage) ──
+	const handleAddOrder = (item) => {
 		addToOrder(item, userName);
-		await addToCart(item._id, 1);
 	};
 
-	// Handler pour mettre à jour la quantité
-	const handleUpdateQuantity = async (item, quantity) => {
+	// Handler pour mettre à jour la quantité (useOrderStore persiste automatiquement)
+	const handleUpdateQuantity = (item, quantity) => {
 		updateOrderQuantity(item, quantity);
-		await updateCartQuantity(item._id, quantity);
 	};
 
-	// Handler pour soumettre la commande
+	// ── PARCOURS : soumet la commande au serveur (crée l'order en BDD) ──
+	// Appelé après validation du panier (MenuScreen) ou auto-submit fast-food (10s)
 	const submitOrder = async ({ redirectToTracking = true } = {}) => {
 		if (currentOrder.length === 0) {
 			showAlert(
@@ -323,10 +387,9 @@ function AppContent() {
 			};
 
 
-			// ⭐ ENVOYER TOUTES LES DONNÉES
+			// ⭐ ENVOYER TOUTES LES DONNÉES (submitOrder nettoie le panier persisté)
 			const createdOrder = await submitOrderToServer(orderData);
 
-			await clearCart();
 			const createdOrderId = createdOrder?._id || createdOrder?.id || null;
 
 			if (redirectToTracking && createdOrderId) {
@@ -361,10 +424,28 @@ function AppContent() {
 		}
 	};
 
-	// Handler pour valider la commande
-	const handleValidateOrder = () => {
-		if (currentOrder.length === 0) {
-			showAlert("Aucun article", "Veuillez ajouter au moins un produit.", [
+	// ── PARCOURS : transition Menu → OrderScreen (charge les commandes serveur) ──
+	const handleValidateOrder = async () => {
+		// 🍔 Fast-food: la commande n'est pas encore en BDD, on navigue directement
+		if (isFastFood && currentOrder.length > 0) {
+			setFastFoodPending(true);
+			setStep("orders");
+			return;
+		}
+
+		// Charger les commandes fraîches depuis le serveur
+		if (reservationId) {
+			try {
+				await useOrderStore.getState().fetchOrdersByReservation(reservationId, clientId);
+			} catch (error) {
+				console.error("❌ Erreur chargement commandes:", error);
+			}
+		}
+
+		// Vérifier qu'il y a des commandes à afficher
+		const freshOrders = useOrderStore.getState().allOrders;
+		if (!freshOrders || freshOrders.length === 0) {
+			showAlert("Aucune commande", "Aucune commande trouvée pour cette réservation.", [
 				{ text: "OK" },
 			]);
 			return;
@@ -385,7 +466,7 @@ function AppContent() {
 		setStep("orders");
 	};
 
-	// Navigation vers le paiement (depuis OrderScreen)
+	// ── PARCOURS : transition OrderScreen → Payment (soumet le panier restant puis navigue) ──
 	const handlePayNow = async () => {
 		if (!reservationId) {
 			showAlert("Erreur", "Aucune réservation active", [{ text: "OK" }]);
@@ -438,29 +519,32 @@ function AppContent() {
 		}
 	};
 
-	// Handler après paiement réussi
+	// ── PARCOURS : nettoyage complet session après paiement validé ──
+	// Reset AsyncStorage + stores + states locaux → retour écran d'accueil
 	const handlePaymentSuccess = async () => {
 		// Le paiement a déjà été effectué dans Payment.js
 		// Nettoyer complètement la session
 		try {
+			await secureSessionStore.clearSensitiveSession();
+
 			// Nettoyer AsyncStorage (garder clientId qui est un UUID permanent)
 			await AsyncStorage.multiRemove([
 				"currentReservationId",
 				"currentTableId",
 				"currentTableNumber",
 				"currentClientName",
-				"currentClientId",
 				"currentClientPhone",
 				"pseudo",
 				"tableId",
 				"restaurantId",
 				"clientPhone",
+				"clientToken",
 			]);
 
 			// Reset les stores
 			await useClientTableStore.getState().reset?.();
 			resetOrder();
-			useCartStore.getState().clearCart?.();
+			await useOrderStore.getState().clearCart();
 			useAllergyStore.getState().clearAllergies?.();
 			useRestrictionStore.getState().clearRestrictions?.();
 
@@ -509,21 +593,13 @@ function AppContent() {
 					<AdminSelectionScreen
 						adminToken={adminUnlockToken}
 						onTableSelected={async (restaurantId, tableId) => {
-							console.log("📱 [App] onTableSelected callback reçu");
-							console.log("   - restaurantId:", restaurantId);
-							console.log("   - tableId:", tableId);
-							
 							// Initialiser les stores avec les nouveaux IDs
-							console.log("📱 [App] Appel initTable...");
 							await initTable(tableId, restaurantId);
-							console.log("✅ [App] initTable complété");
 							
 							// Forcer le remount de l'app
-							console.log("📱 [App] Remount avec forceRefresh++");
 							setForceRefresh(prev => prev + 1);
 							
 							// Sortir du mode admin
-							console.log("📱 [App] setAdminMode(null)");
 							setAdminUnlockToken(null);
 							setAdminMode(null);
 						}}
@@ -540,6 +616,10 @@ function AppContent() {
 								tableNumber={tableNumber}
 								onJoin={({ reservationId, clientId, userName }) => {
 									handleJoinTable(userName, reservationId, tableId || DEFAULT_TABLE_ID, tableNumber, clientId);
+								}}
+								onLookupOrder={(orderData) => {
+									setLookupOrderData(orderData);
+									setStep("order-details");
 								}}
 							/>
 						)}
@@ -578,16 +658,51 @@ function AppContent() {
 							tableId={tableId || DEFAULT_TABLE_ID}
 							tableNumber={tableNumber}
 							userName={userName}
-								onBack={() => setStep("menu")}
+							pendingOrder={fastFoodPending}
+							pendingItems={currentOrder}
+								onBack={() => {
+									setFastFoodPending(false);
+									setStep("menu");
+								}}
 								onPayNow={handlePayNow}
-								onSuccess={handlePaymentSuccess}
 								onReservationClosed={() => setStep("join")}
-								onSplitWithOthers={() => showAlert("Split", "Fonctionnalité à venir", [{ text: "OK" }])}
+								onAutoSubmit={async () => {
+									// 🍔 Fast-food: envoi automatique après 10s
+									try {
+										const created = await submitOrder({ redirectToTracking: false });
+										if (created) {
+											setFastFoodPending(false);
+											// Recharger les commandes depuis le serveur
+											await useOrderStore.getState().fetchOrdersByReservation(reservationId, clientId);
+										}
+									} catch (e) {
+										console.error("❌ Erreur auto-submit fast-food:", e);
+									}
+								}}
 								onCancelOrder={() => {
-									showAlert("Annuler", "Voulez-vous vraiment annuler la commande ?", [
-										{ text: "Non" },
-										{ text: "Oui", onPress: () => setStep("menu") }
-									]);
+									if (fastFoodPending) {
+										// 🍔 Fast-food pending: pas en BDD, juste reset local
+										resetOrder();
+										clearCart();
+										setFastFoodPending(false);
+										setStep("menu");
+									} else {
+										// Commande déjà en BDD : confirmation + annulation serveur
+										showAlert("Annuler", "Voulez-vous vraiment annuler la commande ?", [
+											{ text: "Non" },
+											{
+												text: "Oui",
+												onPress: async () => {
+													try {
+														await useOrderStore.getState().cancelAllOrders();
+													} catch (e) {
+														console.error("❌ Erreur annulation:", e);
+													}
+													setStep("menu");
+												},
+											},
+										]);
+									}
 								}}
 							/>
 						)}
@@ -618,6 +733,16 @@ function AppContent() {
 										window.history.replaceState({}, "", nextPath);
 									}
 									setStep("menu");
+								}}
+							/>
+						)}
+
+						{step === "order-details" && (
+							<OrderDetailsScreen
+								orderData={lookupOrderData}
+								onBack={() => {
+									setLookupOrderData(null);
+									setStep("join");
 								}}
 							/>
 						)}

@@ -23,12 +23,12 @@ import {
 	MaterialIcons,
 	Ionicons,
 } from "@expo/vector-icons";
-import { useCartStore } from "../stores/useCartStore.js";
 import useProductStore from "../stores/useProductStore.js";
 import { useAllergyStore } from "../stores/useAllergyStore.js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useOrderStore } from "../stores/useOrderStore.js";
 import DietaryPreferences from "./DietaryPreferences.jsx";
+import { clientAuthService } from "shared-api/services/clientAuthService.js";
 import MessagingBubble from "../components/messaging/MessagingBubble.jsx";
 import AddOnFlow from "../components/menu/AddOnFlow.jsx"; // ⭐ NOUVEAU : Flux complet add-ons
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
@@ -897,8 +897,14 @@ export default function Menu({
 
 	const products = useProductStore((state) => state.products);
 	const fetchProducts = useProductStore((state) => state.fetchProducts);
-	const { cart } = useCartStore();
 	const { currentOrder, fetchActiveOrder } = useOrderStore();
+
+	// Dériver un objet cart {itemId: quantity} depuis currentOrder (compat legacy)
+	const cart = useMemo(() => {
+		const map = {};
+		currentOrder.forEach(item => { map[item._id] = item.quantity || 0; });
+		return map;
+	}, [currentOrder]);
 
 	const [selectedCategory, setSelectedCategory] = useState(null);
 	const headerAnim = useRef(new Animated.Value(1)).current;
@@ -1142,7 +1148,7 @@ export default function Menu({
 	const fetchProductOptions = async (productId) => {
 		try {
 			setLoadingOptions(true);
-			const token = await AsyncStorage.getItem("clientToken");
+			const token = await clientAuthService.getClientToken();
 			const { API_CONFIG } = require("../config/apiConfig.js");
 
 			const response = await fetch(
@@ -1337,7 +1343,7 @@ export default function Menu({
 	useEffect(() => {
 		const loadProducts = async () => {
 			try {
-				const clientToken = await AsyncStorage.getItem("clientToken");
+				const clientToken = await clientAuthService.getClientToken();
 				if (clientToken) {
 					await fetchProducts(clientToken);
 				} else {

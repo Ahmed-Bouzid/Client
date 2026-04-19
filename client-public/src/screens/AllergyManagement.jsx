@@ -11,7 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAllergyStore } from "../stores/useAllergyStore";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { clientAuthService } from "shared-api/services/clientAuthService.js";
 
 import { buildSafeTheme, DEFAULT_THEME } from "../theme/defaultTheme";
 import useRestaurantConfig from "../hooks/useRestaurantConfig";
@@ -36,7 +36,7 @@ export default function AllergyManagement({ onClose }) {
 	const loadAllergens = async () => {
 		setLoading(true);
 		try {
-			const token = await AsyncStorage.getItem("clientToken");
+			const token = await clientAuthService.getClientToken();
 			const response = await fetch(
 				`${process.env.EXPO_PUBLIC_API_URL || "https://orderit-backend-6y1m.onrender.com"}/allergens`,
 				{

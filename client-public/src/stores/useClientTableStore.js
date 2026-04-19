@@ -2,6 +2,7 @@ import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_CONFIG } from "shared-api/config/apiConfig.js";
 import { errorHandler } from "shared-api/utils/errorHandler.js";
+import { clientAuthService } from "shared-api/services/clientAuthService.js";
 
 export const useClientTableStore = create((set, get) => ({
 	tableId: null,
@@ -78,37 +79,21 @@ export const useClientTableStore = create((set, get) => ({
 				throw new Error("RestaurantId manquant. Vérifiez la configuration.");
 			}
 
-			const response = await fetch(`${API_CONFIG.BASE_URL}/client/token`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					pseudo: userName,
-					tableId: finalTableId,
-					restaurantId: finalRestaurantId,
-				}),
-			});
+			const token = await clientAuthService.getClientToken(
+				userName,
+				finalTableId,
+				finalRestaurantId,
+			);
 
-			if (!response.ok) {
-				let errorMessage = "Erreur serveur";
-				try {
-					const errorData = await response.json();
-					errorMessage = errorData.message || errorMessage;
-				} catch (e) {
-					// Si ce n'est pas du JSON, utiliser le message par défaut
-				}
-				throw new Error(errorMessage);
+			if (!token) {
+				throw new Error("Impossible de créer un token client");
 			}
-
-			const data = await response.json();
-
-			// Stocker le token
-			await AsyncStorage.setItem("clientToken", data.token);
 
 			// Mettre à jour le store
 			await get().setTable(finalTableId, finalRestaurantId);
 			set({ userName });
 
-			return data.token;
+			return token;
 		} catch (error) {
 			errorHandler.handleError(error);
 			throw error;
