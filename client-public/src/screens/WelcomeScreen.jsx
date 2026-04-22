@@ -93,22 +93,34 @@ export default function WelcomeScreen({
   
   // Gestion unifiée du champ téléphone / order number
   const handlePhoneChange = (text) => {
-    if (text.startsWith("#") || (phone.startsWith("#") && text.length > 0)) {
-      // Mode lookup : déléguer le formatage au hook
-      orderLookup.setOrderNumber(text);
-    } else {
-      setPhone(text);
+    // Mode lookup : commence par #
+    if (text.startsWith("#")) {
+      // Garder # + max 6 chiffres
+      const digits = text.slice(1).replace(/\D/g, '').slice(0, 6);
+      const formatted = "#" + digits;
+      setPhone(formatted);
+      orderLookup.setOrderNumber(formatted);
+      return;
     }
+    // Quitter le mode lookup si on efface le #
+    if (phone.startsWith("#") && !text.startsWith("#")) {
+      setPhone("");
+      orderLookup.setOrderNumber("");
+      return;
+    }
+    // Mode téléphone : 06/07 XX XX XX XX
+    const digits = text.replace(/\D/g, '');
+    if (digits.length >= 1 && digits[0] !== '0') return;
+    if (digits.length >= 2 && digits[1] !== '6' && digits[1] !== '7') { setPhone('0'); return; }
+    let formatted = '';
+    for (let i = 0; i < digits.length && i < 10; i++) {
+      if (i > 0 && i % 2 === 0) formatted += ' ';
+      formatted += digits[i];
+    }
+    setPhone(formatted);
   };
   
-  // Sync le phone quand orderLookup.orderNumber change (auto-format)
-  React.useEffect(() => {
-    if (orderLookup.orderNumber) {
-      setPhone(orderLookup.orderNumber);
-    } else if (isOrderLookupMode) {
-      setPhone("");
-    }
-  }, [orderLookup.orderNumber]);
+
   
   const handleLookupOrder = async () => {
     const result = await orderLookup.lookup();
@@ -219,6 +231,47 @@ export default function WelcomeScreen({
     if (!existingSession) return;
     setLoading(true);
     try {
+      // 1. Régénère un token frais (utile si l'ancien a expiré)
+      const freshToken = await clientAuthService.getClientToken(
+        existingSession.clientName,
+        tableId,
+        restaurantId,
+        existingSession.clientId,
+      );
+
+      // 2. Valider la session côté serveur avant de naviguer
+      if (freshToken) {
+        const { deviceIdentity } = await import("shared-api/utils/deviceIdentity.js");
+        const headers = await deviceIdentity.getAuthHeaders({
+          Authorization: `Bearer ${freshToken}`,
+          "Content-Type": "application/json",
+        });
+        const response = await fetch(
+          `${API_CONFIG.BASE_URL}/reservations/client/reservations/resume`,
+          {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ reservationId: existingSession.reservationId }),
+          },
+        );
+        const data = await response.json();
+        if (!data.valid) {
+          // Session terminée ou invalide → nettoyer et rester sur WelcomeScreen
+          await AsyncStorage.multiRemove([
+            "currentTableId",
+            "currentReservationId",
+            "currentClientName",
+            "currentTableNumber",
+          ]);
+          setExistingSession(null);
+          Alert.alert(
+            "Session expirée",
+            "Votre session précédente est terminée. Veuillez créer une nouvelle session.",
+          );
+          return;
+        }
+      }
+
       onJoin({
         reservationId: existingSession.reservationId,
         clientId: existingSession.clientId,
@@ -344,6 +397,15 @@ export default function WelcomeScreen({
   // 5. Stocke credentials dans AsyncStorage
   // 6. Appelle onJoin() → App.jsx navigue vers MenuScreen
   const handleContinueWithEmail = async () => {
+    if (!name?.trim()) {
+      setError("Veuillez entrer votre nom");
+      return;
+    }
+
+    if (!tableId || tableId === "DEFAULT") {
+      setError("Table non identifiée. Re-scanner le QR code.");
+      return;
+    }
     
     setError("");
     setLoading(true);
@@ -965,7 +1027,7 @@ export default function WelcomeScreen({
                 {
                   translateY: keyboardAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, -240],
+                    outputRange: [0, -310],
                   }),
                 },
                 {
@@ -1036,9 +1098,9 @@ export default function WelcomeScreen({
                 placeholderTextColor="#777"
                 value={phone}
                 onChangeText={handlePhoneChange}
-                keyboardType={isOrderLookupMode ? "number-pad" : "phone-pad"}
+                keyboardType="phone-pad"
                 autoCorrect={false}
-                maxLength={isOrderLookupMode ? 8 : undefined}
+                maxLength={isOrderLookupMode ? 7 : 14}
               />
               {isOrderLookupMode && phone.length > 1 && (
                 <Ionicons
