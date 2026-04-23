@@ -11,6 +11,8 @@ import {
 	StyleSheet,
 	Dimensions,
 	Platform,
+	KeyboardAvoidingView,
+	ScrollView,
 	Keyboard,
 	ActivityIndicator,
 } from "react-native";
@@ -132,6 +134,7 @@ export default function FeedbackScreen({
 
 	// 📤 Soumettre le feedback
 	const handleSubmitFeedback = async () => {
+		Keyboard.dismiss();
 		setIsSubmitting(true);
 
 		try {
@@ -314,6 +317,7 @@ export default function FeedbackScreen({
 
 	// 🚪 Fermer le modal
 	const handleClose = () => {
+		Keyboard.dismiss();
 		Animated.parallel([
 			Animated.timing(fadeAnim, {
 				toValue: 0,
@@ -431,75 +435,82 @@ export default function FeedbackScreen({
 		const fulllySatisfied = isFullySatisfied();
 
 		return (
-			<View style={styles.feedbackContainer}>
-				<Text style={styles.title}>
-					{fulllySatisfied ? "Fantastique ! 🎉" : "Merci pour vos réponses !"}
-				</Text>
+			<ScrollView
+				style={styles.feedbackScroll}
+				contentContainerStyle={styles.feedbackScrollContent}
+				showsVerticalScrollIndicator={false}
+				keyboardShouldPersistTaps="handled"
+			>
+				<View style={styles.feedbackContainer}>
+					<Text style={styles.title}>
+						{fulllySatisfied ? "Fantastique ! 🎉" : "Merci pour vos réponses !"}
+					</Text>
 
-				<Text style={styles.feedbackMessage}>
-					{fulllySatisfied
-						? "Votre retour positif nous fait très plaisir ! Votre commentaire peut être directement utilisé pour partager votre expérience sur Google."
-						: "Votre feedback nous aide à nous améliorer. Vous pouvez partager vos suggestions ici, et laisser un avis public sur Google si vous le souhaitez."}
-				</Text>
+					<Text style={styles.feedbackMessage}>
+						{fulllySatisfied
+							? "Votre retour positif nous fait très plaisir ! Votre commentaire peut être directement utilisé pour partager votre expérience sur Google."
+							: "Votre feedback nous aide à nous améliorer. Vous pouvez partager vos suggestions ici, et laisser un avis public sur Google si vous le souhaitez."}
+					</Text>
 
-				<Text style={styles.inputLabel}>
-					{fulllySatisfied
-						? "Partagez votre expérience (optionnel) :"
-						: "Suggestions ou remarques (optionnel) :"}
-				</Text>
+					<Text style={styles.inputLabel}>
+						{fulllySatisfied
+							? "Partagez votre expérience (optionnel) :"
+							: "Suggestions ou remarques (optionnel) :"}
+					</Text>
 
-				<TextInput
-					style={styles.commentInput}
-					multiline
-					numberOfLines={4}
-					placeholder={
-						fulllySatisfied
-							? "Décrivez ce qui vous a plu..."
-							: "Qu'est-ce qui pourrait être amélioré ?"
-					}
-					placeholderTextColor="#999"
-					value={comment}
-					onChangeText={setComment}
-					maxLength={500}
-				/>
+					<TextInput
+						style={styles.commentInput}
+						multiline
+						numberOfLines={4}
+						placeholder={
+							fulllySatisfied
+								? "Décrivez ce qui vous a plu..."
+								: "Qu'est-ce qui pourrait être amélioré ?"
+						}
+						placeholderTextColor="#999"
+						value={comment}
+						onChangeText={setComment}
+						maxLength={500}
+					/>
 
-				<Text style={styles.characterCount}>
-					{comment.length}/500 caractères
-				</Text>
+					<Text style={styles.characterCount}>
+						{comment.length}/500 caractères
+					</Text>
 
-				<View style={styles.finalButtons}>
-					<TouchableOpacity
-						style={styles.submitButton}
-						onPress={handleSubmitFeedback}
-						disabled={isSubmitting}
-					>
-						<LinearGradient
-							colors={GRILLZ_PREMIUM.primary}
-							style={styles.submitButtonGradient}
+					<View style={styles.finalButtons}>
+						<TouchableOpacity
+							style={styles.submitButton}
+							onPress={handleSubmitFeedback}
+							disabled={isSubmitting}
 						>
-							{isSubmitting ? (
-								<ActivityIndicator color="#fff" />
-							) : (
-								<>
-									<Text style={styles.submitButtonText}>
-										{fulllySatisfied
-											? "Continuer vers Google"
-											: "Envoyer & Google"}
-									</Text>
-									<Ionicons name="arrow-forward" size={20} color="#fff" />
-								</>
-							)}
-						</LinearGradient>
-					</TouchableOpacity>
+							<LinearGradient
+								colors={GRILLZ_PREMIUM.primary}
+								style={styles.submitButtonGradient}
+							>
+								{isSubmitting ? (
+									<ActivityIndicator color="#fff" />
+								) : (
+									<>
+										<Text style={styles.submitButtonText}>
+											{fulllySatisfied
+												? "Continuer vers Google"
+												: "Envoyer & Google"}
+										</Text>
+										<Ionicons name="arrow-forward" size={20} color="#fff" />
+									</>
+								)}
+							</LinearGradient>
+						</TouchableOpacity>
 
-					<TouchableOpacity
-						style={styles.skipButton}
-						onPress={handleClose}
-					>
-						<Text style={styles.skipButtonText}>Annuler</Text>
-					</TouchableOpacity>
+						<TouchableOpacity
+							style={styles.skipButton}
+							onPress={handleClose}
+						>
+							<Text style={styles.skipButtonText}>Annuler</Text>
+						</TouchableOpacity>
+					</View>
 				</View>
-			</View>
+			</ScrollView>
 		);
 	};
 
@@ -596,37 +607,43 @@ export default function FeedbackScreen({
 					pointerEvents="none"
 				/>
 
-				<Animated.View
-					style={[
-						styles.container,
-						{
-							transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
-						},
-					]}
+				<KeyboardAvoidingView
+					style={styles.keyboardAvoiding}
+					behavior={Platform.OS === "ios" ? "padding" : "height"}
+					keyboardVerticalOffset={Platform.OS === "ios" ? 16 : 0}
 				>
-					<LinearGradient
-						colors={GRILLZ_PREMIUM.dark}
-						style={styles.modalContent}
+					<Animated.View
+						style={[
+							styles.container,
+							{
+								transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+							},
+						]}
 					>
-						{/* Header avec bouton fermer */}
-						<View style={styles.header}>
-							<View style={styles.headerIndicator} />
-							<TouchableOpacity
-								style={styles.closeIconButton}
-								onPress={handleClose}
-							>
-								<Ionicons name="close" size={24} color="#fff" />
-							</TouchableOpacity>
-						</View>
+						<LinearGradient
+							colors={GRILLZ_PREMIUM.dark}
+							style={styles.modalContent}
+						>
+							{/* Header avec bouton fermer */}
+							<View style={styles.header}>
+								<View style={styles.headerIndicator} />
+								<TouchableOpacity
+									style={styles.closeIconButton}
+									onPress={handleClose}
+								>
+									<Ionicons name="close" size={24} color="#fff" />
+								</TouchableOpacity>
+							</View>
 
-						{/* Contenu selon l'étape */}
-						<View style={styles.content}>
-							{currentStep === "questions" && renderQuestions()}
-							{currentStep === "feedback" && renderFeedback()}
-							{currentStep === "success" && renderSuccess()}
-						</View>
-					</LinearGradient>
-				</Animated.View>
+							{/* Contenu selon l'étape */}
+							<View style={styles.content}>
+								{currentStep === "questions" && renderQuestions()}
+								{currentStep === "feedback" && renderFeedback()}
+								{currentStep === "success" && renderSuccess()}
+							</View>
+						</LinearGradient>
+					</Animated.View>
+				</KeyboardAvoidingView>
 			</Animated.View>
 		</Modal>
 	);
@@ -634,6 +651,10 @@ export default function FeedbackScreen({
 
 const styles = StyleSheet.create({
 	overlay: {
+		flex: 1,
+		justifyContent: "flex-end",
+	},
+	keyboardAvoiding: {
 		flex: 1,
 		justifyContent: "flex-end",
 	},
@@ -764,6 +785,12 @@ const styles = StyleSheet.create({
 	// 💭 Feedback
 	feedbackContainer: {
 		alignItems: "center",
+	},
+	feedbackScroll: {
+		width: "100%",
+	},
+	feedbackScrollContent: {
+		paddingBottom: 12,
 	},
 	feedbackMessage: {
 		fontSize: 16,

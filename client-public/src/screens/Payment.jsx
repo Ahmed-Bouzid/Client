@@ -541,24 +541,42 @@ export default function Payment({
 			);
 
 			if (!response.ok) {
-				const errorText = await response.text();
-				console.error("❌ Erreur fermeture réservation:", errorText);
+				const errorBody = await response.text();
+				let parsedError = null;
+				try {
+					parsedError = JSON.parse(errorBody);
+				} catch (_parseError) {
+					parsedError = null;
+				}
 
-				// ✅ Idempotence: si la réservation est déjà fermée/terminée,
-				// on considère l'opération comme réussie.
-				const normalizedError = (errorText || "").toLowerCase();
+				const errorMessageFromBody =
+					typeof parsedError?.message === "string"
+						? parsedError.message
+						: typeof parsedError?.error === "string"
+							? parsedError.error
+							: "";
+
+				const normalizedError = `${errorBody || ""} ${errorMessageFromBody}`.toLowerCase();
 				const alreadyClosed =
-					normalizedError.includes("déjà terminée") ||
-					normalizedError.includes("deja terminee") ||
-					normalizedError.includes("already terminated") ||
-					normalizedError.includes("already closed");
+					response.status === 400 &&
+					(normalizedError.includes("réservation déjà terminée") ||
+						normalizedError.includes("reservation deja terminee") ||
+						normalizedError.includes("déjà terminée") ||
+						normalizedError.includes("deja terminee") ||
+						normalizedError.includes("already terminated") ||
+						normalizedError.includes("already closed"));
 
 				if (alreadyClosed) {
+					console.info(
+						"ℹ️ Fermeture idempotente: réservation déjà terminée côté serveur",
+					);
 					return {
 						success: true,
 						message: "✅ Réservation déjà fermée",
 					};
 				}
+
+				console.error("❌ Erreur fermeture réservation:", errorBody);
 
 				return {
 					success: false,
