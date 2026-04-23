@@ -8,6 +8,30 @@ import { deviceIdentity } from "../utils/deviceIdentity.js";
  * Génère un JWT client via le backend (POST /client/token) et le stocke localement.
  */
 export const clientAuthService = {
+	async revokeCurrentToken() {
+		try {
+			const token = await secureSessionStore.getString(
+				secureSessionStore.keys.CLIENT_TOKEN,
+			);
+
+			if (!token) {
+				return;
+			}
+
+			const headers = await deviceIdentity.getAuthHeaders({
+				Authorization: `Bearer ${token}`,
+				"Content-Type": "application/json",
+			});
+
+			await fetch(`${API_CONFIG.BASE_URL}/client/token/revoke`, {
+				method: "POST",
+				headers,
+			});
+		} catch (error) {
+			console.warn("⚠️ Révocation distante du token client impossible:", error);
+		}
+	},
+
 	/**
 	 * Retourne le JWT client stocké, ou en génère un nouveau si des paramètres sont fournis.
 	 *

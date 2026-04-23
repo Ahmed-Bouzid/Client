@@ -48,14 +48,11 @@ export const useThemeStore = create((set, get) => {
       set({ loading: true, error: null });
       
       try {
-        console.log(`📋 [useThemeStore] Fetching theme for restaurant ${restaurantId}`);
-        
         // 1. Try cache (AsyncStorage)
         if (!forceRefresh) {
           const cached = await AsyncStorage.getItem(`theme_${restaurantId}`);
           if (cached) {
             const cachedTheme = JSON.parse(cached);
-            console.log(`✅ [useThemeStore] Theme loaded from cache`);
             set({
               theme: cachedTheme.theme,
               customizations: cachedTheme.customizations,
@@ -299,8 +296,6 @@ export function initializeThemeStore(socket) {
   
   // Listen for theme updates from server
   socket.on('theme:updated', ({ restaurantId }) => {
-    console.log(`🔔 [useThemeStore] Theme updated for restaurant ${restaurantId}`);
-    
     // Force refresh
     useThemeStore.getState().fetchThemeForRestaurant(restaurantId, {
       forceRefresh: true,

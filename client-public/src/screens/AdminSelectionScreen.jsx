@@ -74,7 +74,6 @@ export default function AdminSelectionScreen({ onConnect, onTableSelected, admin
 	};
 
 	const handleSelectRestaurant = async (restaurantId) => {
-		console.log("🏪 [AdminSelection] Restaurant sélectionné:", restaurantId);
 		setSelectedRestaurant(restaurantId);
 		setTables([]);
 

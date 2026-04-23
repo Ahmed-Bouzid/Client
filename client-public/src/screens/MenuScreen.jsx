@@ -99,7 +99,7 @@ export default function MenuScreen({
   // Stores - EXACTEMENT comme Menu.jsx
   const products = useProductStore((state) => state.products);
   const fetchProducts = useProductStore((state) => state.fetchProducts);
-  const { currentOrder, addToOrder, updateOrderQuantity, submitOrder, initCart, getTotalItems, getTotalPrice } = useOrderStore();
+  const { currentOrder, allOrders, addToOrder, updateOrderQuantity, submitOrder, initCart, getTotalItems, getTotalPrice } = useOrderStore();
   
   // Store restaurant pour le nom + catégorie
   const restaurantName = useRestaurantStore((state) => state.name);
@@ -170,16 +170,28 @@ export default function MenuScreen({
     initializeCart();
   }, []);
   
+  // Charger les commandes existantes (reprise de session)
+  useEffect(() => {
+    if (reservationId && clientId) {
+      useOrderStore.getState().fetchOrdersByReservation(reservationId, clientId);
+    }
+  }, [reservationId, clientId]);
+  
   // Charger les produits - EXACTEMENT comme Menu.jsx
   // ── PARCOURS : charge le menu complet depuis l'API ──
   useEffect(() => {
-    const loadProducts = async () => {
+    const loadProducts = async (retries = 3) => {
       try {
 		const clientToken = await clientAuthService.getClientToken();
         if (clientToken) {
           await fetchProducts(clientToken, restaurantId);
+        } else if (retries > 0) {
+          // Token pas encore disponible — retry après un court délai
+          console.log(`⏳ [MenuScreen] Token pas encore prêt, retry dans 500ms (${retries} restants)`);
+          setTimeout(() => loadProducts(retries - 1), 500);
         } else {
-          console.warn("⚠️ Client doit rejoindre une table d'abord");
+          console.warn("⚠️ [MenuScreen] Pas de token après retries — retour au join");
+          onBack?.();
         }
       } catch (error) {
         console.error("❌ Error loading products:", error);
@@ -238,10 +250,7 @@ export default function MenuScreen({
   ];
   
   // Cucina = catégories fixes, autres = dynamiques
-  const categories = useMemo(
-    () => isCucina ? cucinaCategories : getCategories(),
-    [products, isCucina]
-  );
+  const categories = isCucina ? cucinaCategories : getCategories();
 
   // Produits filtrés - utilise le selectedCategory pour filtrer
   const filteredProducts = useMemo(
@@ -1094,6 +1103,51 @@ export default function MenuScreen({
           />
         )}
       </View>
+
+      {/* Barre du bas - Payer les commandes existantes (panier vide) */}
+      {totalItems === 0 && allOrders.length > 0 && (
+        isGrillz ? (
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#121212',
+            marginHorizontal: 16,
+            marginBottom: 20,
+            paddingHorizontal: 20,
+            paddingVertical: 16,
+            borderRadius: 20,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 12,
+            elevation: 10,
+          }}>
+            <TouchableOpacity
+              onPress={onNavigateToPayment}
+              activeOpacity={0.8}
+              style={{
+                backgroundColor: '#D35400',
+                paddingHorizontal: 32,
+                paddingVertical: 14,
+                borderRadius: 30,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <Ionicons name="card" size={18} color="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>Payer ma commande</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.bottomBar}>
+            <TouchableOpacity style={styles.placeOrderBtn} onPress={onNavigateToPayment}>
+              <Text style={styles.placeOrderText}>Payer ma commande</Text>
+            </TouchableOpacity>
+          </View>
+        )
+      )}
 
       {/* Barre du bas - Style identique à l'image de référence pour Le Grillz */}
       {totalItems > 0 && (

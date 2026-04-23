@@ -28,7 +28,7 @@
  *   - Thème dynamique par restaurant
  *   - Écoute fermeture de réservation (WebSocket)
  */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -72,6 +72,7 @@ const PremiumPaymentItem = ({
 	isPaid,
 	onToggle,
 	theme = DEFAULT_THEME,
+	isGrillzTheme = false,
 }) => {
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(20)).current;
@@ -130,8 +131,12 @@ const PremiumPaymentItem = ({
 						isPaid
 							? ["rgba(56, 239, 125, 0.2)", "rgba(17, 153, 142, 0.1)"]
 							: isSelected
-								? ["rgba(102, 126, 234, 0.3)", "rgba(118, 75, 162, 0.2)"]
-								: ["rgba(255,255,255,0.95)", "rgba(248,249,250,0.95)"]
+								? isGrillzTheme
+									? ["rgba(234, 88, 12, 0.35)", "rgba(249, 115, 22, 0.2)"]
+									: ["rgba(102, 126, 234, 0.3)", "rgba(118, 75, 162, 0.2)"]
+								: isGrillzTheme
+									? ["rgba(26, 26, 26, 0.95)", "rgba(20, 20, 20, 0.95)"]
+									: ["rgba(255,255,255,0.95)", "rgba(248,249,250,0.95)"]
 					}
 					style={[styles.paymentItem, isPaid && styles.paymentItemPaid]}
 					start={{ x: 0, y: 0 }}
@@ -158,8 +163,8 @@ const PremiumPaymentItem = ({
 								<MaterialIcons name="check" size={18} color="#fff" />
 							</LinearGradient>
 						) : (
-							<View style={styles.checkboxEmpty}>
-								<View style={styles.checkboxInner} />
+							<View style={[styles.checkboxEmpty, isGrillzTheme && { backgroundColor: "#1A1A1A", borderColor: "#3F3F46" }]}>
+								<View style={[styles.checkboxInner, isGrillzTheme && { backgroundColor: "#2A2A2A" }]} />
 							</View>
 						)}
 					</View>
@@ -171,6 +176,7 @@ const PremiumPaymentItem = ({
 								styles.paymentItemName,
 								isPaid && styles.paymentItemNamePaid,
 								!isSelected && !isPaid && styles.paymentItemNameUnselected,
+								!isSelected && !isPaid && isGrillzTheme && { color: "#D4D4D8" },
 							]}
 						>
 							{item.name}
@@ -180,6 +186,7 @@ const PremiumPaymentItem = ({
 								styles.paymentItemDetails,
 								isPaid && styles.paymentItemDetailsPaid,
 								!isSelected && !isPaid && styles.paymentItemDetailsUnselected,
+								!isSelected && !isPaid && isGrillzTheme && { color: "#A1A1AA" },
 							]}
 						>
 							{item.price}€ × {item.quantity || 1}
@@ -195,7 +202,7 @@ const PremiumPaymentItem = ({
 							</View>
 						) : (
 							<LinearGradient
-								colors={isSelected ? theme.primary : ["#e9ecef", "#dee2e6"]}
+								colors={isSelected ? theme.primary : isGrillzTheme ? ["#2A2A2A", "#1F1F1F"] : ["#e9ecef", "#dee2e6"]}
 								style={styles.priceBadge}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 0 }}
@@ -204,6 +211,7 @@ const PremiumPaymentItem = ({
 									style={[
 										styles.priceBadgeText,
 										!isSelected && styles.priceBadgeTextDark,
+										!isSelected && isGrillzTheme && { color: "#D4D4D8" },
 									]}
 								>
 									{itemTotal.toFixed(2)}€
@@ -221,6 +229,7 @@ export default function Payment({
 	allOrders = [],
 	orderId = null,
 	reservationId = null,
+	restaurantId: restaurantIdProp = null,
 	tableId = null,
 	tableNumber = null, // 🆕
 	userName = null, // 🆕
@@ -246,9 +255,12 @@ export default function Payment({
 	const [payForWholeTable, setPayForWholeTable] = useState(false);
 
 	// Commandes filtrées selon le mode actif
-	const visibleOrders = payForWholeTable
-		? allOrders
-		: allOrders.filter((item) => !item.clientId || item.clientId === clientId);
+	const visibleOrders = useMemo(
+		() => payForWholeTable
+			? allOrders
+			: allOrders.filter((item) => !item.clientId || item.clientId === clientId),
+		[allOrders, payForWholeTable, clientId]
+	);
 
 	const otherClientsCount = allOrders.filter(
 		(item) => item.clientId && item.clientId !== clientId,
@@ -266,7 +278,8 @@ export default function Payment({
 	const [webCheckoutContext, setWebCheckoutContext] = useState(null);
 
 	// 🚪 Écouter la fermeture de réservation et rediriger automatiquement
-	const restaurantId = useRestaurantStore((state) => state.id);
+	const storeRestaurantId = useRestaurantStore((state) => state.id);
+	const restaurantId = restaurantIdProp || storeRestaurantId;
 	const restaurantCategory = useRestaurantStore((state) => state.category);
 	useReservationStatus(restaurantId, reservationId, onReservationClosed);
 
@@ -283,6 +296,8 @@ export default function Payment({
 		config?.style,
 		isGrillzTheme ? "grillz" : config?.styleKey,
 	);
+	// 🔍 DEBUG — supprimer après vérification
+	console.log("[Payment] restaurantId:", restaurantId, "| isGrillzTheme:", isGrillzTheme, "| styleKey:", config?.styleKey);
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -528,6 +543,23 @@ export default function Payment({
 			if (!response.ok) {
 				const errorText = await response.text();
 				console.error("❌ Erreur fermeture réservation:", errorText);
+
+				// ✅ Idempotence: si la réservation est déjà fermée/terminée,
+				// on considère l'opération comme réussie.
+				const normalizedError = (errorText || "").toLowerCase();
+				const alreadyClosed =
+					normalizedError.includes("déjà terminée") ||
+					normalizedError.includes("deja terminee") ||
+					normalizedError.includes("already terminated") ||
+					normalizedError.includes("already closed");
+
+				if (alreadyClosed) {
+					return {
+						success: true,
+						message: "✅ Réservation déjà fermée",
+					};
+				}
+
 				return {
 					success: false,
 					message: `Erreur serveur: ${response.status}`,
@@ -761,11 +793,19 @@ export default function Payment({
 
 	// ── PARCOURS : crée PaymentIntent Stripe, affiche Payment Sheet, finalise le paiement ──
 	const handlePay = async (paymentMethod = "card") => {
+		console.log("[PaymentClient] handlePay pressed", {
+			paymentMethod,
+			selectedItemsCount: selectedItems.size,
+			allOrdersCount: allOrders.length,
+		});
+
 		if (paymentRequestInFlightRef.current) {
+			console.log("[PaymentClient] paiement déjà en cours, action ignorée");
 			return;
 		}
 
 		if (selectedItems.size === 0) {
+			console.warn("[PaymentClient] Aucun article sélectionné, PaymentIntent non créé");
 			Alert.alert(
 				"Erreur",
 				"Veuillez sélectionner au moins un article à payer",
@@ -820,10 +860,20 @@ export default function Payment({
 			const firstOrderId =
 				selectedOrders[0]?.orderId || orderId || allOrders[0]?.orderId;
 			if (!firstOrderId) {
+				console.warn("[PaymentClient] firstOrderId introuvable, abandon du paiement", {
+					selectedOrdersCount: selectedOrders.length,
+					orderId,
+				});
 				Alert.alert("Erreur", "Impossible de trouver l'ID de commande");
 				setLoading(false);
 				return;
 			}
+
+			console.log("[PaymentClient] Création PaymentIntent", {
+				firstOrderId,
+				amountCents,
+				paymentMethod,
+			});
 
 			const paymentIntentResult = await stripeService.createPaymentIntent({
 				orderId: firstOrderId,
@@ -837,6 +887,9 @@ export default function Payment({
 
 			const newClientSecret = paymentIntentResult.clientSecret;
 			const newPaymentIntentId = paymentIntentResult.paymentIntentId;
+			console.log("[PaymentClient] PaymentIntent créé", {
+				paymentIntentId: newPaymentIntentId,
+			});
 			setClientSecret(newClientSecret);
 			setPaymentIntentId(newPaymentIntentId);
 
@@ -883,6 +936,7 @@ export default function Payment({
 
 			if (presentError) {
 				if (presentError.code === "Canceled") {
+					console.log("[PaymentClient] PaymentSheet annulé par l'utilisateur");
 					setLoading(false);
 					return;
 				}
@@ -892,12 +946,22 @@ export default function Payment({
 				return;
 			}
 
+			console.log("[PaymentClient] PaymentSheet confirmé, finalisation en cours", {
+				paymentIntentId: newPaymentIntentId,
+			});
+
 			await finalizePaymentSuccess(
 				selectedOrders,
 				amountPaid,
 				paymentMethod,
 				newPaymentIntentId,
 			);
+
+			console.log("[PaymentClient] finalizePaymentSuccess terminé", {
+				paymentIntentId: newPaymentIntentId,
+				selectedOrdersCount: selectedOrders.length,
+				amountPaid,
+			});
 		} catch (error) {
 			console.error("❌ Erreur paiement:", error);
 			Alert.alert("Erreur", "Échec du paiement. Veuillez réessayer.");
@@ -998,8 +1062,8 @@ export default function Payment({
 					>
 						<MaterialIcons name="error-outline" size={48} color="#fff" />
 					</LinearGradient>
-					<Text style={styles.errorTitle}>Aucune commande</Text>
-					<Text style={styles.errorText}>
+					<Text style={[styles.errorTitle, isGrillzTheme && { color: "#F8FAFC" }]}>Aucune commande</Text>
+					<Text style={[styles.errorText, isGrillzTheme && { color: "#A1A1AA" }]}>
 						Aucune commande n'a été trouvée pour cette réservation.{"\n"}
 						Retournez au menu et commandez des articles d'abord.
 					</Text>
@@ -1100,8 +1164,8 @@ export default function Payment({
 					>
 						<Ionicons name="card" size={36} color="#fff" />
 					</LinearGradient>
-					<Text style={styles.title}>Paiement</Text>
-					<Text style={styles.subtitle}>Sélectionnez les articles à payer</Text>
+					<Text style={[styles.title, isGrillzTheme && { color: "#F8FAFC" }]}>Paiement</Text>
+					<Text style={[styles.subtitle, isGrillzTheme && { color: "#A1A1AA" }]}>Sélectionnez les articles à payer</Text>
 
 					{/* 🍔 Bannière statut foodtruck / fast-food */}
 					{(isFoodtruck || isFastFood) && (
@@ -1173,7 +1237,7 @@ export default function Payment({
 				<View style={styles.itemsSection}>
 					{/* 👥 Toggle : Mes articles / Toute la table */}
 					{otherClientsCount > 0 && (
-						<View style={styles.clientToggleRow}>
+						<View style={[styles.clientToggleRow, isGrillzTheme && { backgroundColor: "rgba(255,255,255,0.08)" }]}>
 							<TouchableOpacity
 								style={[
 									styles.clientToggleBtn,
@@ -1225,7 +1289,7 @@ export default function Payment({
 							>
 								<MaterialIcons name="shopping-cart" size={18} color="#fff" />
 							</LinearGradient>
-							<Text style={styles.sectionTitle}>
+							<Text style={[styles.sectionTitle, isGrillzTheme && { color: "#F8FAFC" }]}>
 								Articles à payer ({availableItems.length})
 							</Text>
 						</View>
@@ -1261,8 +1325,8 @@ export default function Payment({
 							>
 								<MaterialIcons name="celebration" size={48} color="#fff" />
 							</LinearGradient>
-							<Text style={styles.emptyStateTitle}>Tout est payé !</Text>
-							<Text style={styles.emptyStateSubtext}>
+							<Text style={[styles.emptyStateTitle, isGrillzTheme && { color: "#F8FAFC" }]}>Tout est payé !</Text>
+							<Text style={[styles.emptyStateSubtext, isGrillzTheme && { color: "#A1A1AA" }]}>
 								Vous pouvez retourner au menu.
 							</Text>
 							<TouchableOpacity
@@ -1306,6 +1370,7 @@ export default function Payment({
 										isPaid={false}
 										onToggle={() => toggleItem(item)}
 										theme={theme}
+										isGrillzTheme={isGrillzTheme}
 									/>
 								);
 							})}
@@ -1324,7 +1389,7 @@ export default function Payment({
 								>
 									<MaterialIcons name="check-circle" size={18} color="#fff" />
 								</LinearGradient>
-								<Text style={styles.paidSectionTitle}>
+								<Text style={[styles.paidSectionTitle, isGrillzTheme && { color: "#A1A1AA" }]}>
 									Déjà payés ({paidItemsList.length})
 								</Text>
 							</View>
@@ -1337,6 +1402,7 @@ export default function Payment({
 										isSelected={false}
 										isPaid={true}
 										theme={theme}
+										isGrillzTheme={isGrillzTheme}
 									/>
 								))}
 							</View>
@@ -1375,7 +1441,7 @@ export default function Payment({
 				{/* Info Note */}
 				{reservationId && (
 					<View style={styles.infoNote}>
-						<BlurView intensity={15} tint="light" style={styles.infoNoteBlur}>
+						<BlurView intensity={15} tint="light" style={[styles.infoNoteBlur, isGrillzTheme && { borderColor: "#2A2A2A" }]}>
 							<MaterialIcons name="info-outline" size={20} color="#4facfe" />
 							<View style={styles.infoNoteText}>
 								<Text style={styles.infoNoteTitle}>
@@ -1427,7 +1493,7 @@ export default function Payment({
 												? [theme.primary, theme.primary]
 												: [theme.success, theme.success]
 									}
-									style={styles.payButton}
+									style={[styles.payButton, isGrillzTheme && { shadowColor: "#EA580C" }]}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 0 }}
 								>
@@ -1490,7 +1556,7 @@ export default function Payment({
 												? ["#ccc", "#999"]
 												: ["#FF8C00", "#FF6B00"]
 										}
-										style={styles.payButton}
+										style={[styles.payButton, isGrillzTheme && { shadowColor: "#EA580C" }]}
 										start={{ x: 0, y: 0 }}
 										end={{ x: 1, y: 0 }}
 									>

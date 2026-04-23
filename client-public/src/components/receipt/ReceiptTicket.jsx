@@ -75,9 +75,6 @@ export const ReceiptTicket = React.forwardRef(
 
 				{/* Header with success icon */}
 				<LinearGradient colors={["#11998e", "#38ef7d"]} style={styles.header}>
-					<View style={styles.iconContainer}>
-						<MaterialIcons name="check-circle" size={60} color="#ffffff" />
-					</View>
 					<Text style={styles.headerTitle}>Merci !</Text>
 					<Text style={styles.headerSubtitle}>
 						Votre paiement a été effectué avec succès
@@ -278,7 +275,7 @@ const styles = StyleSheet.create({
 		borderStyle: "dashed",
 		borderWidth: 1,
 		borderColor: "#444",
-		marginVertical: 20,
+		marginVertical: 10,
 	},
 	section: {
 		marginBottom: 20,
@@ -357,8 +354,8 @@ const styles = StyleSheet.create({
 		gap: 15,
 	},
 	paymentIcon: {
-		width: 50,
-		height: 50,
+		width: 40,
+		height: 40,
 		borderRadius: 25,
 		backgroundColor: "#11998e",
 		justifyContent: "center",

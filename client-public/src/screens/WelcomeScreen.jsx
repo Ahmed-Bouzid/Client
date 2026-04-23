@@ -46,6 +46,7 @@ import { useRestaurantStore } from "../stores/useRestaurantStore";
 import { clientAuthService } from "shared-api/services/clientAuthService.js";
 import { API_CONFIG } from "shared-api/config/apiConfig.js";
 import { secureSessionStore } from "shared-api/utils/secureSessionStore";
+import { deviceIdentity } from "shared-api/utils/deviceIdentity";
 import RNUUID from "react-native-uuid";
 
 import { getRestaurantAssets, getRestaurantFont } from "../utils/restaurantAssets";
@@ -458,13 +459,16 @@ export default function WelcomeScreen({
       
       console.log("📤 [JOIN] Envoi réservation:", JSON.stringify(body, null, 2));
       
+      const requestHeaders = await deviceIdentity.getAuthHeaders({
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      });
+
       const response = await fetch(
         `${API_CONFIG.BASE_URL}/reservations/client/reservations`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: requestHeaders,
           body: JSON.stringify(body),
         },
       );

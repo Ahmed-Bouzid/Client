@@ -94,10 +94,8 @@ const useProductStore = create((set, get) => ({
 	fetchProducts: async (token, restaurantId) => {
 		// ✅ Accepte token et restaurantId en paramètre
 		try {
-			console.log("📦 [ProductStore] Appel fetchProducts avec token:", token ? "oui" : "non", "restaurantId:", restaurantId);
 			const products = await productService.fetchProducts(token, restaurantId);
 			set({ products });
-			console.log("📦 [ProductStore] Store mis à jour avec", products.length, "produits");
 			return products;
 		} catch (err) {
 			console.error("❌ [ProductStore] Error fetching products:", err);

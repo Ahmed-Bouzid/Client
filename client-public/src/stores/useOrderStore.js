@@ -1,3 +1,22 @@
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * useOrderStore.js — STORE CENTRAL : PANIER + COMMANDES
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * Gère tout le cycle de vie de la commande :
+ *   - Panier local (currentOrder) persisté dans AsyncStorage
+ *   - Ajout/suppression/modification d'articles
+ *   - Soumission de commande au serveur (POST /orders)
+ *   - Récupération des commandes par réservation (GET /orders/reservation/:id)
+ *   - Marquage comme payé (PUT /orders/:id/mark-paid)
+ *   - Annulation des commandes (PUT /orders/:id/cancel)
+ *   - Cache offline (AsyncStorage fallback si réseau indisponible)
+ *
+ * Architecture :
+ *   - currentOrder[] = panier en construction (pas encore en BDD)
+ *   - allOrders[] = items aplatis de toutes les commandes serveur
+ *   - activeOrderId = dernière commande créée (pour tracking)
+ */
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { orderService } from "shared-api/services/orderService.js";
@@ -9,6 +28,7 @@ export const useOrderStore = create((set, get) => ({
 	activeOrderId: null, // ID de la commande active côté serveur
 	hasActiveOrder: false,
 	isLoading: false,
+	_persistUserName: null, // Nom utilisateur pour persistence AsyncStorage
 
 	/**
 	 * Initialise le store depuis AsyncStorage
@@ -18,10 +38,8 @@ export const useOrderStore = create((set, get) => ({
 		try {
 			const savedId = await AsyncStorage.getItem("activeOrderId");
 			if (savedId) {
-				// Restaurer l'ID sans vérifier avec le serveur (évite trop de requêtes)
 				set({ activeOrderId: savedId, hasActiveOrder: true });
 			} else {
-				// Pas de commande sauvegardée
 				set({ activeOrderId: null, hasActiveOrder: false });
 			}
 		} catch (error) {
@@ -30,8 +48,84 @@ export const useOrderStore = create((set, get) => ({
 		}
 	},
 
+	// ═══════════════════════════════════════════════════════════════════
+	// CART : Persistence & utilitaires (remplace useCartStore)
+	// ═══════════════════════════════════════════════════════════════════
+
 	/**
-	 * Ajoute un article à la commande en cours
+	 * Initialise le panier depuis AsyncStorage
+	 */
+	initCart: async (userName, clearPrevious = false) => {
+		set({ _persistUserName: userName });
+		if (clearPrevious) {
+			await AsyncStorage.removeItem(`cart_${userName}`);
+			set({ currentOrder: [] });
+		} else {
+			try {
+				const saved = await AsyncStorage.getItem(`cart_${userName}`);
+				if (saved) {
+					set({ currentOrder: JSON.parse(saved) });
+				}
+			} catch (error) {
+				console.error("❌ Erreur chargement panier:", error);
+			}
+		}
+	},
+
+	/**
+	 * Sauvegarde le panier (currentOrder) dans AsyncStorage
+	 */
+	_persistCart: async () => {
+		const state = get();
+		if (!state._persistUserName) return;
+		try {
+			await AsyncStorage.setItem(
+				`cart_${state._persistUserName}`,
+				JSON.stringify(state.currentOrder),
+			);
+		} catch (error) {
+			console.error("❌ Erreur sauvegarde panier:", error);
+		}
+	},
+
+	/**
+	 * Vide le panier (currentOrder) + AsyncStorage
+	 */
+	clearCart: async () => {
+		const userName = get()._persistUserName;
+		set({ currentOrder: [] });
+		if (userName) {
+			try {
+				await AsyncStorage.removeItem(`cart_${userName}`);
+			} catch (error) {
+				console.error("❌ Erreur suppression panier:", error);
+			}
+		}
+	},
+
+	/**
+	 * Nombre total d'articles dans le panier
+	 */
+	getTotalItems: () => {
+		return get().currentOrder.reduce((sum, item) => sum + (item.quantity || 0), 0);
+	},
+
+	/**
+	 * Total du panier en euros
+	 */
+	getTotalPrice: () => {
+		return get().currentOrder.reduce(
+			(sum, item) => sum + (item.price || 0) * (item.quantity || 0),
+			0,
+		);
+	},
+
+	// ═══════════════════════════════════════════════════════════════════
+	// COMMANDE : Gestion des articles
+	// ═══════════════════════════════════════════════════════════════════
+
+	/**
+	 * Ajoute un article à la commande en cours (+ persistence)
 	 */
 	addToOrder: (item, userName) => {
 		set((state) => {
@@ -49,10 +143,11 @@ export const useOrderStore = create((set, get) => ({
 			}
 			return { currentOrder: newOrder };
 		});
+		get()._persistCart();
 	},
 
 	/**
-	 * Met à jour la quantité d'un article dans la commande
+	 * Met à jour la quantité d'un article dans la commande (+ persistence)
 	 */
 	updateOrderQuantity: (item, quantity) => {
 		if (quantity <= 0) {
@@ -66,6 +161,7 @@ export const useOrderStore = create((set, get) => ({
 				),
 			}));
 		}
+		get()._persistCart();
 	},
 
 	/**
@@ -142,6 +238,12 @@ export const useOrderStore = create((set, get) => ({
 				currentOrder: [],
 				isLoading: false,
 			});
+
+			// Nettoyer le panier persisté (currentOrder est maintenant vide)
+			const userName = get()._persistUserName;
+			if (userName) {
+				await AsyncStorage.removeItem(`cart_${userName}`);
+			}
 
 			return data;
 		} catch (error) {
@@ -311,5 +413,49 @@ export const useOrderStore = create((set, get) => ({
 			activeOrderId: null,
 			hasActiveOrder: false,
 		});
+	},
+
+	/**
+	 * Annule toutes les commandes en BDD pour cette session,
+	 * puis reset le state local
+	 */
+	cancelAllOrders: async () => {
+		const state = get();
+		set({ isLoading: true });
+
+		try {
+			// Récupérer les orderIds uniques depuis allOrders (items aplatis)
+			const orderIds = [
+				...new Set(state.allOrders.map((item) => item.orderId).filter(Boolean)),
+			];
+
+			// Annuler chaque commande côté serveur
+			await Promise.all(
+				orderIds.map((id) =>
+					orderService.cancelOrder(id).catch((err) => {
+						console.warn(`⚠️ Erreur annulation commande ${id}:`, err.message);
+					}),
+				),
+			);
+
+			// Nettoyer le state local
+			await AsyncStorage.removeItem("activeOrderId");
+			const userName = state._persistUserName;
+			if (userName) {
+				await AsyncStorage.removeItem(`cart_${userName}`);
+			}
+
+			set({
+				currentOrder: [],
+				allOrders: [],
+				activeOrderId: null,
+				hasActiveOrder: false,
+				isLoading: false,
+			});
+		} catch (error) {
+			set({ isLoading: false });
+			console.error("❌ Erreur cancelAllOrders:", error);
+			throw error;
+		}
 	},
 }));

@@ -77,7 +77,7 @@ export default function OrderSummary({
           </Text>
           <Text style={[styles.summaryDate, isGrillzTheme && styles.grillzSummaryDate]}>{dateText}</Text>
         </View>
-        <Text style={[styles.summaryPrice, isGrillzTheme && styles.grillzSummaryPrice]}>${total.toFixed(2)}</Text>
+        <Text style={[styles.summaryPrice, isGrillzTheme && styles.grillzSummaryPrice]}>{total.toFixed(2)}€</Text>
       </View>
 
       {/* ═══════════════════════════════════════════════════════════
@@ -111,20 +111,20 @@ export default function OrderSummary({
                   {/* Infos */}
                   <View style={styles.infoContainer}>
                     <Text style={[styles.productName, isGrillzTheme && styles.grillzProductName]}>{item.name}</Text>
-                    <Text style={[styles.productPrice, isGrillzTheme && styles.grillzProductPrice]}>${itemPrice.toFixed(2)}</Text>
+                    <Text style={[styles.productPrice, isGrillzTheme && styles.grillzProductPrice]}>{itemPrice.toFixed(2)}€</Text>
                   </View>
 
                   {/* Quantity controls */}
-                  <View style={styles.quantityControls}>
+                  <View style={[styles.quantityControls, isGrillzTheme && styles.grillzQuantityControls]}>
                     <TouchableOpacity 
-                      style={styles.quantityBtn} 
+                      style={[styles.quantityBtn, isGrillzTheme && styles.grillzQuantityBtn]} 
                       onPress={() => handleQuantityChange(item, -1)}
                     >
                       <MaterialIcons name="remove" size={20} color={isGrillzTheme ? "#F59E0B" : "#1F2937"} />
                     </TouchableOpacity>
                     <Text style={[styles.quantityText, isGrillzTheme && styles.grillzQuantityText]}>{item.quantity || 1}</Text>
                     <TouchableOpacity 
-                      style={styles.quantityBtn} 
+                      style={[styles.quantityBtn, isGrillzTheme && styles.grillzQuantityBtn]} 
                       onPress={() => handleQuantityChange(item, 1)}
                     >
                       <MaterialIcons name="add" size={20} color={isGrillzTheme ? "#F59E0B" : "#1F2937"} />
@@ -151,7 +151,7 @@ export default function OrderSummary({
         <View style={[styles.footer, isGrillzTheme && styles.grillzFooter]}>
           {/* Confirm button */}
           <TouchableOpacity style={[styles.confirmBtn, isGrillzTheme && styles.grillzConfirmBtn]} onPress={handleConfirm} activeOpacity={0.9}>
-            <Text style={styles.confirmBtnText}>Confirmer la commande • ${total.toFixed(2)}</Text>
+            <Text style={styles.confirmBtnText}>Confirmer la commande • {total.toFixed(2)}€</Text>
           </TouchableOpacity>
 
           {/* Back button */}
@@ -305,6 +305,8 @@ const styles = StyleSheet.create({
   grillzProductName: { color: "#F8FAFC" },
   grillzProductPrice: { color: "#F97316" },
   grillzProductDescription: { color: "#A3A3A3" },
+  grillzQuantityControls: { backgroundColor: "#2A2A2A" },
+  grillzQuantityBtn: { backgroundColor: "#3A3A3A" },
   grillzQuantityText: { color: "#F8FAFC" },
   grillzFooter: { backgroundColor: "#0D0D0D" },
   grillzConfirmBtn: { backgroundColor: "#EA580C" },

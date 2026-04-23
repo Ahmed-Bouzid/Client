@@ -1,8 +1,26 @@
 /**
- * OrderScreen - Design Foodmood + Fonctionnalités Payment complètes
- * PARTIE 1: Logique sans modification du design
+ * ═══════════════════════════════════════════════════════════════
+ * OrderScreen.jsx — ÉTAPE 3 : RÉCAPITULATIF COMMANDE & VALIDATION
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * Parcours client :
+ *   1. Affiche les articles commandés avec quantités et prix
+ *   2. Affiche la barre de progression (Prepare → Cook → Ready → Served)
+ *   3. Bouton "Payer" → navigue vers Payment
+ *   4. Bouton "Annuler" → annulation locale (fast-food) ou serveur
+ *
+ * Mode fast-food :
+ *   - Commande PAS encore en BDD (pendingOrder=true)
+ *   - Timer 10s avec countdown visible
+ *   - Annulation gratuite pendant le countdown (pas de requête BDD)
+ *   - Auto-submit en BDD après 10s via onAutoSubmit callback
+ *
+ * Fonctionnalités secondaires :
+ *   - Bannière de statut selon la catégorie (foodtruck, fast-food)
+ *   - Barre de progression de cuisson
+ *   - Écoute fermeture de réservation (useReservationStatus)
  */
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,21 +30,11 @@ import {
   Platform,
   StatusBar,
   Image,
-  Alert,
   Dimensions,
-  Animated,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useStripe } from "@stripe/stripe-react-native";
-import { useOrderStore } from "../stores/useOrderStore.js";
 import { useRestaurantStore } from "../stores/useRestaurantStore";
 import { useReservationStatus } from "../hooks/useReservationStatus";
-import { ReceiptModal } from "../components/receipt/ReceiptModal";
-import FeedbackScreen from "../components/FeedbackScreen";
-import stripeService from "../services/stripeService";
-import { API_BASE_URL } from "../config/api";
-import logger from "../utils/secureLogger";
 
 const { width } = Dimensions.get("window");
 const PANINI_IMAGE = require("../../assets/images/menu/image-fond/panini.png");
@@ -112,71 +120,74 @@ export default function OrderScreen({
   tableId = null,
   tableNumber = null,
   userName = null,
+  pendingOrder = false,   // 🍔 Fast-food: commande pas encore en BDD
+  pendingItems = [],      // 🍔 Fast-food: articles du panier local
   onBack = () => {},
   onPayNow = () => {},
   onCancelOrder = () => {},
-  onSuccess = () => {},
+  onAutoSubmit = () => {},  // 🍔 Fast-food: callback envoi BDD après 10s
   onReservationClosed = () => {},
 }) {
-  // ═══════════════════════════════════════════════════════════════════════
-  // STATE
-  // ═══════════════════════════════════════════════════════════════════════
-  const [loading, setLoading] = useState(false);
-  const [selectedItems, setSelectedItems] = useState(new Set());
-  const [paidItems, setPaidItems] = useState(new Set());
-  const [payForWholeTable, setPayForWholeTable] = useState(false);
-  const [reservationStatus, setReservationStatus] = useState({
-    canClose: false,
-    reason: "",
-    unpaidOrders: [],
-    totalDue: 0,
-    totalPaid: 0,
-  });
-
-  // 🧾 Ticket de caisse
-  const [showReceipt, setShowReceipt] = useState(false);
-  const [receiptData, setReceiptData] = useState(null);
-
-  // 🌟 Feedback
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [feedbackData, setFeedbackData] = useState(null);
-
-  // Stripe
-  const { initPaymentSheet, presentPaymentSheet, isApplePaySupported } = useStripe();
-  const [applePayAvailable, setApplePayAvailable] = useState(false);
-  const [clientSecret, setClientSecret] = useState(null);
-  const [paymentIntentId, setPaymentIntentId] = useState(null);
-
   // Stores
-  const { markAsPaid, activeOrderId: storeOrderId } = useOrderStore();
   const storeRestaurantId = useRestaurantStore((state) => state.id);
-
-  // Use orderId from props or from store
-  const effectiveOrderId = orderId || storeOrderId;
+  const restaurantCategory = useRestaurantStore((state) => state.category);
   const effectiveRestaurantId = restaurantId || storeRestaurantId;
   const isGrillzTheme = effectiveRestaurantId === GRILLZ_RESTAURANT_ID;
+  const isFoodtruck = restaurantCategory === "foodtruck";
+  const isFastFood = restaurantCategory === "fast-food";
 
   // 🚪 Écouter fermeture réservation WebSocket
   useReservationStatus(effectiveRestaurantId, reservationId, onReservationClosed);
 
   // ═══════════════════════════════════════════════════════════════════════
-  // HELPERS
+  // 🍔 FAST-FOOD: Countdown 10s avant envoi BDD
   // ═══════════════════════════════════════════════════════════════════════
-  const getItemId = (item) => {
-    if (!item) return `unknown-${Date.now()}`;
-    if (item._id) return item._id;
-    return `${item.id || item.productId}-${item.name}-${item.price}`;
-  };
+  const CANCEL_WINDOW = 10; // secondes
+  const [countdown, setCountdown] = useState(pendingOrder ? CANCEL_WINDOW : 0);
+  const [isSubmitted, setIsSubmitted] = useState(!pendingOrder);
+  const timerRef = useRef(null);
+  const hasAutoSubmitted = useRef(false);
 
-  const getStorageKey = () => {
-    if (reservationId) return `paidItems_res_${reservationId}`;
-    if (orderId) return `paidItems_order_${orderId}`;
-    return null;
-  };
+  // Stabiliser la ref du callback pour éviter les re-renders
+  const onAutoSubmitRef = useRef(onAutoSubmit);
+  onAutoSubmitRef.current = onAutoSubmit;
+
+  useEffect(() => {
+    if (!pendingOrder || isSubmitted) return;
+
+    timerRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+          // Auto-submit après 10s
+          if (!hasAutoSubmitted.current) {
+            hasAutoSubmitted.current = true;
+            setIsSubmitted(true);
+            onAutoSubmitRef.current();
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [pendingOrder, isSubmitted]);
+
+  // L'annulation est possible UNIQUEMENT pendant le countdown
+  const canCancel = pendingOrder && !isSubmitted && countdown > 0;
 
   // ═══════════════════════════════════════════════════════════════════════
-  // MULTI-CLIENTS : Filtrage
+  // MULTI-CLIENTS : Filtrage par clientId
   // ═══════════════════════════════════════════════════════════════════════
+  const [payForWholeTable, setPayForWholeTable] = useState(false);
+
   const visibleOrders = useMemo(() => {
     if (payForWholeTable) return allOrders;
     return allOrders.filter((item) => !item.clientId || item.clientId === clientId);
@@ -187,356 +198,15 @@ export default function OrderScreen({
   }, [allOrders, clientId]);
 
   // ═══════════════════════════════════════════════════════════════════════
-  // LOAD PAID ITEMS FROM STORAGE
-  // ═══════════════════════════════════════════════════════════════════════
-  useEffect(() => {
-    (async () => {
-      const storageKey = getStorageKey();
-      if (!storageKey) return;
-      try {
-        const saved = await AsyncStorage.getItem(storageKey);
-        if (saved) setPaidItems(new Set(JSON.parse(saved)));
-      } catch (e) {
-        console.error("❌ Erreur chargement paidItems:", e);
-      }
-    })();
-  }, [reservationId, orderId]);
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // SAVE PAID ITEMS TO STORAGE
-  // ═══════════════════════════════════════════════════════════════════════
-  useEffect(() => {
-    (async () => {
-      const storageKey = getStorageKey();
-      if (!storageKey) return;
-      try {
-        await AsyncStorage.setItem(storageKey, JSON.stringify(Array.from(paidItems)));
-      } catch (e) {
-        logger.error("Erreur sauvegarde paidItems", e.message);
-      }
-    })();
-  }, [paidItems, reservationId, orderId]);
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // CHECK APPLE PAY
-  // ═══════════════════════════════════════════════════════════════════════
-  useEffect(() => {
-    (async () => {
-      if (Platform.OS === "ios" && typeof isApplePaySupported === "function") {
-        try {
-          const supported = await isApplePaySupported();
-          setApplePayAvailable(supported);
-        } catch (e) {
-          setApplePayAvailable(false);
-        }
-      }
-    })();
-  }, [isApplePaySupported]);
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // AUTO-SELECT NON-PAID ITEMS
-  // ═══════════════════════════════════════════════════════════════════════
-  useEffect(() => {
-    if (visibleOrders.length > 0) {
-      const nonPaidIds = new Set(
-        visibleOrders.filter((i) => !paidItems.has(getItemId(i))).map(getItemId)
-      );
-      setSelectedItems(nonPaidIds);
-    }
-  }, [visibleOrders.length, paidItems.size, payForWholeTable]);
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // CHECK RESERVATION CLOSURE
-  // ═══════════════════════════════════════════════════════════════════════
-  const checkReservationClosure = async () => {
-    if (!allOrders || allOrders.length === 0) {
-      setReservationStatus({ canClose: false, reason: "Aucune commande", unpaidOrders: [], totalDue: 0, totalPaid: 0 });
-      return;
-    }
-
-    const unpaidOrders = allOrders.filter((i) => !paidItems.has(getItemId(i)));
-    const totalDue = unpaidOrders.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
-    const paidOrdersList = allOrders.filter((i) => paidItems.has(getItemId(i)));
-    const totalPaid = paidOrdersList.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
-
-    const canClose = unpaidOrders.length === 0;
-    setReservationStatus({
-      canClose,
-      reason: canClose ? "✅ Tout payé" : `${unpaidOrders.length} article(s) à payer`,
-      unpaidOrders,
-      totalDue,
-      totalPaid,
-    });
-
-    return { canClose, totalDue, totalPaid, unpaidOrders };
-  };
-
-  useEffect(() => {
-    if (allOrders?.length > 0) checkReservationClosure();
-  }, [allOrders, paidItems]);
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // SELECTION FUNCTIONS
-  // ═══════════════════════════════════════════════════════════════════════
-  const toggleItem = (item) => {
-    const id = getItemId(item);
-    const s = new Set(selectedItems);
-    s.has(id) ? s.delete(id) : s.add(id);
-    setSelectedItems(s);
-  };
-
-  const toggleAll = () => {
-    const nonPaid = visibleOrders.filter((i) => !paidItems.has(getItemId(i)));
-    if (nonPaid.length === 0) return;
-    const allIds = new Set(nonPaid.map(getItemId));
-    setSelectedItems(selectedItems.size === allIds.size ? new Set() : allIds);
-  };
-
-  const selectOneThird = () => {
-    const nonPaid = visibleOrders.filter((i) => !paidItems.has(getItemId(i)));
-    if (nonPaid.length === 0) return;
-    const count = Math.ceil(nonPaid.length / 3);
-    setSelectedItems(new Set(nonPaid.slice(0, count).map(getItemId)));
-  };
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // CLOSE RESERVATION
-  // ═══════════════════════════════════════════════════════════════════════
-  const closeReservationOnServer = async () => {
-    if (!reservationId) return { success: false, message: "Aucun ID de réservation" };
-    try {
-      const res = await fetch(`${API_BASE_URL}/reservations/client/${reservationId}/close`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) return { success: false, message: `Erreur: ${res.status}` };
-      return { success: true, message: "Réservation fermée" };
-    } catch (e) {
-      return { success: false, message: e.message };
-    }
-  };
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // RECEIPT
-  // ═══════════════════════════════════════════════════════════════════════
-  const showReceiptTicket = (paymentDetails, selectedOrders) => {
-    const restaurantName = useRestaurantStore.getState().name || "Restaurant";
-    const now = new Date();
-    const initiales = restaurantName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 3);
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
-    const timeStr = `${now.getHours().toString().padStart(2, "0")}${now.getMinutes().toString().padStart(2, "0")}`;
-    const ticketNumber = `${initiales}-${dateStr}-${timeStr}`;
-
-    const totalAmount = selectedOrders.reduce(
-      (s, i) => s + (parseFloat(i.price) || 0) * (parseInt(i.quantity) || 1), 0
-    );
-
-    const paymentMethodLabel = { card: "Carte", apple_pay: "Apple Pay", fake: "Test" }[paymentDetails.method] || "Carte";
-
-    setReceiptData({
-      reservation: {
-        _id: ticketNumber,
-        tableNumber,
-        clientName: userName || "Client",
-        restaurantId: { name: restaurantName },
-      },
-      items: selectedOrders.map(i => ({ name: i.name, quantity: i.quantity || 1, price: i.price || 0 })),
-      amount: totalAmount,
-      paymentMethod: paymentMethodLabel,
-      last4Digits: paymentDetails.last4 || null,
-    });
-    setShowReceipt(true);
-  };
-
-  const handleReceiptClose = () => {
-    setShowReceipt(false);
-    setReceiptData(null);
-    // Retour direct au menu
-    setTimeout(() => {
-      setSelectedItems(new Set());
-      // Force navigation back to menu
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        onBack();
-      }
-    }, 200);
-  };
-
-  const handleFeedbackClose = () => {
-    setShowFeedback(false);
-    setFeedbackData(null);
-    setTimeout(() => {
-      setSelectedItems(new Set());
-      onSuccess?.();
-    }, 300);
-  };
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // PAYMENT
-  // ═══════════════════════════════════════════════════════════════════════
-  const handlePay = async (paymentMethod = "card") => {
-    if (selectedItems.size === 0) {
-      Alert.alert("Erreur", "Sélectionnez au moins un article");
-      return;
-    }
-
-    // Web must use the dedicated Stripe web checkout flow (Payment screen).
-    // Keeping native PaymentSheet on web can bypass UI and create inconsistent behavior.
-    if (Platform.OS === "web") {
-      if (typeof onPayNow === "function") {
-        onPayNow();
-      } else {
-        Alert.alert("Paiement web", "Veuillez ouvrir l'écran de paiement.");
-      }
-      return;
-    }
-
-    if (!initPaymentSheet || !presentPaymentSheet) {
-      Alert.alert("Erreur", "Stripe non initialisé");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const selectedOrders = allOrders.filter((i) => selectedItems.has(getItemId(i)));
-      const amountPaid = selectedOrders.reduce(
-        (s, i) => s + (parseFloat(i.price) || 0) * (parseInt(i.quantity) || 1), 0
-      );
-      const amountCents = Math.round(amountPaid * 100);
-
-      // Get orderId from items or props (commande déjà soumise par MenuScreen)
-      const finalOrderId = selectedOrders[0]?.orderId || effectiveOrderId || allOrders[0]?.orderId;
-      
-      if (!finalOrderId) {
-        Alert.alert("Erreur", "Aucune commande trouvée. Retournez au menu.");
-        setLoading(false);
-        return;
-      }
-
-      // Create PaymentIntent
-      const paymentIntentResult = await stripeService.createPaymentIntent({
-        orderId: finalOrderId,
-        amount: amountCents,
-        currency: "eur",
-        paymentMethodTypes: paymentMethod === "apple_pay" ? ["card", "apple_pay"] : ["card"],
-        tipAmount: 0,
-        paymentMode: "client",
-        reservationId,
-      });
-
-      const newClientSecret = paymentIntentResult.clientSecret;
-      setClientSecret(newClientSecret);
-      setPaymentIntentId(paymentIntentResult.paymentIntentId);
-
-      // Init Payment Sheet
-      const { error: initError } = await initPaymentSheet({
-        paymentIntentClientSecret: newClientSecret,
-        merchantDisplayName: "Foodmood",
-        applePay: applePayAvailable ? {
-          merchantCountryCode: "FR",
-          merchantIdentifier: "merchant.com.foodmood.app",
-          cartItems: [{ label: "Commande", amount: (amountCents / 100).toFixed(2) }],
-        } : undefined,
-        returnURL: "foodmood://payment",
-      });
-
-      if (initError) {
-        Alert.alert("Erreur", initError.message);
-        setLoading(false);
-        return;
-      }
-
-      // Present Payment Sheet
-      const { error: presentError } = await presentPaymentSheet();
-
-      if (presentError) {
-        if (presentError.code === "Canceled") {
-          setLoading(false);
-          return;
-        }
-        Alert.alert("Erreur", presentError.message);
-        setLoading(false);
-        return;
-      }
-
-      // Payment succeeded - update paidItems
-      const newPaidItems = new Set(paidItems);
-      selectedOrders.forEach((i) => newPaidItems.add(getItemId(i)));
-      setPaidItems(newPaidItems);
-
-      // Check if full payment
-      const remainingItems = allOrders.filter((i) => !newPaidItems.has(getItemId(i)));
-      const isFullPayment = remainingItems.length === 0;
-
-      // Close reservation if fully paid
-      let reservationClosed = false;
-      if (isFullPayment && reservationId) {
-        const closureResult = await closeReservationOnServer();
-        if (closureResult.success) {
-          reservationClosed = true;
-          const storageKey = getStorageKey();
-          if (storageKey) await AsyncStorage.removeItem(storageKey);
-          await AsyncStorage.multiRemove([
-            "currentReservationId", "currentTableId", "currentTableNumber", "currentClientName"
-          ]);
-        }
-      }
-
-      // Show receipt
-      showReceiptTicket({ method: paymentMethod, last4: "****" }, selectedOrders);
-
-    } catch (e) {
-      console.error("❌ Erreur paiement:", e);
-      Alert.alert("Erreur", e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ═══════════════════════════════════════════════════════════════════════
   // COMPUTED VALUES
   // ═══════════════════════════════════════════════════════════════════════
-  const items = visibleOrders.filter((i) => !paidItems.has(getItemId(i)));
-  const total = visibleOrders.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
-  const selectedTotal = Array.from(selectedItems).reduce((s, id) => {
-    const item = visibleOrders.find((i) => getItemId(i) === id);
-    return s + (item ? (item.price || 0) * (item.quantity || 1) : 0);
-  }, 0);
+  // 🍔 Fast-food pending: afficher les items locaux tant que pas soumis
+  const items = (pendingOrder && !isSubmitted) ? pendingItems : visibleOrders;
+  const total = items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
 
   const summaryText = items.map((i) => `${i.quantity || 1} x ${i.name}`).join(", ");
   const dateText = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) +
     " à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // RENDER MODALS
-  // ═══════════════════════════════════════════════════════════════════════
-  if (showReceipt && receiptData) {
-    return (
-      <ReceiptModal 
-        visible={true} 
-        reservation={receiptData.reservation}
-        items={receiptData.items}
-        amount={receiptData.amount}
-        paymentMethod={receiptData.paymentMethod}
-        last4Digits={receiptData.last4Digits}
-        onClose={handleReceiptClose} 
-      />
-    );
-  }
-
-  if (showFeedback && feedbackData) {
-    return (
-      <FeedbackScreen
-        restaurantData={feedbackData.restaurantData}
-        customerData={feedbackData.customerData}
-        onClose={handleFeedbackClose}
-        onSubmit={handleFeedbackClose}
-      />
-    );
-  }
 
   // ═══════════════════════════════════════════════════════════════════════
   // RENDER
@@ -559,42 +229,24 @@ export default function OrderScreen({
           </Text>
           <Text style={[styles.summaryDate, isGrillzTheme && styles.grillzSummaryDate]}>{dateText}</Text>
         </View>
-        <Text style={[styles.summaryPrice, isGrillzTheme && styles.grillzSummaryPrice]}>${total.toFixed(2)}</Text>
+        <Text style={[styles.summaryPrice, isGrillzTheme && styles.grillzSummaryPrice]}>{total.toFixed(2)}€</Text>
       </View>
 
-      {/* TOGGLE: Mes articles / Toute la table */}
-      {otherClientsCount > 0 && (
-        <View style={[styles.clientToggleRow, isGrillzTheme && styles.grillzClientToggleRow]}>
-          <TouchableOpacity
-            style={[styles.clientToggleBtn, !payForWholeTable && styles.clientToggleBtnActive, isGrillzTheme && !payForWholeTable && styles.grillzClientToggleBtnActive]}
-            onPress={() => setPayForWholeTable(false)}
-            activeOpacity={0.8}
-          >
-            <MaterialIcons name="person" size={16} color={!payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#6B7280"} />
-            <Text style={[styles.clientToggleText, !payForWholeTable && styles.clientToggleTextActive]}>
-              Mes articles
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.clientToggleBtn, payForWholeTable && styles.clientToggleBtnActive, isGrillzTheme && payForWholeTable && styles.grillzClientToggleBtnActive]}
-            onPress={() =>
-              Alert.alert(
-                "Payer pour toute la table",
-                "Vous allez régler les commandes de tous les clients. Confirmez-vous ?",
-                [
-                  { text: "Annuler", style: "cancel" },
-                  { text: "Confirmer", onPress: () => setPayForWholeTable(true) },
-                ]
-              )
-            }
-            activeOpacity={0.8}
-          >
-            <MaterialIcons name="group" size={16} color={payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#6B7280"} />
-            <Text style={[styles.clientToggleText, payForWholeTable && styles.clientToggleTextActive]}>
-              Toute la table ({otherClientsCount + items.length})
-            </Text>
-          </TouchableOpacity>
+      {/* 🍔 STATUS BANNER (foodtruck / fast-food) */}
+      {(isFoodtruck || isFastFood) && (
+        <View style={[styles.statusBanner, isFoodtruck ? styles.statusBannerFoodtruck : styles.statusBannerFastfood]}>
+          <MaterialIcons
+            name={isFoodtruck ? "delivery-dining" : (canCancel ? "hourglass-top" : "restaurant")}
+            size={20}
+            color={isFoodtruck ? "#FF6B00" : "#4CAF50"}
+          />
+          <Text style={styles.statusBannerText}>
+            {isFoodtruck
+              ? "Commande reçue — Payez pour lancer la préparation"
+              : canCancel
+                ? `Envoi dans ${countdown}s — Vous pouvez encore annuler`
+                : "Préparation en cours — Payez quand vous êtes prêt"}
+          </Text>
         </View>
       )}
 
@@ -603,20 +255,16 @@ export default function OrderScreen({
         {items.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialIcons name="check-circle" size={80} color="#4ECDC4" />
-            <Text style={[styles.emptyText, isGrillzTheme && styles.grillzEmptyText]}>Tout est payé !</Text>
+            <Text style={[styles.emptyText, isGrillzTheme && styles.grillzEmptyText]}>Aucune commande</Text>
           </View>
         ) : (
-          items.map((item) => {
-            const id = getItemId(item);
+          items.map((item, index) => {
             const itemPrice = (item.price || 0) * (item.quantity || 1);
-            const isSelected = selectedItems.has(id);
 
             return (
-              <TouchableOpacity
-                key={id}
-                style={[styles.card, isSelected && styles.cardSelected, isGrillzTheme && styles.grillzCard, isGrillzTheme && isSelected && styles.grillzCardSelected]}
-                onPress={() => toggleItem(item)}
-                activeOpacity={0.95}
+              <View
+                key={item._id || `item-${index}`}
+                style={[styles.card, isGrillzTheme && styles.grillzCard]}
               >
                 <View style={styles.cardTop}>
                   <View style={styles.productImageContainer}>
@@ -624,19 +272,14 @@ export default function OrderScreen({
                   </View>
                   <View style={styles.infoContainer}>
                     <Text style={[styles.productName, isGrillzTheme && styles.grillzProductName]}>{item.name}</Text>
-                    <Text style={[styles.productPrice, isGrillzTheme && styles.grillzProductPrice]}>${itemPrice.toFixed(2)}</Text>
+                    <Text style={[styles.productPrice, isGrillzTheme && styles.grillzProductPrice]}>{itemPrice.toFixed(2)}€</Text>
                   </View>
-                  {/* Checkbox */}
-                  <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                    {isSelected && <MaterialIcons name="check" size={16} color="#FFF" />}
+                  <View style={styles.quantityBadge}>
+                    <Text style={styles.quantityBadgeText}>x{item.quantity || 1}</Text>
                   </View>
                 </View>
                 <ProgressBar step={1} />
-                <View style={styles.timeRow}>
-                  <Text style={[styles.timeLeft, isGrillzTheme && styles.grillzTimeLeft]}>15 minutes restantes</Text>
-                  <Text style={[styles.timeAvg, isGrillzTheme && styles.grillzTimeAvg]}>40 min en moyenne</Text>
-                </View>
-              </TouchableOpacity>
+              </View>
             );
           })
         )}
@@ -645,26 +288,53 @@ export default function OrderScreen({
       {/* FOOTER */}
       {items.length > 0 && (
         <View style={[styles.footer, isGrillzTheme && styles.grillzFooter]}>
+          {/* 🍔 Fast-food pending: bouton "Payer" désactivé tant que pas soumis */}
           <TouchableOpacity 
-            style={[styles.payBtn, loading && styles.payBtnDisabled, isGrillzTheme && styles.grillzPayBtn]} 
-            onPress={() => handlePay("card")} 
+            style={[
+              styles.payBtn,
+              isGrillzTheme && styles.grillzPayBtn,
+              canCancel && styles.payBtnDisabled,
+            ]} 
+            onPress={onPayNow} 
             activeOpacity={0.9}
-            disabled={loading}
+            disabled={canCancel}
           >
-            <Text style={styles.payBtnText}>
-              {loading ? "Paiement..." : `Payer maintenant • $${selectedTotal.toFixed(2)}`}
+            <Text style={[styles.payBtnText, canCancel && styles.payBtnTextDisabled]}>
+              {canCancel
+                ? `Envoi en cours (${countdown}s)…`
+                : `Payer maintenant • ${total.toFixed(2)}€`}
             </Text>
           </TouchableOpacity>
 
           <View style={styles.btnRow}>
-            {!isGrillzTheme && (
-              <TouchableOpacity style={styles.splitBtn} onPress={selectOneThird} activeOpacity={0.9}>
-                <Text style={styles.splitBtnText}>Split with others</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={styles.backButton} onPress={onBack} activeOpacity={0.9}>
+              <Text style={styles.backButtonText}>Retour au menu</Text>
+            </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.cancelBtn, isGrillzTheme && styles.grillzCancelBtn]} onPress={onCancelOrder} activeOpacity={0.9}>
-              <Text style={[styles.cancelBtnText, isGrillzTheme && styles.grillzCancelBtnText]}>Annuler la commande</Text>
+            {/* 🍔 Fast-food: cancel cliquable pendant 10s uniquement */}
+            <TouchableOpacity
+              style={[
+                styles.cancelBtn,
+                isGrillzTheme && styles.grillzCancelBtn,
+                canCancel && styles.cancelBtnActive,
+                (pendingOrder && !canCancel) && styles.cancelBtnDisabled,
+              ]}
+              onPress={canCancel ? onCancelOrder : (pendingOrder ? undefined : onCancelOrder)}
+              activeOpacity={canCancel ? 0.7 : (pendingOrder ? 1 : 0.9)}
+              disabled={pendingOrder && !canCancel}
+            >
+              <Text style={[
+                styles.cancelBtnText,
+                isGrillzTheme && styles.grillzCancelBtnText,
+                canCancel && styles.cancelBtnTextActive,
+                (pendingOrder && !canCancel) && styles.cancelBtnTextDisabled,
+              ]}>
+                {canCancel
+                  ? `Annuler (${countdown}s)`
+                  : pendingOrder
+                    ? "Commande envoyée ✓"
+                    : "Annuler la commande"}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -701,6 +371,34 @@ const styles = StyleSheet.create({
   summaryDate: { fontSize: 11, color: "#9CA3AF", fontStyle: "italic", marginTop: 4 },
   summaryPrice: { fontSize: 28, fontWeight: "700", color: "#EA580C" },
 
+  statusBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginBottom: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    gap: 10,
+  },
+  statusBannerFoodtruck: {
+    backgroundColor: "rgba(255, 107, 0, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 107, 0, 0.2)",
+  },
+  statusBannerFastfood: {
+    backgroundColor: "rgba(76, 175, 80, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(76, 175, 80, 0.2)",
+  },
+  statusBannerText: {
+    fontSize: 13,
+    color: "#374151",
+    flex: 1,
+    lineHeight: 18,
+    fontWeight: "500",
+  },
+
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 220 },
 
@@ -718,10 +416,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 2,
   },
-  cardSelected: {
-    borderWidth: 2,
-    borderColor: "#EA580C",
-  },
 
   cardTop: { flexDirection: "row", alignItems: "center" },
   productImageContainer: {
@@ -738,28 +432,13 @@ const styles = StyleSheet.create({
   productName: { fontSize: 16, fontWeight: "700", color: "#1F2937", marginBottom: 4 },
   productPrice: { fontSize: 16, fontWeight: "700", color: "#EA580C" },
 
-  checkbox: {
-    width: 24,
-    height: 24,
+  quantityBadge: {
+    backgroundColor: "#F3F4F6",
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#D1D5DB",
-    alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  checkboxSelected: {
-    backgroundColor: "#EA580C",
-    borderColor: "#EA580C",
-  },
-
-  timeRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 8,
-  },
-  timeLeft: { fontSize: 13, fontWeight: "700", color: "#EA580C" },
-  timeAvg: { fontSize: 11, color: "#9CA3AF" },
+  quantityBadgeText: { fontSize: 14, fontWeight: "600", color: "#6B7280" },
 
   footer: {
     position: "absolute",
@@ -779,22 +458,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  payBtnDisabled: { opacity: 0.6 },
   payBtnText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
 
   btnRow: { flexDirection: "row", gap: 12 },
 
-  splitBtn: {
+  backButton: {
     flex: 1,
     backgroundColor: "#1F2937",
     paddingVertical: 14,
     borderRadius: 30,
     alignItems: "center",
   },
-  splitBtnText: { fontSize: 13, fontWeight: "600", color: "#FFFFFF" },
+  backButtonText: { fontSize: 13, fontWeight: "600", color: "#FFFFFF" },
 
   cancelBtn: {
-      flex: 1,
+    flex: 1,
     backgroundColor: "transparent",
     paddingVertical: 14,
     borderRadius: 30,
@@ -804,64 +482,44 @@ const styles = StyleSheet.create({
   },
   cancelBtnText: { fontSize: 13, fontWeight: "500", color: "#9CA3AF" },
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // CLIENT TOGGLE
-  // ═══════════════════════════════════════════════════════════════════════
-  clientToggleRow: {
-    flexDirection: "row",
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 12,
-    backgroundColor: "#F3F4F6",
-    padding: 4,
-    gap: 4,
+  // 🍔 Fast-food pending styles
+  payBtnDisabled: {
+    backgroundColor: "#D1D5DB",
   },
-  clientToggleBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    gap: 6,
+  payBtnTextDisabled: {
+    color: "#9CA3AF",
   },
-  clientToggleBtnActive: {
-    backgroundColor: "#F87171",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  cancelBtnActive: {
+    backgroundColor: "#FEE2E2",
+    borderColor: "#F87171",
+    borderWidth: 1.5,
   },
-  clientToggleText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#6B7280",
-  },
-  clientToggleTextActive: {
-    color: "#fff",
+  cancelBtnTextActive: {
+    color: "#DC2626",
     fontWeight: "700",
   },
+  cancelBtnDisabled: {
+    backgroundColor: "#F3F4F6",
+    borderColor: "#E5E7EB",
+  },
+  cancelBtnTextDisabled: {
+    color: "#D1D5DB",
+  },
 
+  // Grillz theme
   grillzContainer: { backgroundColor: "#0D0D0D" },
   grillzHeaderTitle: { color: "#F8FAFC" },
   grillzSummaryText: { color: "#F8FAFC" },
   grillzSummaryDate: { color: "#A3A3A3" },
   grillzSummaryPrice: { color: "#F97316" },
-  grillzClientToggleRow: { backgroundColor: "#1A1A1A" },
-  grillzClientToggleBtnActive: { backgroundColor: "#EA580C" },
   grillzEmptyText: { color: "#F8FAFC" },
   grillzCard: {
     backgroundColor: "#1A1A1A",
     borderWidth: 1,
     borderColor: "#2A2A2A",
   },
-  grillzCardSelected: { borderColor: "#F97316" },
   grillzProductName: { color: "#F8FAFC" },
   grillzProductPrice: { color: "#F97316" },
-  grillzTimeLeft: { color: "#F97316" },
-  grillzTimeAvg: { color: "#A3A3A3" },
   grillzFooter: { backgroundColor: "#0D0D0D" },
   grillzPayBtn: { backgroundColor: "#EA580C" },
   grillzCancelBtn: { borderColor: "#3F3F46" },

@@ -26,7 +26,9 @@ async function canUseSecureStore() {
 
 async function getSecureItem(key) {
 	if (await canUseSecureStore()) {
-		return SecureStore.getItemAsync(key);
+		return SecureStore.getItemAsync(key, {
+			keychainService: "orderit-secure-session",
+		});
 	}
 	return AsyncStorage.getItem(key);
 }

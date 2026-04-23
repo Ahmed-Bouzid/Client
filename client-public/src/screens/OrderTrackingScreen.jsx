@@ -1,3 +1,19 @@
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * OrderTrackingScreen.jsx — ÉTAPE 5 : SUIVI COMMANDE TEMPS RÉEL
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * Parcours client :
+ *   1. Affiche le statut de la commande en 3 étapes (Reçue → Préparation → Prête)
+ *   2. Polling périodique (6-15s) + écoute WebSocket pour mise à jour temps réel
+ *   3. Bannière de statut dynamique avec icône et message
+ *   4. Barre de progression animée entre les étapes
+ *   5. Bouton retour au menu
+ *
+ * Dépendances :
+ *   - useOrderTracking hook (polling + WebSocket combinés)
+ *   - GET /orders/:orderId pour récupérer le statut
+ */
 import React, { useEffect, useMemo, useRef } from "react";
 import {
 	ActivityIndicator,

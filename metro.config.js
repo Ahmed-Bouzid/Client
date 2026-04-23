@@ -22,25 +22,6 @@ config.resolver = {
 	],
 	// Sur web : remplacer les modules natifs incompatibles par des stubs vides
 	resolveRequest: (context, moduleName, platform) => {
-		// DEBUG: Log shared-api resolution attempts
-		if (moduleName.startsWith("shared-api/")) {
-			const fs = require("fs");
-			const targetPath = path.join(sharedApiPath, moduleName.replace("shared-api/", ""));
-			const targetPathJs = targetPath.endsWith(".js") ? targetPath : targetPath + ".js";
-			const fileExists = fs.existsSync(targetPathJs) || fs.existsSync(targetPath);
-			console.log(`[METRO-DEBUG] Resolving: "${moduleName}" | platform: ${platform}`);
-			console.log(`[METRO-DEBUG]   Target path: ${targetPathJs}`);
-			console.log(`[METRO-DEBUG]   File exists on disk: ${fileExists}`);
-			console.log(`[METRO-DEBUG]   extraNodeModules["shared-api"]: ${context.extraNodeModules?.["shared-api"]}`);
-			console.log(`[METRO-DEBUG]   Origin: ${context.originModulePath}`);
-			try {
-				const lookupResult = context.fileSystemLookup(targetPathJs);
-				console.log(`[METRO-DEBUG]   fileSystemLookup result: ${JSON.stringify(lookupResult)}`);
-			} catch (e) {
-				console.log(`[METRO-DEBUG]   fileSystemLookup error: ${e.message}`);
-			}
-		}
-
 		if (platform === "web") {
 			const webStubs = {
 				"@stripe/stripe-react-native": path.resolve(__dirname, "stubs/stripe-react-native.js"),

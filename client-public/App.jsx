@@ -45,6 +45,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getUrlParams } from "./src/utils/getUrlParams";
 import { Platform, View, StyleSheet, AppState } from "react-native";
 import { ThemeProvider } from "./src/theme";
+import { clientAuthService } from "shared-api/services/clientAuthService";
 import { secureSessionStore } from "shared-api/utils/secureSessionStore";
 
 export default function App() {
@@ -79,6 +80,7 @@ function AppContent() {
 
 	// 🍔 Fast-food: commande en attente (pas encore en BDD)
 	const [fastFoodPending, setFastFoodPending] = useState(false);
+	const autoSubmitPromiseRef = useRef(null);
 
 	// Restaurant category
 	const restaurantCategory = useRestaurantStore((state) => state.category);
@@ -115,6 +117,7 @@ function AppContent() {
 	const { showAlert, AlertComponent } = useCustomAlert();
 
 	const forceSecureLogout = async () => {
+		await clientAuthService.revokeCurrentToken();
 		await secureSessionStore.clearSensitiveSession();
 		await AsyncStorage.multiRemove([
 			"currentReservationId",
@@ -308,6 +311,15 @@ function AppContent() {
 		clientIdParam,
 	) => {
 		try {
+			if (!tableIdParam || !restaurantId) {
+				showAlert(
+					"Erreur",
+					"Contexte table/restaurant manquant. Re-scanner le QR code.",
+					[{ text: "OK" }],
+				);
+				return;
+			}
+
 			// ⭐ Stocker toutes les infos
 			setUserName(clientName);
 			setReservationId(reservationId);
@@ -317,7 +329,7 @@ function AppContent() {
 			// ⭐ Mettre à jour le store avec les infos (sans rappeler /client/token)
 			// Le token a déjà été obtenu dans WelcomeScreen
 			const { setTable } = useClientTableStore.getState();
-			await setTable(tableIdParam || DEFAULT_TABLE_ID, restaurantId || DEFAULT_RESTAURANT_ID);
+			await setTable(tableIdParam, restaurantId);
 			useClientTableStore.setState({ userName: clientName });
 
 			resetOrder();
@@ -340,7 +352,7 @@ function AppContent() {
 
 	// ── PARCOURS : soumet la commande au serveur (crée l'order en BDD) ──
 	// Appelé après validation du panier (MenuScreen) ou auto-submit fast-food (10s)
-	const submitOrder = async ({ redirectToTracking = true } = {}) => {
+	const submitOrder = async ({ redirectToTracking = true, showSuccessAlert = true } = {}) => {
 		if (currentOrder.length === 0) {
 			showAlert(
 				"Panier vide",
@@ -396,22 +408,24 @@ function AppContent() {
 				navigateToTracking(createdOrderId);
 			}
 
-			showAlert(
-				"✅ Commande envoyée",
-				redirectToTracking && createdOrderId
-					? "Votre commande est envoyée. Suivi en temps reel active."
-					: "Votre commande a été envoyée avec succès !",
-				[
-					{
-						text: "OK",
-						onPress: () => {
-							if (!redirectToTracking) {
-								setStep("menu");
-							}
+			if (showSuccessAlert) {
+				showAlert(
+					"✅ Commande envoyée",
+					redirectToTracking && createdOrderId
+						? "Votre commande est envoyée. Suivi en temps reel active."
+						: "Votre commande a été envoyée avec succès !",
+					[
+						{
+							text: "OK",
+							onPress: () => {
+								if (!redirectToTracking) {
+									setStep("menu");
+								}
+							},
 						},
-					},
-				],
-			);
+					],
+				);
+			}
 
 			return createdOrder;
 		} catch (error) {
@@ -474,10 +488,17 @@ function AppContent() {
 		}
 
 		try {
+			if (autoSubmitPromiseRef.current) {
+				await autoSubmitPromiseRef.current;
+			}
+
 			// If there is an in-progress cart, submit it first. If already submitted,
 			// skip submission and only navigate to payment with fetched orders.
 			if (currentOrder.length > 0) {
-				const createdOrder = await submitOrder({ redirectToTracking: false });
+				const createdOrder = await submitOrder({
+					redirectToTracking: false,
+					showSuccessAlert: false,
+				});
 				if (!createdOrder) return;
 			}
 			
@@ -485,6 +506,8 @@ function AppContent() {
 			await useOrderStore
 				.getState()
 				.fetchOrdersByReservation(reservationId, clientId);
+
+			setFastFoodPending(false);
 
 			// Passer à l'écran de paiement
 			setStep("payment");
@@ -523,11 +546,12 @@ function AppContent() {
 	// Reset AsyncStorage + stores + states locaux → retour écran d'accueil
 	const handlePaymentSuccess = async () => {
 		// Le paiement a déjà été effectué dans Payment.js
-		// Nettoyer complètement la session
+		// Nettoyer uniquement la session client; conserver le contexte table/restaurant
 		try {
+			await clientAuthService.revokeCurrentToken();
 			await secureSessionStore.clearSensitiveSession();
 
-			// Nettoyer AsyncStorage (garder clientId qui est un UUID permanent)
+			// Nettoyer AsyncStorage de session (garder tableId/restaurantId pour éviter le fallback DEFAULT)
 			await AsyncStorage.multiRemove([
 				"currentReservationId",
 				"currentTableId",
@@ -535,22 +559,19 @@ function AppContent() {
 				"currentClientName",
 				"currentClientPhone",
 				"pseudo",
-				"tableId",
-				"restaurantId",
 				"clientPhone",
 				"clientToken",
 			]);
 
-			// Reset les stores
-			await useClientTableStore.getState().reset?.();
+			// Reset les stores métier (sans reset table store)
 			resetOrder();
 			await useOrderStore.getState().clearCart();
 			useAllergyStore.getState().clearAllergies?.();
 			useRestrictionStore.getState().clearRestrictions?.();
+			useClientTableStore.getState().setUserName?.(null);
 
 			// Reset les states locaux
 			setReservationId(null);
-			setTableNumber(null);
 			setUserName("");
 			setClientId(null);
 
@@ -612,10 +633,10 @@ function AppContent() {
 						{step === "join" && (
 							<WelcomeScreen
 								key={forceRefresh}
-								tableId={tableId || DEFAULT_TABLE_ID}
+								tableId={tableId}
 								tableNumber={tableNumber}
-								onJoin={({ reservationId, clientId, userName }) => {
-									handleJoinTable(userName, reservationId, tableId || DEFAULT_TABLE_ID, tableNumber, clientId);
+								onJoin={({ reservationId, clientId, userName, tableNumber: joinedTableNumber }) => {
+									handleJoinTable(userName, reservationId, tableId, joinedTableNumber || tableNumber, clientId);
 								}}
 								onLookupOrder={(orderData) => {
 									setLookupOrderData(orderData);
@@ -668,16 +689,31 @@ function AppContent() {
 								onReservationClosed={() => setStep("join")}
 								onAutoSubmit={async () => {
 									// 🍔 Fast-food: envoi automatique après 10s
-									try {
-										const created = await submitOrder({ redirectToTracking: false });
-										if (created) {
-											setFastFoodPending(false);
-											// Recharger les commandes depuis le serveur
-											await useOrderStore.getState().fetchOrdersByReservation(reservationId, clientId);
-										}
-									} catch (e) {
-										console.error("❌ Erreur auto-submit fast-food:", e);
+									if (autoSubmitPromiseRef.current) {
+										return;
 									}
+
+									autoSubmitPromiseRef.current = (async () => {
+										try {
+											const created = await submitOrder({
+												redirectToTracking: false,
+												showSuccessAlert: false,
+											});
+											if (created) {
+												setFastFoodPending(false);
+												// Recharger les commandes depuis le serveur
+												await useOrderStore
+													.getState()
+													.fetchOrdersByReservation(reservationId, clientId);
+											}
+										} catch (e) {
+											console.error("❌ Erreur auto-submit fast-food:", e);
+										} finally {
+											autoSubmitPromiseRef.current = null;
+										}
+									})();
+
+									await autoSubmitPromiseRef.current;
 								}}
 								onCancelOrder={() => {
 									if (fastFoodPending) {
@@ -712,6 +748,7 @@ function AppContent() {
 								allOrders={allOrders}
 								orderId={activeOrderId}
 								reservationId={reservationId}
+								restaurantId={restaurantId || DEFAULT_RESTAURANT_ID}
 								tableId={tableId || DEFAULT_TABLE_ID}
 								tableNumber={tableNumber}
 								clientId={clientId}
