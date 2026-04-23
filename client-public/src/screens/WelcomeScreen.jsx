@@ -1181,8 +1181,7 @@ export default function WelcomeScreen({
   const CUCINA_LOGO = require("../../assets/images/restaurants/cucina-6970ef6594abf8bacd9d804d/logo.png");
   
   if (isCucina) {
-    return (
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    const cucinaContent = (
       <View style={{ 
         position: 'absolute',
         top: 0,
@@ -1198,7 +1197,7 @@ export default function WelcomeScreen({
           resizeMode="cover"
         >
           {/* Overlay sombre */}
-          <View style={{ 
+          <View pointerEvents="none" style={{ 
             ...StyleSheet.absoluteFillObject, 
             backgroundColor: 'rgba(0, 0, 0, 0.5)' 
           }} />
@@ -1253,6 +1252,7 @@ export default function WelcomeScreen({
           {/* 🍕 4 Images de nourriture dans les coins */}
           {/* Image 1 - Haut gauche */}
           <Image 
+            pointerEvents="none"
             source={require("../../assets/images/restaurants/cucina-6970ef6594abf8bacd9d804d/welcome/panini2.png")}
             style={{
               position: 'absolute',
@@ -1266,6 +1266,7 @@ export default function WelcomeScreen({
           />
           {/* Image 2 - Haut droit */}
           <Image 
+            pointerEvents="none"
             source={require("../../assets/images/restaurants/cucina-6970ef6594abf8bacd9d804d/welcome/panini3.png")}
             style={{
               position: 'absolute',
@@ -1279,6 +1280,7 @@ export default function WelcomeScreen({
           />
           {/* Image 3 - Bas gauche */}
           <Image 
+            pointerEvents="none"
             source={require("../../assets/images/restaurants/cucina-6970ef6594abf8bacd9d804d/welcome/panini4.png")}
             style={{
               position: 'absolute',
@@ -1292,6 +1294,7 @@ export default function WelcomeScreen({
           />
           {/* Image 4 - Bas droit */}
           <Image 
+            pointerEvents="none"
             source={require("../../assets/images/restaurants/cucina-6970ef6594abf8bacd9d804d/welcome/panini5.png")}
             style={{
               position: 'absolute',
@@ -1417,6 +1420,15 @@ export default function WelcomeScreen({
           </Animated.View>
         </ImageBackground>
       </View>
+    );
+
+    if (Platform.OS === "web") {
+      return cucinaContent;
+    }
+
+    return (
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        {cucinaContent}
       </TouchableWithoutFeedback>
     );
   }
