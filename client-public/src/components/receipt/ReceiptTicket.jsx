@@ -10,6 +10,7 @@ export const ReceiptTicket = React.forwardRef(
 	(
 		{
 			ticketId,
+			orderCode,
 			amount,
 			date,
 			items = [],
@@ -113,6 +114,17 @@ export const ReceiptTicket = React.forwardRef(
 							</Text>
 						</View>
 					</View>
+
+					{/* CMD code helper */}
+					{orderCode && (
+						<View style={styles.lookupBox}>
+							<Text style={styles.lookupTitle}>Code commande: {orderCode}</Text>
+							<Text style={styles.lookupText}>
+								Tapez ce code sur la page d'accueil pour retrouver votre commande,
+								votre paiement et votre ticket.
+							</Text>
+						</View>
+					)}
 
 					{/* Date */}
 					<View style={styles.section}>
@@ -396,6 +408,27 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		marginTop: 10,
 		gap: 5,
+	lookupBox: {
+		marginTop: 12,
+		marginBottom: 4,
+		backgroundColor: "rgba(255,255,255,0.06)",
+		borderRadius: 10,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+		borderWidth: 1,
+		borderColor: "rgba(255,255,255,0.1)",
+	},
+	lookupTitle: {
+		fontSize: 13,
+		fontWeight: "700",
+		color: "#FFFFFF",
+		marginBottom: 4,
+	},
+	lookupText: {
+		fontSize: 12,
+		lineHeight: 16,
+		color: "#B8B8B8",
+	},
 	},
 	footerText: {
 		fontSize: 12,

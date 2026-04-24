@@ -108,12 +108,14 @@ export const ReceiptModal = ({
 	if (!visible) return null;
 
 	const ticketId = reservation?._id?.slice(-10).toUpperCase() || "XXXXXXXXXXXX";
+	const orderCode = reservation?.orderCode || null;
+	const effectiveTicketId = orderCode || ticketId;
 	const tableNumber = reservation?.tableId?.number || reservation?.tableNumber;
 	const restaurantName =
 		reservation?.restaurantId?.name || "SunnyGo Restaurant";
 
 	const handleExport = async () => {
-		const id = ticketId || `${Date.now()}`;
+		const id = effectiveTicketId || `${Date.now()}`;
 		await exportReceipt(receiptRef, id);
 	};
 
@@ -179,7 +181,8 @@ export const ReceiptModal = ({
 						{/* Receipt Ticket */}
 						<ReceiptTicket
 							ref={receiptRef}
-							ticketId={ticketId}
+							ticketId={effectiveTicketId}
+							orderCode={orderCode}
 							amount={amount || 0}
 							date={new Date()}
 							items={items || []}

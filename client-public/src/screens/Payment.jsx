@@ -258,7 +258,12 @@ export default function Payment({
 	const visibleOrders = useMemo(
 		() => payForWholeTable
 			? allOrders
-			: allOrders.filter((item) => !item.clientId || item.clientId === clientId),
+			: allOrders.filter((item) => {
+				if (!clientId) {
+					return true;
+				}
+				return item.clientId === clientId;
+			}),
 		[allOrders, payForWholeTable, clientId]
 	);
 
@@ -606,6 +611,11 @@ export default function Payment({
 	const showReceiptTicket = (paymentDetails, selectedOrders) => {
 		// Récupérer le nom du restaurant depuis le store
 		const restaurantName = useRestaurantStore.getState().name || "Restaurant";
+		const sourceOrderId =
+			selectedOrders[0]?.orderId || orderId || allOrders[0]?.orderId || null;
+		const cmdCode = sourceOrderId
+			? `#${String(sourceOrderId).slice(-4).toUpperCase()}`
+			: null;
 
 		// Générer le numéro de ticket : INITIALES-YYYYMMDD-HHMM
 		const now = new Date();
@@ -638,6 +648,7 @@ export default function Payment({
 		const receipt = {
 			reservation: {
 				_id: ticketNumber,
+				orderCode: cmdCode,
 				tableNumber: tableNumber,
 				clientName: userName || "Client",
 				restaurantId: {
@@ -856,6 +867,18 @@ export default function Payment({
 				selectedItems.has(getItemId(item)),
 			);
 
+			const uniqueOrderIds = [
+				...new Set(selectedOrders.map((item) => item.orderId).filter(Boolean)),
+			];
+			if (uniqueOrderIds.length !== 1) {
+				Alert.alert(
+					"Paiement non supporté",
+					"Sélectionnez des articles d'une seule commande à la fois.",
+				);
+				setLoading(false);
+				return;
+			}
+
 			// 2. Calculer le montant payé
 			const amountPaid = selectedOrders.reduce(
 				(sum, item) =>
@@ -875,8 +898,7 @@ export default function Payment({
 				paymentMethod === "apple_pay" ? ["card", "apple_pay"] : ["card"];
 
 			// 2.5. Récupérer orderId depuis le premier article sélectionné
-			const firstOrderId =
-				selectedOrders[0]?.orderId || orderId || allOrders[0]?.orderId;
+			const firstOrderId = uniqueOrderIds[0] || orderId || allOrders[0]?.orderId;
 			if (!firstOrderId) {
 				console.warn("[PaymentClient] firstOrderId introuvable, abandon du paiement", {
 					selectedOrdersCount: selectedOrders.length,

@@ -314,6 +314,8 @@ export const useOrderStore = create((set, get) => ({
 						const enrichedItem = {
 							...item,
 							orderId: order._id, // Garder l'ID de la commande parente
+							clientId: order.clientId || null,
+							clientName: order.clientName || null,
 							orderStatus: order.orderStatus || order.status,
 							orderPaid: order.paid,
 							totalAmount: order.totalAmount,

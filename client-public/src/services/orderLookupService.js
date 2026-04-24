@@ -1,70 +1,73 @@
 /**
  * orderLookupService.js — Service de recherche de commande par numéro
  *
- * Recherche une commande via son numéro unique (#XXX-XXX).
- * Actuellement en mode mock. Prêt pour intégration backend future.
- *
- * Intégration backend future :
- *   GET /orders/lookup/:orderNumber
- *   → Retourne les détails de la commande ou 404
- *   → Le backend doit valider le format et chercher par orderNumber (pas par _id)
+ * Recherche une commande via son code CMD (ex: #FA24).
  */
 
 import { API_CONFIG } from "shared-api/config/apiConfig.js";
 
-// ── MOCK DATA (à retirer quand le backend est prêt) ──
-const MOCK_ORDERS = {
-  "#123-456": {
-    orderNumber: "#123-456",
-    date: "2026-04-18T14:30:00.000Z",
-    status: "delivered",
-    paymentMethod: "Carte bancaire",
-    items: [
-      { name: "Chicken Burger", quantity: 2, price: 12.90 },
-      { name: "Frites maison", quantity: 1, price: 4.50 },
-      { name: "Coca-Cola", quantity: 2, price: 3.00 },
-    ],
-    total: 36.30,
-  },
-  "#001-789": {
-    orderNumber: "#001-789",
-    date: "2026-04-15T19:15:00.000Z",
-    status: "in_progress",
-    paymentMethod: "Apple Pay",
-    items: [
-      { name: "Wings BBQ x12", quantity: 1, price: 14.90 },
-      { name: "Onion Rings", quantity: 1, price: 5.50 },
-    ],
-    total: 20.40,
-  },
-};
+function normalizeCmdCode(value) {
+	const cleaned = String(value || "")
+		.toUpperCase()
+		.replace(/[^A-Z0-9]/g, "")
+		.slice(0, 4);
+
+	if (!cleaned) return "";
+	return `#${cleaned}`;
+}
 
 /**
- * Recherche une commande par son numéro (#XXX-XXX)
- * @param {string} orderNumber - Format #XXX-XXX
+ * Recherche une commande par code CMD (#FA24)
+ * @param {string} orderNumber - Format #XXXX
+ * @param {{restaurantId?: string}} options
  * @returns {Promise<object|null>} Détails de la commande ou null
  */
-export async function lookupOrderByNumber(orderNumber) {
-  // ── MODE MOCK ──
-  // Simuler un délai réseau
-  await new Promise((resolve) => setTimeout(resolve, 800));
+export async function lookupOrderByNumber(orderNumber, options = {}) {
+	const cmdCode = normalizeCmdCode(orderNumber);
+	const restaurantId = options.restaurantId || null;
 
-  const order = MOCK_ORDERS[orderNumber] || null;
-  return order;
+	if (!cmdCode || !restaurantId) {
+		return null;
+	}
 
-  // ── MODE API (décommenter quand le backend est prêt) ──
-  // const encoded = encodeURIComponent(orderNumber);
-  // const response = await fetch(
-  //   `${API_CONFIG.BASE_URL}/orders/lookup/${encoded}`,
-  //   {
-  //     method: "GET",
-  //     headers: { "Content-Type": "application/json" },
-  //   }
-  // );
-  //
-  // if (response.status === 404) return null;
-  // if (!response.ok) throw new Error(`Erreur serveur: ${response.status}`);
-  //
-  // const data = await response.json();
-  // return data.order || null;
+	const encodedCode = encodeURIComponent(cmdCode);
+	const url = `${API_CONFIG.BASE_URL}/client-orders/lookup/${encodedCode}?restaurantId=${encodeURIComponent(
+		restaurantId,
+	)}`;
+
+	const response = await fetch(url, {
+		method: "GET",
+		headers: { "Content-Type": "application/json" },
+	});
+
+	if (response.status === 404) return null;
+	if (!response.ok) {
+		throw new Error(`Erreur serveur: ${response.status}`);
+	}
+
+	const data = await response.json();
+	if (!data?.order) return null;
+
+	return {
+		orderId: data.order.id,
+		orderNumber: data.order.cmdCode,
+		restaurantId: data.order.restaurantId || null,
+		date: data.order.createdAt,
+		status: data.order.status,
+		trackingStatus: data.order.trackingStatus,
+		paymentStatus: data.order.paymentStatus,
+		paymentMethod: data.order.paymentMethod,
+		items: data.order.items || [],
+		total: Number(data.order.totalAmount) || 0,
+		paidAmount: Number(data.order.paidAmount) || 0,
+		paid: !!data.order.paid,
+		tableNumber: data.order.tableNumber || null,
+		tableId: data.order.tableId || null,
+		clientId: data.order.clientId || null,
+		clientName: data.order.clientName || null,
+		reservationId: data.order.reservationId || null,
+		payment: data.payment || null,
+		timeline: Array.isArray(data.timeline) ? data.timeline : [],
+		serverTime: data.serverTime,
+	};
 }

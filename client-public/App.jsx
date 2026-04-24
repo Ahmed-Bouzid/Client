@@ -145,6 +145,61 @@ function AppContent() {
 		setStep("join");
 	};
 
+	const handlePayRecoveredOrderByCard = async () => {
+		if (!lookupOrderData) {
+			showAlert("Erreur", "Aucune commande récupérée.", [{ text: "OK" }]);
+			return;
+		}
+
+		try {
+			const recoveredRestaurantId =
+				lookupOrderData.restaurantId || restaurantId || DEFAULT_RESTAURANT_ID;
+			const recoveredTableId = lookupOrderData.tableId || tableId || null;
+			const recoveredClientName = lookupOrderData.clientName || "Client";
+			const recoveredReservationId = lookupOrderData.reservationId || null;
+			const recoveredClientId = lookupOrderData.clientId || null;
+
+			if (!recoveredReservationId) {
+				showAlert("Erreur", "Réservation introuvable pour cette commande.", [
+					{ text: "OK" },
+				]);
+				return;
+			}
+
+			await clientAuthService.getClientToken(
+				recoveredClientName,
+				recoveredTableId,
+				recoveredRestaurantId,
+				recoveredClientId,
+			);
+
+			if (recoveredTableId) {
+				await initTable(recoveredTableId, recoveredRestaurantId);
+			}
+
+			setUserName(recoveredClientName);
+			setClientId(recoveredClientId);
+			setReservationId(recoveredReservationId);
+			if (lookupOrderData.tableNumber) {
+				setTableNumber(lookupOrderData.tableNumber);
+			}
+
+			await useOrderStore
+				.getState()
+				.fetchOrdersByReservation(recoveredReservationId, recoveredClientId);
+
+			setLookupOrderData(null);
+			setStep("payment");
+		} catch (error) {
+			console.error("❌ Erreur ouverture paiement depuis lookup:", error);
+			showAlert(
+				"Erreur",
+				error.message || "Impossible d'ouvrir le paiement par carte.",
+				[{ text: "OK" }],
+			);
+		}
+	};
+
 	// 🔐 Initialisation admin mode au démarrage
 	useEffect(() => {
 		const checkAdminMode = async () => {
@@ -777,6 +832,7 @@ function AppContent() {
 						{step === "order-details" && (
 							<OrderDetailsScreen
 								orderData={lookupOrderData}
+								onPayByCard={handlePayRecoveredOrderByCard}
 								onBack={() => {
 									setLookupOrderData(null);
 									setStep("join");

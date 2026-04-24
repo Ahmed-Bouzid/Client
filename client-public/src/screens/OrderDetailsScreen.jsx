@@ -14,7 +14,7 @@
  *   - onBack: () => void — retour à l'accueil
  */
 
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -32,13 +32,37 @@ import { LinearGradient } from "expo-linear-gradient";
 const STATUS_LABELS = {
   pending: { label: "En attente", color: "#FF9800", icon: "time-outline" },
   in_progress: { label: "En préparation", color: "#2196F3", icon: "flame-outline" },
+  confirmed: { label: "Confirmée", color: "#22C55E", icon: "checkmark-outline" },
   ready: { label: "Prête", color: "#4CAF50", icon: "checkmark-circle-outline" },
+  completed: { label: "Terminée", color: "#22C55E", icon: "checkmark-done-outline" },
   delivered: { label: "Livrée", color: "#4CAF50", icon: "checkmark-done-outline" },
   cancelled: { label: "Annulée", color: "#F44336", icon: "close-circle-outline" },
 };
 
+const PAYMENT_STATUS_LABELS = {
+  unpaid: { label: "Non payé", color: "#FF9800", icon: "alert-circle-outline" },
+  partially_paid: { label: "Partiellement payé", color: "#F59E0B", icon: "wallet-outline" },
+  paid: { label: "Payé", color: "#22C55E", icon: "checkmark-circle-outline" },
+  refunded: { label: "Remboursé", color: "#60A5FA", icon: "return-down-back-outline" },
+  pending: { label: "Paiement en attente", color: "#F59E0B", icon: "time-outline" },
+  processing: { label: "Paiement en cours", color: "#60A5FA", icon: "sync-outline" },
+  succeeded: { label: "Paiement confirmé", color: "#22C55E", icon: "checkmark-circle-outline" },
+  failed: { label: "Paiement échoué", color: "#F44336", icon: "close-circle-outline" },
+  partially_refunded: { label: "Remboursement partiel", color: "#93C5FD", icon: "return-down-back-outline" },
+};
+
 function getStatusInfo(status) {
   return STATUS_LABELS[status] || { label: status, color: "#999", icon: "help-outline" };
+}
+
+function getPaymentStatusInfo(status) {
+  return (
+    PAYMENT_STATUS_LABELS[status] || {
+      label: status || "Inconnu",
+      color: "#999",
+      icon: "help-outline",
+    }
+  );
 }
 
 function formatDate(dateStr) {
@@ -62,9 +86,7 @@ function formatPrice(price) {
 
 // ── Component ──
 
-export default function OrderDetailsScreen({ orderData, onBack }) {
-  const [refundRequested, setRefundRequested] = useState(false);
-
+export default function OrderDetailsScreen({ orderData, onBack, onPayByCard }) {
   if (!orderData) {
     return (
       <View style={styles.container}>
@@ -85,6 +107,27 @@ export default function OrderDetailsScreen({ orderData, onBack }) {
   }
 
   const statusInfo = getStatusInfo(orderData.status);
+  const resolvedPaymentStatus = (() => {
+    if (orderData.paymentStatus) {
+      return orderData.paymentStatus;
+    }
+    if (orderData.paid === true) {
+      return "paid";
+    }
+    return orderData.payment?.status;
+  })();
+  const paymentStatusInfo = getPaymentStatusInfo(
+    resolvedPaymentStatus,
+  );
+  const trackingInfo = getStatusInfo(orderData.trackingStatus);
+  const remainingAmount = Math.max(0, (orderData.total || 0) - (orderData.paidAmount || 0));
+  const hasPayByCardHandler = typeof onPayByCard === "function";
+  const canPayByCard =
+    hasPayByCardHandler &&
+    remainingAmount > 0 &&
+    orderData.paid !== true &&
+    !["paid", "refunded"].includes(resolvedPaymentStatus || "") &&
+    !["cancelled"].includes(orderData.status || "");
 
   return (
     <View style={styles.container}>
@@ -119,6 +162,12 @@ export default function OrderDetailsScreen({ orderData, onBack }) {
               {statusInfo.label}
             </Text>
           </View>
+            <View style={[styles.statusBadge, { backgroundColor: trackingInfo.color + "20", marginTop: 8 }]}>
+              <Ionicons name={trackingInfo.icon} size={16} color={trackingInfo.color} />
+              <Text style={[styles.statusText, { color: trackingInfo.color }]}> 
+                Suivi: {trackingInfo.label}
+              </Text>
+            </View>
         </View>
 
         {/* Items Card */}
@@ -147,49 +196,93 @@ export default function OrderDetailsScreen({ orderData, onBack }) {
         </View>
 
         {/* Payment method */}
-        {orderData.paymentMethod && (
+          {(orderData.paymentMethod || orderData.payment) && (
           <View style={styles.card}>
             <View style={styles.paymentRow}>
               <Ionicons name="card-outline" size={20} color="#FF8A50" />
-              <Text style={styles.paymentLabel}>Moyen de paiement</Text>
+                <Text style={styles.paymentLabel}>Paiement</Text>
             </View>
-            <Text style={styles.paymentValue}>{orderData.paymentMethod}</Text>
+              <Text style={styles.paymentValue}>{orderData.paymentMethod || "-"}</Text>
+
+              <View style={[styles.statusBadge, { backgroundColor: paymentStatusInfo.color + "20", marginTop: 10 }]}>
+                <Ionicons name={paymentStatusInfo.icon} size={16} color={paymentStatusInfo.color} />
+                <Text style={[styles.statusText, { color: paymentStatusInfo.color }]}> 
+                  {paymentStatusInfo.label}
+                </Text>
+              </View>
+
+              {orderData.payment?.cardLast4 && (
+                <Text style={styles.statusMiniText}>
+                  Carte: {orderData.payment.cardBrand || "card"} •••• {orderData.payment.cardLast4}
+                </Text>
+              )}
+              {orderData.payment?.errorMessage && (
+                <Text style={[styles.statusMiniText, { color: "#FF6B6B" }]}> 
+                  Erreur: {orderData.payment.errorMessage}
+                </Text>
+              )}
+              {orderData.payment?.confirmedAt && (
+                <Text style={styles.statusMiniText}>
+                  Payé à: {formatDate(orderData.payment.confirmedAt)}
+                </Text>
+              )}
           </View>
         )}
 
-        {/* Refund Button (placeholder) */}
-        <TouchableOpacity
-          onPress={() => setRefundRequested(true)}
-          activeOpacity={0.8}
-          disabled={refundRequested}
-          style={{ marginTop: 8 }}
-        >
-          <View
-            style={[
-              styles.refundButton,
-              refundRequested && styles.refundButtonDisabled,
-            ]}
-          >
-            <Ionicons
-              name={refundRequested ? "checkmark-circle" : "return-down-back-outline"}
-              size={18}
-              color={refundRequested ? "#4CAF50" : "#FF6B6B"}
-              style={{ marginRight: 8 }}
-            />
-            <Text
-              style={[
-                styles.refundText,
-                refundRequested && styles.refundTextDisabled,
-              ]}
-            >
-              {refundRequested
-                ? "Demande enregistrée"
-                : "Demander un remboursement"}
-            </Text>
+          {/* Timeline */}
+          {Array.isArray(orderData.timeline) && orderData.timeline.length > 0 && (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Historique</Text>
+              {orderData.timeline.map((event, index) => (
+                <View key={`${event.type}-${index}`} style={styles.timelineRow}>
+                  <View style={styles.timelineDot} />
+                  <View style={styles.timelineContent}>
+                    <Text style={styles.timelineTitle}>{event.label}</Text>
+                    <Text style={styles.timelineDate}>{formatDate(event.timestamp)}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Info utile */}
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Informations utiles</Text>
+            <View style={styles.infoGrid}>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Table</Text>
+                <Text style={styles.infoValue}>{orderData.tableNumber || "-"}</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Client</Text>
+                <Text style={styles.infoValue}>{orderData.clientName || "-"}</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Payé</Text>
+                <Text style={styles.infoValue}>{orderData.paid ? "Oui" : "Non"}</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Montant réglé</Text>
+                <Text style={styles.infoValue}>{formatPrice(orderData.paidAmount || 0)}</Text>
+              </View>
+            </View>
           </View>
-        </TouchableOpacity>
 
         {/* Back to home */}
+        {canPayByCard && (
+          <TouchableOpacity onPress={onPayByCard} activeOpacity={0.85} style={{ marginTop: 8 }}>
+            <LinearGradient
+              colors={["#11998e", "#38ef7d"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.payButton}
+            >
+              <Ionicons name="card-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.payButtonText}>Payer en CB ({formatPrice(remainingAmount)})</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity onPress={onBack} activeOpacity={0.8} style={{ marginTop: 16 }}>
           <LinearGradient
             colors={["#D35400", "#E67E22"]}
@@ -296,6 +389,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
+  statusMiniText: {
+    color: "#9CA3AF",
+    fontSize: 12,
+    marginTop: 8,
+  },
 
   // ── Section Title ──
   sectionTitle: {
@@ -382,6 +480,57 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
+  // ── Timeline ──
+  timelineRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  timelineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FF8A50",
+    marginTop: 6,
+    marginRight: 10,
+  },
+  timelineContent: {
+    flex: 1,
+  },
+  timelineTitle: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  timelineDate: {
+    color: "#9CA3AF",
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  // ── Info Grid ──
+  infoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 4,
+  },
+  infoItem: {
+    width: "50%",
+    marginBottom: 12,
+  },
+  infoLabel: {
+    color: "#888",
+    fontSize: 12,
+    marginBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  infoValue: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
   // ── Refund Button (placeholder) ──
   refundButton: {
     flexDirection: "row",
@@ -419,6 +568,20 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   homeButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+  payButton: {
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+  },
+  payButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",

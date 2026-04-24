@@ -2,7 +2,7 @@
  * useOrderLookup.js — Hook de validation et recherche de commande
  *
  * Gère :
- *   - Validation stricte du format #XXX-XXX (temps réel)
+ *   - Validation stricte du format #XXXX (temps réel)
  *   - Auto-formatage de l'input (ajout #, insertion -)
  *   - Appel au service de lookup
  *   - États loading / error / result
@@ -11,11 +11,11 @@
 import { useState, useCallback, useMemo } from "react";
 import { lookupOrderByNumber } from "../services/orderLookupService";
 
-// Regex stricte : #XXX-XXX (X = chiffre)
-const ORDER_NUMBER_REGEX = /^#\d{3}-\d{3}$/;
+// Regex stricte : #XXXX (X = alphanumérique)
+const ORDER_NUMBER_REGEX = /^#[A-Z0-9]{4}$/;
 
 /**
- * Valide si un numéro de commande respecte le format #XXX-XXX
+ * Valide si un numéro de commande respecte le format #XXXX
  * @param {string} value
  * @returns {boolean}
  */
@@ -24,23 +24,21 @@ export function isValidOrderNumber(value) {
 }
 
 /**
- * Auto-formate l'input vers #XXX-XXX
+ * Auto-formate l'input vers #XXXX
  * - Ajoute # au début si manquant
- * - Insère - après les 3 premiers chiffres
- * - Limite à #XXX-XXX (8 caractères max)
+ * - Garde uniquement A-Z0-9
+ * - Limite à 4 caractères utiles
  * @param {string} raw
  * @returns {string}
  */
 export function formatOrderNumber(raw) {
-  // Extraire uniquement les chiffres
-  const digits = raw.replace(/[^0-9]/g, "");
+  const sanitized = String(raw || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 4);
 
-  // Limiter à 6 chiffres max
-  const limited = digits.slice(0, 6);
-
-  if (limited.length === 0) return "#";
-  if (limited.length <= 3) return `#${limited}`;
-  return `#${limited.slice(0, 3)}-${limited.slice(3)}`;
+  if (sanitized.length === 0) return "#";
+  return `#${sanitized}`;
 }
 
 /**
@@ -71,9 +69,14 @@ export default function useOrderLookup() {
   }, []);
 
   // Lancer la recherche
-  const lookup = useCallback(async () => {
-    if (!isValid) {
-      setError("Format invalide. Utilisez #XXX-XXX (ex: #123-456)");
+  const lookup = useCallback(async (options = {}) => {
+    const { orderNumber: overrideOrderNumber, ...lookupOptions } = options || {};
+    const effectiveOrderNumber = overrideOrderNumber
+      ? formatOrderNumber(overrideOrderNumber)
+      : orderNumber;
+
+    if (!isValidOrderNumber(effectiveOrderNumber)) {
+      setError("Format invalide. Utilisez #XXXX (ex: #FA24)");
       return null;
     }
 
@@ -82,7 +85,7 @@ export default function useOrderLookup() {
     setResult(null);
 
     try {
-      const order = await lookupOrderByNumber(orderNumber);
+      const order = await lookupOrderByNumber(effectiveOrderNumber, lookupOptions);
 
       if (!order) {
         setError("Aucune commande trouvée avec ce numéro.");
@@ -99,7 +102,7 @@ export default function useOrderLookup() {
       setLoading(false);
       return null;
     }
-  }, [orderNumber, isValid]);
+  }, [orderNumber]);
 
   // Reset complet
   const reset = useCallback(() => {
