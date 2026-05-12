@@ -63,7 +63,6 @@ import WebStripeCheckout from "../components/payment/WebStripeCheckout";
 import { orderService } from "shared-api/services/orderService.js";
 
 const { width, height } = Dimensions.get("window");
-const GRILLZ_RESTAURANT_ID = "695e4300adde654b80f6911a";
 
 // 🎴 Premium Payment Item Card
 const PremiumPaymentItem = ({
@@ -73,7 +72,6 @@ const PremiumPaymentItem = ({
 	isPaid,
 	onToggle,
 	theme = DEFAULT_THEME,
-	isGrillzTheme = false, // LEGACY 0.3.3-A — toujours accepté mais plus consommé dans le rendu (kept until smoke validated). Sera retiré au cleanup final 0.3.3.
 	paymentTokens, // 🔑 Phase 0.3.3-A — tokens component-scoped (cf. getPaymentItemTokens)
 }) => {
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -136,17 +134,6 @@ const PremiumPaymentItem = ({
 								? paymentTokens.itemBackground.selected
 								: paymentTokens.itemBackground.idle
 					}
-					/* LEGACY 0.3.3-A: was
-						isPaid
-							? ["rgba(56, 239, 125, 0.2)", "rgba(17, 153, 142, 0.1)"]
-							: isSelected
-								? isGrillzTheme
-									? ["rgba(234, 88, 12, 0.35)", "rgba(249, 115, 22, 0.2)"]
-									: ["rgba(102, 126, 234, 0.3)", "rgba(118, 75, 162, 0.2)"]
-								: isGrillzTheme
-									? ["rgba(26, 26, 26, 0.95)", "rgba(20, 20, 20, 0.95)"]
-									: ["rgba(255,255,255,0.95)", "rgba(248,249,250,0.95)"]
-					*/
 					style={[styles.paymentItem, isPaid && styles.paymentItemPaid]}
 					start={{ x: 0, y: 0 }}
 					end={{ x: 1, y: 1 }}
@@ -172,9 +159,7 @@ const PremiumPaymentItem = ({
 								<MaterialIcons name="check" size={18} color={paymentTokens.iconOnPrimary} />
 							</LinearGradient>
 						) : (
-							// LEGACY 0.3.3-A: was [styles.checkboxEmpty, isGrillzTheme && { backgroundColor: "#1A1A1A", borderColor: "#3F3F46" }]
 							<View style={[styles.checkboxEmpty, paymentTokens.checkboxEmpty]}>
-								{/* LEGACY 0.3.3-A: was [styles.checkboxInner, isGrillzTheme && { backgroundColor: "#2A2A2A" }] */}
 								<View style={[styles.checkboxInner, paymentTokens.checkboxInner]} />
 							</View>
 						)}
@@ -187,7 +172,6 @@ const PremiumPaymentItem = ({
 								styles.paymentItemName,
 								isPaid && styles.paymentItemNamePaid,
 								!isSelected && !isPaid && styles.paymentItemNameUnselected,
-								// LEGACY 0.3.3-A: was !isSelected && !isPaid && isGrillzTheme && { color: "#D4D4D8" }
 								!isSelected && !isPaid && paymentTokens.itemTextIdle && { color: paymentTokens.itemTextIdle },
 							]}
 						>
@@ -198,7 +182,6 @@ const PremiumPaymentItem = ({
 								styles.paymentItemDetails,
 								isPaid && styles.paymentItemDetailsPaid,
 								!isSelected && !isPaid && styles.paymentItemDetailsUnselected,
-								// LEGACY 0.3.3-A: was !isSelected && !isPaid && isGrillzTheme && { color: "#A1A1AA" }
 								!isSelected && !isPaid && paymentTokens.itemSubtextIdle && { color: paymentTokens.itemSubtextIdle },
 							]}
 						>
@@ -214,7 +197,6 @@ const PremiumPaymentItem = ({
 								<Text style={styles.paidBadgeText}>Payé</Text>
 							</View>
 						) : (
-							// LEGACY 0.3.3-A: was colors={isSelected ? theme.primary : isGrillzTheme ? ["#2A2A2A", "#1F1F1F"] : ["#e9ecef", "#dee2e6"]}
 							<LinearGradient
 								colors={isSelected ? theme.primary : paymentTokens.itemGradientIdle}
 								style={styles.priceBadge}
@@ -225,7 +207,6 @@ const PremiumPaymentItem = ({
 									style={[
 										styles.priceBadgeText,
 										!isSelected && styles.priceBadgeTextDark,
-										// LEGACY 0.3.3-A: was !isSelected && isGrillzTheme && { color: "#D4D4D8" }
 										!isSelected && paymentTokens.itemPriceIdle && { color: paymentTokens.itemPriceIdle },
 									]}
 								>
@@ -309,12 +290,9 @@ export default function Payment({
 
 	// 🎨 Thème dynamique depuis la BDD, fallback DEFAULT_THEME
 	const { config } = useRestaurantConfig(restaurantId);
-	const isGrillzTheme =
-		(config?.styleKey || "").toLowerCase() === "grillz" ||
-		restaurantId === GRILLZ_RESTAURANT_ID;
 	const theme = buildSafeTheme(
 		config?.style,
-		isGrillzTheme ? "grillz" : config?.styleKey,
+		config?.styleKey,
 	);
 
 	// 🔑 Phase 0.3.3-A — useThemeKey() coexiste avec useRestaurantConfig (strangler).
@@ -1128,11 +1106,6 @@ export default function Payment({
 					paymentContainerTokens.containerBackground ||
 					theme.background || [theme.dark, theme.card]
 				}
-				/* LEGACY 0.3.3-B: was
-					isGrillzTheme
-						? ["#0D0D0D", "#171717", "#0F0F0F"]
-						: theme.background || [theme.dark, theme.card]
-				*/
 				style={styles.container}
 			>
 				<View style={styles.errorContainer}>
@@ -1144,9 +1117,7 @@ export default function Payment({
 					>
 						<MaterialIcons name="error-outline" size={48} color={paymentContainerTokens.iconOnPrimary} />
 					</LinearGradient>
-					{/* LEGACY 0.3.3-B: was [styles.errorTitle, isGrillzTheme && { color: "#F8FAFC" }] */}
 					<Text style={[styles.errorTitle, paymentContainerTokens.headingColor && { color: paymentContainerTokens.headingColor }]}>Aucune commande</Text>
-					{/* LEGACY 0.3.3-B: was [styles.errorText, isGrillzTheme && { color: "#A1A1AA" }] */}
 					<Text style={[styles.errorText, paymentContainerTokens.bodyMutedColor && { color: paymentContainerTokens.bodyMutedColor }]}>
 						Aucune commande n'a été trouvée pour cette réservation.{"\n"}
 						Retournez au menu et commandez des articles d'abord.
@@ -1205,11 +1176,6 @@ export default function Payment({
 				paymentContainerTokens.containerBackground ||
 				theme.background || [theme.dark, theme.card]
 			}
-			/* LEGACY 0.3.3-B: was
-				isGrillzTheme
-					? ["#0D0D0D", "#171717", "#0F0F0F"]
-					: theme.background || [theme.dark, theme.card]
-			*/
 			style={styles.container}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 1 }}
@@ -1221,7 +1187,6 @@ export default function Payment({
 					style={[styles.bgCircle, styles.bgCircle1]}
 				/>
 				<LinearGradient
-					/* LEGACY 0.3.3-B: was [...(isGrillzTheme ? theme.accent : theme.success), "transparent"] */
 					colors={[
 						...theme[paymentContainerTokens.bgDecorSecondaryKey],
 						"transparent",
@@ -1246,7 +1211,6 @@ export default function Payment({
 					]}
 				>
 					<LinearGradient
-					/* LEGACY 0.3.3-B: was colors={isGrillzTheme ? theme.primary : theme.success} */
 					colors={theme[paymentContainerTokens.headerIconGradientKey]}
 					style={styles.headerIcon}
 					start={{ x: 0, y: 0 }}
@@ -1254,9 +1218,7 @@ export default function Payment({
 				>
 					<Ionicons name="card" size={36} color={paymentContainerTokens.iconOnPrimary} />
 				</LinearGradient>
-				{/* LEGACY 0.3.3-B: was [styles.title, isGrillzTheme && { color: "#F8FAFC" }] */}
 				<Text style={[styles.title, paymentContainerTokens.headingColor && { color: paymentContainerTokens.headingColor }]}>Paiement</Text>
-				{/* LEGACY 0.3.3-B: was [styles.subtitle, isGrillzTheme && { color: "#A1A1AA" }] */}
 				<Text style={[styles.subtitle, paymentContainerTokens.bodyMutedColor && { color: paymentContainerTokens.bodyMutedColor }]}>Sélectionnez les articles à payer</Text>
 					{/* 🍔 Bannière statut foodtruck / fast-food */}
 					{(isFoodtruck || isFastFood) && (
@@ -1328,19 +1290,16 @@ export default function Payment({
 				<View style={styles.itemsSection}>
 					{/* 👥 Toggle : Mes articles / Toute la table */}
 					{otherClientsCount > 0 && (
-					/* LEGACY 0.3.3-B: was [styles.clientToggleRow, isGrillzTheme && { backgroundColor: "rgba(255,255,255,0.08)" }] */
 					<View style={[styles.clientToggleRow, paymentContainerTokens.toggleRowBackground]}>
 						<TouchableOpacity
 							style={[
 								styles.clientToggleBtn,
 								!payForWholeTable && styles.clientToggleBtnActive,
-								// LEGACY 0.3.3-B: was isGrillzTheme && !payForWholeTable && styles.clientToggleBtnActiveGrillz
 								!payForWholeTable && paymentContainerTokens.toggleActiveOverride,
 							]}
 							onPress={() => setPayForWholeTable(false)}
 							activeOpacity={0.8}
 						>
-							{/* LEGACY 0.3.3-B: was color={!payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#666"} */}
 							<MaterialIcons name="person" size={15} color={!payForWholeTable ? paymentContainerTokens.iconOnPrimary : paymentContainerTokens.toggleIconInactive} />
 							<Text style={[styles.clientToggleText, !payForWholeTable && styles.clientToggleTextActive]}>
 								Mes articles
@@ -1350,7 +1309,6 @@ export default function Payment({
 							style={[
 								styles.clientToggleBtn,
 								payForWholeTable && styles.clientToggleBtnActive,
-								// LEGACY 0.3.3-B: was isGrillzTheme && payForWholeTable && styles.clientToggleBtnActiveGrillz
 								payForWholeTable && paymentContainerTokens.toggleActiveOverride,
 							]}
 							onPress={() =>
@@ -1365,7 +1323,6 @@ export default function Payment({
 							}
 							activeOpacity={0.8}
 						>
-							{/* LEGACY 0.3.3-B: was color={payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#666"} */}
 							<MaterialIcons name="group" size={15} color={payForWholeTable ? paymentContainerTokens.iconOnPrimary : paymentContainerTokens.toggleIconInactive} />
 							<Text style={[styles.clientToggleText, payForWholeTable && styles.clientToggleTextActive]}>
 								Toute la table
@@ -1385,7 +1342,6 @@ export default function Payment({
 							>
 								<MaterialIcons name="shopping-cart" size={18} color={paymentContainerTokens.iconOnPrimary} />
 							</LinearGradient>
-							{/* LEGACY 0.3.3-B: was [styles.sectionTitle, isGrillzTheme && { color: "#F8FAFC" }] */}
 							<Text style={[styles.sectionTitle, paymentContainerTokens.headingColor && { color: paymentContainerTokens.headingColor }]}>
 								Articles à payer ({availableItems.length})
 							</Text>
@@ -1422,9 +1378,7 @@ export default function Payment({
 							>
 								<MaterialIcons name="celebration" size={48} color={paymentContainerTokens.iconOnPrimary} />
 							</LinearGradient>
-							{/* LEGACY 0.3.3-B: was [styles.emptyStateTitle, isGrillzTheme && { color: "#F8FAFC" }] */}
 							<Text style={[styles.emptyStateTitle, paymentContainerTokens.headingColor && { color: paymentContainerTokens.headingColor }]}>Tout est payé !</Text>
-							{/* LEGACY 0.3.3-B: was [styles.emptyStateSubtext, isGrillzTheme && { color: "#A1A1AA" }] */}
 							<Text style={[styles.emptyStateSubtext, paymentContainerTokens.bodyMutedColor && { color: paymentContainerTokens.bodyMutedColor }]}>
 								Vous pouvez retourner au menu.
 							</Text>
@@ -1469,7 +1423,6 @@ export default function Payment({
 										isPaid={false}
 										onToggle={() => toggleItem(item)}
 										theme={theme}
-										isGrillzTheme={isGrillzTheme}
 										paymentTokens={paymentItemTokens}
 									/>
 								);
@@ -1487,10 +1440,8 @@ export default function Payment({
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 1 }}
 								>
-									{/* LEGACY 0.3.3-C: was color="#fff" */}
 									<MaterialIcons name="check-circle" size={18} color={paymentButtonsTokens.iconOnPrimary} />
 								</LinearGradient>
-								{/* LEGACY 0.3.3-C: was [styles.paidSectionTitle, isGrillzTheme && { color: "#A1A1AA" }] */}
 								<Text style={[styles.paidSectionTitle, paymentButtonsTokens.paidSectionTitleColor && { color: paymentButtonsTokens.paidSectionTitleColor }]}>
 									Déjà payés ({paidItemsList.length})
 								</Text>
@@ -1504,7 +1455,6 @@ export default function Payment({
 										isSelected={false}
 										isPaid={true}
 										theme={theme}
-										isGrillzTheme={isGrillzTheme}
 										paymentTokens={paymentItemTokens}
 									/>
 								))}
@@ -1524,7 +1474,6 @@ export default function Payment({
 						>
 							<View style={styles.totalContent}>
 								<View style={styles.totalLeft}>
-									{/* LEGACY 0.3.3-C: was color="#fff" */}
 									<MaterialIcons name="payments" size={24} color={paymentButtonsTokens.iconOnPrimary} />
 									<View style={styles.totalTextContainer}>
 										<Text style={styles.totalLabel}>Total sélectionné</Text>
@@ -1545,9 +1494,7 @@ export default function Payment({
 				{/* Info Note */}
 				{reservationId && (
 					<View style={styles.infoNote}>
-						{/* LEGACY 0.3.3-C: was style={[styles.infoNoteBlur, isGrillzTheme && { borderColor: "#2A2A2A" }]} */}
 						<BlurView intensity={15} tint="light" style={[styles.infoNoteBlur, paymentButtonsTokens.infoNoteBorderOverride]}>
-							{/* LEGACY 0.3.3-C: was color="#4facfe" (brand info universelle non thémable) */}
 							<MaterialIcons name="info-outline" size={20} color={paymentButtonsTokens.infoIconColor} />
 							<View style={styles.infoNoteText}>
 								<Text style={styles.infoNoteTitle}>
@@ -1591,7 +1538,6 @@ export default function Payment({
 								}}
 								disabled={isProcessing || selectedItems.size === 0}
 							>
-								{/* LEGACY 0.3.3-C: was colors={["#ccc","#ccc"] / [theme.primary,theme.primary] / [theme.success,theme.success]} + style={[styles.payButton, isGrillzTheme && { shadowColor: "#EA580C" }]} */}
 								<LinearGradient
 									colors={
 										isProcessing || selectedItems.size === 0
@@ -1606,7 +1552,6 @@ export default function Payment({
 										<ActivityIndicator color={paymentButtonsTokens.iconOnPrimary} />
 									) : (
 										<>
-											{/* LEGACY 0.3.3-C: was color="#fff" */}
 											<MaterialIcons name="payment" size={24} color={paymentButtonsTokens.iconOnPrimary} />
 											<Text style={styles.payButtonText}>
 												Payer {selectedOrders.length} article
@@ -1627,7 +1572,6 @@ export default function Payment({
 									disabled={isProcessing || selectedItems.size === 0}
 									activeOpacity={0.9}
 								>
-									{/* 🍎 LEGACY 0.3.3-C: was colors={["#ccc","#999"] / ["#000","#333"]} — Apple HIG NON-NÉGOCIABLE */}
 									<LinearGradient
 										colors={
 											isProcessing || selectedItems.size === 0
@@ -1642,7 +1586,6 @@ export default function Payment({
 											<ActivityIndicator color={paymentButtonsTokens.iconOnApple} />
 										) : (
 											<>
-												{/* 🍎 LEGACY 0.3.3-C: was color="#fff" — Apple HIG icon white obligatoire */}
 												<Ionicons name="logo-apple" size={24} color={paymentButtonsTokens.iconOnApple} />
 												<Text style={styles.payButtonText}>Apple Pay</Text>
 											</>
@@ -1658,7 +1601,6 @@ export default function Payment({
 									disabled={isProcessing || selectedItems.size === 0}
 									activeOpacity={0.9}
 								>
-									{/* LEGACY 0.3.3-C: was colors={["#ccc","#999"] / ["#FF8C00","#FF6B00"]} + style={[styles.payButton, isGrillzTheme && { shadowColor: "#EA580C" }]} */}
 									<LinearGradient
 										colors={
 											isProcessing || selectedItems.size === 0
@@ -1673,7 +1615,6 @@ export default function Payment({
 											<ActivityIndicator color={paymentButtonsTokens.iconOnPrimary} />
 										) : (
 											<>
-												{/* LEGACY 0.3.3-C: was color="#fff" */}
 												<MaterialIcons name="store" size={24} color={paymentButtonsTokens.iconOnPrimary} />
 												<Text style={styles.payButtonText}>
 													Payer au comptoir
@@ -1699,7 +1640,6 @@ export default function Payment({
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 0 }}
 						>
-							{/* LEGACY 0.3.3-C: was color="#fff" */}
 							<MaterialIcons name="arrow-back" size={22} color={paymentButtonsTokens.iconOnPrimary} />
 							<Text style={styles.backButtonText}>Retour</Text>
 						</LinearGradient>
@@ -1743,11 +1683,8 @@ export default function Payment({
 					}}
 				>
 					<View style={styles.webModalBackdrop}>
-						{/* LEGACY 0.3.3-D1: was [styles.webModalCard, isGrillzTheme && styles.webModalCardGrillz] */}
 						<View style={[styles.webModalCard, paymentModalTokens.cardOverride]}>
-							{/* LEGACY 0.3.3-D1: was [styles.webModalTitle, isGrillzTheme && styles.webModalTitleGrillz] */}
 							<Text style={[styles.webModalTitle, paymentModalTokens.titleOverride]}>Paiement sécurisé Stripe</Text>
-							{/* LEGACY 0.3.3-D1: was [styles.webModalSubtitle, isGrillzTheme && styles.webModalSubtitleGrillz] */}
 							<Text style={[styles.webModalSubtitle, paymentModalTokens.subtitleOverride]}>
 								Entrez vos informations de carte pour finaliser le paiement.
 							</Text>
@@ -1801,19 +1738,6 @@ const styles = StyleSheet.create({
 		color: "#475569",
 		marginBottom: 12,
 	},
-	// LEGACY 0.3.3-D1 — orphan, cleanup 0.3.3-D2
-	webModalCardGrillz: {
-		backgroundColor: "#141414",
-		borderColor: "#3F3F46",
-	},
-	// LEGACY 0.3.3-D1 — orphan, cleanup 0.3.3-D2
-	webModalTitleGrillz: {
-		color: "#F8FAFC",
-	},
-	// LEGACY 0.3.3-D1 — orphan, cleanup 0.3.3-D2
-	webModalSubtitleGrillz: {
-		color: "#D4D4D8",
-	},
 
 	// 👥 CLIENT TOGGLE (Mes articles / Toute la table)
 	clientToggleRow: {
@@ -1835,10 +1759,6 @@ const styles = StyleSheet.create({
 	},
 	clientToggleBtnActive: {
 		backgroundColor: "#667eea",
-	},
-	clientToggleBtnActiveGrillz: {
-		// LEGACY 0.3.3-B — orphan, cleanup 0.3.3-D
-		backgroundColor: "#EA580C",
 	},
 	clientToggleText: {
 		fontSize: 13,
