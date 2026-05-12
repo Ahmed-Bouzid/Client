@@ -1,4 +1,7 @@
 // components/receipt/ReceiptTicket.jsx
+// THEMING: orphan palette by design — see audit 0.1
+// Ce composant utilise une palette purple/teal interne (style ticket de caisse virtuel)
+// indépendante du theming multi-tenant. NE PAS tokeniser sans décision produit.
 import React, { useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Animated, Dimensions } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";

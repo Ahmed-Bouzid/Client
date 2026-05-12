@@ -1,5 +1,5 @@
 // src/screens/index.js
-export { default as Menu } from "./Menu";
+// NOTE: ./Menu (legacy) archivé en _archive_2026-05-12_phase0/ (audit 0.2). Ne pas réintroduire sans décision produit.
 export { default as Payment } from "./Payment";
 export { default as OrderSummary } from "./OrderSummary";
 export { default as JoinOrCreateTable } from "./JoinOrCreateTable";

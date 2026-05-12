@@ -10,6 +10,9 @@ config.watchFolders = [sharedApiPath];
 
 config.resolver = {
 	...config.resolver,
+	// Exclure les dossiers d'archivage (refactor theming Phase 0+) du bundling.
+	// blockList accepte directement une RegExp ou un tableau de RegExp.
+	blockList: /.*\/_archive_[^/]+\/.*/,
 	extraNodeModules: {
 		...config.resolver.extraNodeModules,
 		"shared-api": sharedApiPath,
