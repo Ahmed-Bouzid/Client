@@ -31,6 +31,45 @@ export const useThemeStore = create((set, get) => {
     // Metadata
     abVariant: "control",
     customThemeEnabled: false,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 🔑 SESSION KEY (Phase 0.2.5 — Single source of truth for theming identity)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // themeKey consolide les 4 inputs d'identification tenant en un objet stable.
+    // Lu via le hook useThemeKey() (src/hooks/useThemeKey.js).
+    // Mis à jour exclusivement via setSession() (cf. plus bas).
+    themeKey: {
+      themeId: null,
+      restaurantId: null,
+      category: null,
+      styleKey: null,
+    },
+
+    /**
+     * 🔑 Single entry point pour reconstruire themeKey à partir des 4 inputs.
+     * Doit être appelé:
+     *   - Au boot après init des stores annexes (App.jsx, Phase 0.3)
+     *   - À tout changement de session/restaurant (scan QR, deep link /r/:id)
+     *
+     * @param {object} payload
+     * @param {string|null} payload.restaurantId
+     * @param {string|null} payload.category   - 'restaurant' | 'foodtruck' | 'snack' | ...
+     * @param {string|null} payload.styleKey   - 'grillz' | 'cucina' | 'italia' | ...
+     * @param {string|null} payload.themeId    - UUID du theme assignment côté BDD
+     */
+    setSession: ({ restaurantId = null, category = null, styleKey = null, themeId = null } = {}) => {
+      const current = get().themeKey;
+      // No-op si rien ne change (évite re-renders inutiles côté consommateurs).
+      if (
+        current.restaurantId === restaurantId &&
+        current.category === category &&
+        current.styleKey === styleKey &&
+        current.themeId === themeId
+      ) {
+        return;
+      }
+      set({ themeKey: { restaurantId, category, styleKey, themeId } });
+    },
     
     // ═══════════════════════════════════════════════════════════════════════════
     // 📡 FETCH METHODS
@@ -100,7 +139,7 @@ export const useThemeStore = create((set, get) => {
           customThemeEnabled: themeData.customThemeEnabled,
           loading: false,
         });
-        
+
         console.log(`✅ [useThemeStore] Theme fetched and cached`);
         return themeData;
         
