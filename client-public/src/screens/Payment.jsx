@@ -56,7 +56,7 @@ import { useRestaurantStore } from "../stores/useRestaurantStore";
 import { useReservationStatus } from "../hooks/useReservationStatus"; // 🚪 Écoute fermeture réservation
 import FeedbackScreen from "../components/FeedbackScreen"; // 🌟 Feedback & Avis Google
 import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 API Feedback
-import { buildSafeTheme, DEFAULT_THEME, getPaymentItemTokens, getPaymentContainerTokens } from "../theme/defaultTheme";
+import { buildSafeTheme, DEFAULT_THEME, getPaymentItemTokens, getPaymentContainerTokens, getPaymentButtonsTokens } from "../theme/defaultTheme";
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
 import useThemeKey from "../hooks/useThemeKey";
 import WebStripeCheckout from "../components/payment/WebStripeCheckout";
@@ -329,6 +329,11 @@ export default function Payment({
 	// Phase 0.3.3-B — tokens scoped Container + Header (cf. getPaymentContainerTokens)
 	const paymentContainerTokens = useMemo(
 		() => getPaymentContainerTokens(themeKey?.styleKey || config?.styleKey),
+		[themeKey?.styleKey, config?.styleKey],
+	);
+	// Phase 0.3.3-C — tokens scoped Boutons paiement (cf. getPaymentButtonsTokens)
+	const paymentButtonsTokens = useMemo(
+		() => getPaymentButtonsTokens(themeKey?.styleKey || config?.styleKey),
 		[themeKey?.styleKey, config?.styleKey],
 	);
 
@@ -1477,9 +1482,11 @@ export default function Payment({
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 1 }}
 								>
-									<MaterialIcons name="check-circle" size={18} color="#fff" />
+									{/* LEGACY 0.3.3-C: was color="#fff" */}
+									<MaterialIcons name="check-circle" size={18} color={paymentButtonsTokens.iconOnPrimary} />
 								</LinearGradient>
-								<Text style={[styles.paidSectionTitle, isGrillzTheme && { color: "#A1A1AA" }]}>
+								{/* LEGACY 0.3.3-C: was [styles.paidSectionTitle, isGrillzTheme && { color: "#A1A1AA" }] */}
+								<Text style={[styles.paidSectionTitle, paymentButtonsTokens.paidSectionTitleColor && { color: paymentButtonsTokens.paidSectionTitleColor }]}>
 									Déjà payés ({paidItemsList.length})
 								</Text>
 							</View>
@@ -1512,7 +1519,8 @@ export default function Payment({
 						>
 							<View style={styles.totalContent}>
 								<View style={styles.totalLeft}>
-									<MaterialIcons name="payments" size={24} color="#fff" />
+									{/* LEGACY 0.3.3-C: was color="#fff" */}
+									<MaterialIcons name="payments" size={24} color={paymentButtonsTokens.iconOnPrimary} />
 									<View style={styles.totalTextContainer}>
 										<Text style={styles.totalLabel}>Total sélectionné</Text>
 										<Text style={styles.totalCount}>
@@ -1532,8 +1540,10 @@ export default function Payment({
 				{/* Info Note */}
 				{reservationId && (
 					<View style={styles.infoNote}>
-						<BlurView intensity={15} tint="light" style={[styles.infoNoteBlur, isGrillzTheme && { borderColor: "#2A2A2A" }]}>
-							<MaterialIcons name="info-outline" size={20} color="#4facfe" />
+						{/* LEGACY 0.3.3-C: was style={[styles.infoNoteBlur, isGrillzTheme && { borderColor: "#2A2A2A" }]} */}
+						<BlurView intensity={15} tint="light" style={[styles.infoNoteBlur, paymentButtonsTokens.infoNoteBorderOverride]}>
+							{/* LEGACY 0.3.3-C: was color="#4facfe" (brand info universelle non thémable) */}
+							<MaterialIcons name="info-outline" size={20} color={paymentButtonsTokens.infoIconColor} />
 							<View style={styles.infoNoteText}>
 								<Text style={styles.infoNoteTitle}>
 									Les articles payés sont sauvegardés
@@ -1576,23 +1586,23 @@ export default function Payment({
 								}}
 								disabled={isProcessing || selectedItems.size === 0}
 							>
+								{/* LEGACY 0.3.3-C: was colors={["#ccc","#ccc"] / [theme.primary,theme.primary] / [theme.success,theme.success]} + style={[styles.payButton, isGrillzTheme && { shadowColor: "#EA580C" }]} */}
 								<LinearGradient
 									colors={
 										isProcessing || selectedItems.size === 0
-											? ["#ccc", "#ccc"]
-											: isGrillzTheme
-												? [theme.primary, theme.primary]
-												: [theme.success, theme.success]
+											? paymentButtonsTokens.cardDisabledGradient
+											: theme[paymentButtonsTokens.cardActiveGradientKey]
 									}
-									style={[styles.payButton, isGrillzTheme && { shadowColor: "#EA580C" }]}
+									style={[styles.payButton, paymentButtonsTokens.cardShadowOverride]}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 0 }}
 								>
 									{isProcessing ? (
-										<ActivityIndicator color="#fff" />
+										<ActivityIndicator color={paymentButtonsTokens.iconOnPrimary} />
 									) : (
 										<>
-											<MaterialIcons name="payment" size={24} color="#fff" />
+											{/* LEGACY 0.3.3-C: was color="#fff" */}
+											<MaterialIcons name="payment" size={24} color={paymentButtonsTokens.iconOnPrimary} />
 											<Text style={styles.payButtonText}>
 												Payer {selectedOrders.length} article
 												{selectedOrders.length > 1 ? "s" : ""}
@@ -1612,21 +1622,23 @@ export default function Payment({
 									disabled={isProcessing || selectedItems.size === 0}
 									activeOpacity={0.9}
 								>
+									{/* 🍎 LEGACY 0.3.3-C: was colors={["#ccc","#999"] / ["#000","#333"]} — Apple HIG NON-NÉGOCIABLE */}
 									<LinearGradient
 										colors={
 											isProcessing || selectedItems.size === 0
-												? ["#ccc", "#999"]
-												: ["#000", "#333"]
+												? paymentButtonsTokens.applePayDisabledGradient
+												: paymentButtonsTokens.applePayActiveGradient
 										}
 										style={styles.applePayButton}
 										start={{ x: 0, y: 0 }}
 										end={{ x: 1, y: 0 }}
 									>
 										{isProcessing ? (
-											<ActivityIndicator color="#fff" />
+											<ActivityIndicator color={paymentButtonsTokens.iconOnApple} />
 										) : (
 											<>
-												<Ionicons name="logo-apple" size={24} color="#fff" />
+												{/* 🍎 LEGACY 0.3.3-C: was color="#fff" — Apple HIG icon white obligatoire */}
+												<Ionicons name="logo-apple" size={24} color={paymentButtonsTokens.iconOnApple} />
 												<Text style={styles.payButtonText}>Apple Pay</Text>
 											</>
 										)}
@@ -1641,21 +1653,23 @@ export default function Payment({
 									disabled={isProcessing || selectedItems.size === 0}
 									activeOpacity={0.9}
 								>
+									{/* LEGACY 0.3.3-C: was colors={["#ccc","#999"] / ["#FF8C00","#FF6B00"]} + style={[styles.payButton, isGrillzTheme && { shadowColor: "#EA580C" }]} */}
 									<LinearGradient
 										colors={
 											isProcessing || selectedItems.size === 0
-												? ["#ccc", "#999"]
-												: ["#FF8C00", "#FF6B00"]
+												? paymentButtonsTokens.counterDisabledGradient
+												: paymentButtonsTokens.counterActiveGradient
 										}
-										style={[styles.payButton, isGrillzTheme && { shadowColor: "#EA580C" }]}
+										style={[styles.payButton, paymentButtonsTokens.counterShadowOverride]}
 										start={{ x: 0, y: 0 }}
 										end={{ x: 1, y: 0 }}
 									>
 										{isProcessing ? (
-											<ActivityIndicator color="#fff" />
+											<ActivityIndicator color={paymentButtonsTokens.iconOnPrimary} />
 										) : (
 											<>
-												<MaterialIcons name="store" size={24} color="#fff" />
+												{/* LEGACY 0.3.3-C: was color="#fff" */}
+												<MaterialIcons name="store" size={24} color={paymentButtonsTokens.iconOnPrimary} />
 												<Text style={styles.payButtonText}>
 													Payer au comptoir
 												</Text>
@@ -1680,7 +1694,8 @@ export default function Payment({
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 0 }}
 						>
-							<MaterialIcons name="arrow-back" size={22} color="#fff" />
+							{/* LEGACY 0.3.3-C: was color="#fff" */}
+							<MaterialIcons name="arrow-back" size={22} color={paymentButtonsTokens.iconOnPrimary} />
 							<Text style={styles.backButtonText}>Retour</Text>
 						</LinearGradient>
 					</TouchableOpacity>

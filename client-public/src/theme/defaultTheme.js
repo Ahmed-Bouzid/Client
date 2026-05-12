@@ -358,4 +358,78 @@ export const getPaymentContainerTokens = (styleKey) => {
 	};
 };
 
+/**
+ * Phase 0.3.3-C — Tokens scopés à la zone Boutons paiement (Payment.jsx L1471-L1700)
+ *
+ * Couvre :
+ *  - Card pay button (gradient + shadow)
+ *  - 🍎 Apple Pay button (gradient + icon — NON-NÉGOCIABLE Apple HIG)
+ *  - Counter pay button (fast-food, gradient + shadow)
+ *  - InfoNote (icon + border override)
+ *  - PaidSection title color (override Grillz)
+ *  - Disabled gradients universels
+ *
+ * Convention :
+ *  - `*Key`        → string clé de palette à résoudre via `theme[key]`
+ *  - `*Override`   → objet style RN (ou null si pas d'override) pour pattern array `[base, override]`
+ *  - `*Gradient`   → tableau de couleurs prêt à passer à <LinearGradient colors={...} />
+ *
+ * Sites NON-thémables documentés (préservés hardcoded dans le helper pour centralisation) :
+ *  - 🍎 ApplePay active gradient + icon : Apple HIG (jamais teintable)
+ *  - Counter brand orange : sémantique métier "comptoir" cross-tenant
+ *  - InfoNote #4facfe : brand info universelle Stripe-like
+ *  - Disabled gradients : états système universels (asymétrie Card/ApplePay/Counter
+ *    préservée — micro-dette UI Phase 0.6, cf. Brain log)
+ *
+ * @param {string} styleKey - "grillz" | "cucina" | autre
+ * @returns {object} tokens scopés à la zone Boutons paiement
+ */
+export const getPaymentButtonsTokens = (styleKey) => {
+	const isGrillz = (styleKey || "").toLowerCase() === "grillz";
+	return {
+		// === DISABLED STATES (universels, ni thémables ni Apple-spécifiques) ===
+		// Asymétrie préservée tel quel (Card symétrique, ApplePay/Counter asymétriques).
+		// Micro-dette UI Phase 0.6 — cf. Brain log "asymétrie gradients disabled".
+		cardDisabledGradient: ["#ccc", "#ccc"],
+		applePayDisabledGradient: ["#ccc", "#999"],
+		counterDisabledGradient: ["#ccc", "#999"],
+
+		// === CARD PAY BUTTON (thémable) ===
+		// Clé de palette résolue côté JSX via theme[tokens.cardActiveGradientKey]
+		cardActiveGradientKey: isGrillz ? "primary" : "success",
+		cardShadowOverride: isGrillz ? { shadowColor: "#EA580C" } : null,
+
+		// === 🍎 APPLE PAY (NON-NÉGOCIABLE Apple Human Interface Guidelines) ===
+		// 🍎 Bouton noir/foncé OBLIGATOIRE — jamais thémable, jamais teinté.
+		// 🍎 Cf. https://developer.apple.com/design/human-interface-guidelines/apple-pay
+		applePayActiveGradient: ["#000", "#333"],
+		// 🍎 Contraste blanc obligatoire sur fond noir Apple Pay
+		iconOnApple: "#fff",
+
+		// === COUNTER PAY (brand fast-food, sémantique métier cross-tenant) ===
+		// Orange "comptoir" indépendant du theme — pas de variante Grillz.
+		// Seul l'effet d'ombre est thémable (cohérence visuelle Grillz orange profond).
+		counterActiveGradient: ["#FF8C00", "#FF6B00"],
+		counterShadowOverride: isGrillz ? { shadowColor: "#EA580C" } : null,
+
+		// === INFO NOTE ===
+		// Brand info universelle — non thémable cross-tenant.
+		// Si un futur tenant veut son propre bleu info → créer un nouveau token
+		// infoBrandColor à ce moment-là, pas avant (YAGNI).
+		infoIconColor: "#4facfe",
+		infoNoteBorderOverride: isGrillz ? { borderColor: "#2A2A2A" } : null,
+
+		// === PAID SECTION ===
+		// Override Grillz only sur le titre "Déjà payés (n)".
+		// Côté JSX : pattern [styles.base, tokens.paidSectionTitleColor && { color: tokens.paidSectionTitleColor }]
+		paidSectionTitleColor: isGrillz ? "#A1A1AA" : null,
+
+		// === ICON UNIVERSEL ===
+		// ⚠️ DUPLICATION INTENTIONNELLE avec getPaymentItemTokens.iconOnPrimary
+		// et getPaymentContainerTokens.iconOnPrimary — micro-dette Phase 0.6
+		// (factoriser en THEME_CONSTANTS.iconOnPrimary lors du cleanup).
+		iconOnPrimary: "#fff",
+	};
+};
+
 export default DEFAULT_THEME;
