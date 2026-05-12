@@ -56,8 +56,9 @@ import { useRestaurantStore } from "../stores/useRestaurantStore";
 import { useReservationStatus } from "../hooks/useReservationStatus"; // 🚪 Écoute fermeture réservation
 import FeedbackScreen from "../components/FeedbackScreen"; // 🌟 Feedback & Avis Google
 import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 API Feedback
-import { buildSafeTheme, DEFAULT_THEME } from "../theme/defaultTheme";
+import { buildSafeTheme, DEFAULT_THEME, getPaymentItemTokens } from "../theme/defaultTheme";
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
+import useThemeKey from "../hooks/useThemeKey";
 import WebStripeCheckout from "../components/payment/WebStripeCheckout";
 import { orderService } from "shared-api/services/orderService.js";
 
@@ -72,7 +73,8 @@ const PremiumPaymentItem = ({
 	isPaid,
 	onToggle,
 	theme = DEFAULT_THEME,
-	isGrillzTheme = false,
+	isGrillzTheme = false, // LEGACY 0.3.3-A — toujours accepté mais plus consommé dans le rendu (kept until smoke validated). Sera retiré au cleanup final 0.3.3.
+	paymentTokens, // 🔑 Phase 0.3.3-A — tokens component-scoped (cf. getPaymentItemTokens)
 }) => {
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(20)).current;
@@ -129,6 +131,13 @@ const PremiumPaymentItem = ({
 				<LinearGradient
 					colors={
 						isPaid
+							? paymentTokens.itemBackground.paid
+							: isSelected
+								? paymentTokens.itemBackground.selected
+								: paymentTokens.itemBackground.idle
+					}
+					/* LEGACY 0.3.3-A: was
+						isPaid
 							? ["rgba(56, 239, 125, 0.2)", "rgba(17, 153, 142, 0.1)"]
 							: isSelected
 								? isGrillzTheme
@@ -137,7 +146,7 @@ const PremiumPaymentItem = ({
 								: isGrillzTheme
 									? ["rgba(26, 26, 26, 0.95)", "rgba(20, 20, 20, 0.95)"]
 									: ["rgba(255,255,255,0.95)", "rgba(248,249,250,0.95)"]
-					}
+					*/
 					style={[styles.paymentItem, isPaid && styles.paymentItemPaid]}
 					start={{ x: 0, y: 0 }}
 					end={{ x: 1, y: 1 }}
@@ -151,7 +160,7 @@ const PremiumPaymentItem = ({
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
 							>
-								<MaterialIcons name="check" size={18} color="#fff" />
+								<MaterialIcons name="check" size={18} color={paymentTokens.iconOnPrimary} />
 							</LinearGradient>
 						) : isSelected ? (
 							<LinearGradient
@@ -160,11 +169,13 @@ const PremiumPaymentItem = ({
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
 							>
-								<MaterialIcons name="check" size={18} color="#fff" />
+								<MaterialIcons name="check" size={18} color={paymentTokens.iconOnPrimary} />
 							</LinearGradient>
 						) : (
-							<View style={[styles.checkboxEmpty, isGrillzTheme && { backgroundColor: "#1A1A1A", borderColor: "#3F3F46" }]}>
-								<View style={[styles.checkboxInner, isGrillzTheme && { backgroundColor: "#2A2A2A" }]} />
+							// LEGACY 0.3.3-A: was [styles.checkboxEmpty, isGrillzTheme && { backgroundColor: "#1A1A1A", borderColor: "#3F3F46" }]
+							<View style={[styles.checkboxEmpty, paymentTokens.checkboxEmpty]}>
+								{/* LEGACY 0.3.3-A: was [styles.checkboxInner, isGrillzTheme && { backgroundColor: "#2A2A2A" }] */}
+								<View style={[styles.checkboxInner, paymentTokens.checkboxInner]} />
 							</View>
 						)}
 					</View>
@@ -176,7 +187,8 @@ const PremiumPaymentItem = ({
 								styles.paymentItemName,
 								isPaid && styles.paymentItemNamePaid,
 								!isSelected && !isPaid && styles.paymentItemNameUnselected,
-								!isSelected && !isPaid && isGrillzTheme && { color: "#D4D4D8" },
+								// LEGACY 0.3.3-A: was !isSelected && !isPaid && isGrillzTheme && { color: "#D4D4D8" }
+								!isSelected && !isPaid && paymentTokens.itemTextIdle && { color: paymentTokens.itemTextIdle },
 							]}
 						>
 							{item.name}
@@ -186,7 +198,8 @@ const PremiumPaymentItem = ({
 								styles.paymentItemDetails,
 								isPaid && styles.paymentItemDetailsPaid,
 								!isSelected && !isPaid && styles.paymentItemDetailsUnselected,
-								!isSelected && !isPaid && isGrillzTheme && { color: "#A1A1AA" },
+								// LEGACY 0.3.3-A: was !isSelected && !isPaid && isGrillzTheme && { color: "#A1A1AA" }
+								!isSelected && !isPaid && paymentTokens.itemSubtextIdle && { color: paymentTokens.itemSubtextIdle },
 							]}
 						>
 							{item.price}€ × {item.quantity || 1}
@@ -197,12 +210,13 @@ const PremiumPaymentItem = ({
 					<View style={styles.priceBadgeWrapper}>
 						{isPaid ? (
 							<View style={styles.paidBadge}>
-								<MaterialIcons name="check-circle" size={14} color="#38ef7d" />
+								<MaterialIcons name="check-circle" size={14} color={paymentTokens.successIcon} />
 								<Text style={styles.paidBadgeText}>Payé</Text>
 							</View>
 						) : (
+							// LEGACY 0.3.3-A: was colors={isSelected ? theme.primary : isGrillzTheme ? ["#2A2A2A", "#1F1F1F"] : ["#e9ecef", "#dee2e6"]}
 							<LinearGradient
-								colors={isSelected ? theme.primary : isGrillzTheme ? ["#2A2A2A", "#1F1F1F"] : ["#e9ecef", "#dee2e6"]}
+								colors={isSelected ? theme.primary : paymentTokens.itemGradientIdle}
 								style={styles.priceBadge}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 0 }}
@@ -211,7 +225,8 @@ const PremiumPaymentItem = ({
 									style={[
 										styles.priceBadgeText,
 										!isSelected && styles.priceBadgeTextDark,
-										!isSelected && isGrillzTheme && { color: "#D4D4D8" },
+										// LEGACY 0.3.3-A: was !isSelected && isGrillzTheme && { color: "#D4D4D8" }
+										!isSelected && paymentTokens.itemPriceIdle && { color: paymentTokens.itemPriceIdle },
 									]}
 								>
 									{itemTotal.toFixed(2)}€
@@ -300,6 +315,16 @@ export default function Payment({
 	const theme = buildSafeTheme(
 		config?.style,
 		isGrillzTheme ? "grillz" : config?.styleKey,
+	);
+
+	// 🔑 Phase 0.3.3-A — useThemeKey() coexiste avec useRestaurantConfig (strangler).
+	// styleKey est la single source of truth tenant identity (cf. useThemeKey JSDoc).
+	// Fallback sur config?.styleKey tant que la propagation tees Phase 0.3 n'est
+	// pas garantie sur tous les chemins de boot (deep links, refresh).
+	const themeKey = useThemeKey();
+	const paymentItemTokens = useMemo(
+		() => getPaymentItemTokens(themeKey?.styleKey || config?.styleKey),
+		[themeKey?.styleKey, config?.styleKey],
 	);
 
 	// 🎨 Animation refs
@@ -1409,6 +1434,7 @@ export default function Payment({
 										onToggle={() => toggleItem(item)}
 										theme={theme}
 										isGrillzTheme={isGrillzTheme}
+										paymentTokens={paymentItemTokens}
 									/>
 								);
 							})}
@@ -1441,6 +1467,7 @@ export default function Payment({
 										isPaid={true}
 										theme={theme}
 										isGrillzTheme={isGrillzTheme}
+										paymentTokens={paymentItemTokens}
 									/>
 								))}
 							</View>

@@ -8,6 +8,15 @@
  *
  * ⚠️ Ce thème est NEUTRE : il ne représente aucun restaurant spécifique.
  * Les thèmes spécifiques (Grillz, Italia...) sont gérés par la BDD via useRestaurantConfig.
+ *
+ * 📝 DETTE PHASE 1.3 — TOKENS COMPONENT-SCOPED INLINE
+ * Les tokens component-scoped ajoutés en Phase 0.3.3 (ex: getPaymentItemTokens)
+ * embarquent leurs valeurs (couleurs, gradients) en dur dans ce fichier JS,
+ * branchées sur styleKey via if/else. C'est temporaire — en Phase 1.3 ces
+ * valeurs migreront vers le payload BDD via enrichissement de
+ * RestaurantThemeAssignment.style (cf. Brain 04-SunnyGo/theming-roadmap.md).
+ * Les helpers garderont leur signature (styleKey → tokens), seule la source
+ * des valeurs changera (BDD au lieu de in-file).
  */
 
 // =============================================================================
@@ -227,6 +236,70 @@ export const buildSafeTheme = (dbStyle, typeOrKey) => {
 	if (!dbStyle) return base;
 	// Fusion : BDD surcharge la base, toutes les propriétés sont garanties
 	return { ...base, ...dbStyle };
+};
+
+// =============================================================================
+// COMPONENT-SCOPED TOKENS — Phase 0.3.3 strangler migration
+// =============================================================================
+// Ces helpers retournent les tokens spécifiques à un sous-composant donné,
+// branchés sur styleKey. Permet de migrer Payment.jsx hors des `isGrillzTheme`
+// hardcodés sans toucher la structure des THEMES globaux (DEFAULT_THEME etc.).
+//
+// Convention : les overrides "Grillz only" (ex: itemTextIdle) renvoient `null`
+// quand non applicables — ainsi le composant peut faire :
+//   <View style={[styles.base, tokens.override]} />
+// React Native ignore proprement `null` dans les arrays de style.
+//
+// Phase 1.3 : les valeurs hardcodées ici migreront vers le payload BDD.
+// =============================================================================
+
+/**
+ * 🎨 Tokens pour le sous-composant PremiumPaymentItem (Payment.jsx Zone A).
+ *
+ * @param {string|null|undefined} styleKey - Clé de style du restaurant courant
+ *   (ex: "grillz", "cucina", null pendant boot).
+ * @returns {{
+ *   itemBackground: { paid: string[], selected: string[], idle: string[] },
+ *   checkboxEmpty: object|null,
+ *   checkboxInner: object|null,
+ *   itemTextIdle: string|null,
+ *   itemSubtextIdle: string|null,
+ *   itemPriceIdle: string|null,
+ *   iconOnPrimary: string,
+ *   successIcon: string,
+ *   itemGradientIdle: string[],
+ * }}
+ */
+export const getPaymentItemTokens = (styleKey) => {
+	const isGrillz = (styleKey || "").toLowerCase() === "grillz";
+	return {
+		// Fond gradient de la card item (3 états)
+		itemBackground: {
+			paid: ["rgba(56, 239, 125, 0.2)", "rgba(17, 153, 142, 0.1)"],
+			selected: isGrillz
+				? ["rgba(234, 88, 12, 0.35)", "rgba(249, 115, 22, 0.2)"]
+				: ["rgba(102, 126, 234, 0.3)", "rgba(118, 75, 162, 0.2)"],
+			idle: isGrillz
+				? ["rgba(26, 26, 26, 0.95)", "rgba(20, 20, 20, 0.95)"]
+				: ["rgba(255,255,255,0.95)", "rgba(248,249,250,0.95)"],
+		},
+		// Checkbox idle (override Grillz only, null sinon)
+		checkboxEmpty: isGrillz
+			? { backgroundColor: "#1A1A1A", borderColor: "#3F3F46" }
+			: null,
+		checkboxInner: isGrillz ? { backgroundColor: "#2A2A2A" } : null,
+		// Couleurs texte item idle (override Grillz only)
+		itemTextIdle: isGrillz ? "#D4D4D8" : null,
+		itemSubtextIdle: isGrillz ? "#A1A1AA" : null,
+		itemPriceIdle: isGrillz ? "#D4D4D8" : null,
+		// Icônes — valeurs identiques tous thèmes (haut contraste sur gradient coloré)
+		iconOnPrimary: "#fff",
+		successIcon: "#38ef7d",
+		// Gradient prix badge idle (Grillz dark / default light)
+		itemGradientIdle: isGrillz
+			? ["#2A2A2A", "#1F1F1F"]
+			: ["#e9ecef", "#dee2e6"],
+	};
 };
 
 export default DEFAULT_THEME;
