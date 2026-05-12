@@ -101,6 +101,16 @@ export const useThemeStore = create((set, get) => {
               customThemeEnabled: cachedTheme.customThemeEnabled,
               loading: false,
             });
+            // ──────────────────────────────────────────────────────
+            // 🔑 Phase 0.3 — TEE vers themeKey (Option A strangler)
+            // Spread obligatoire: ne pas écraser category/styleKey
+            // déjà alimentés par les autres tees.
+            // ──────────────────────────────────────────────────────
+            get().setSession({
+              ...get().themeKey,
+              restaurantId,
+              themeId: cachedTheme.theme.id,
+            });
             return cachedTheme;
           }
         }
@@ -138,6 +148,17 @@ export const useThemeStore = create((set, get) => {
           abVariant: themeData.abVariant,
           customThemeEnabled: themeData.customThemeEnabled,
           loading: false,
+        });
+
+        // ──────────────────────────────────────────────────────
+        // 🔑 Phase 0.3 — TEE vers themeKey (Option A strangler)
+        // Spread obligatoire: ne pas écraser category/styleKey
+        // déjà alimentés par les autres tees.
+        // ──────────────────────────────────────────────────────
+        get().setSession({
+          ...get().themeKey,
+          restaurantId,
+          themeId: themeData.theme.id,
         });
 
         console.log(`✅ [useThemeStore] Theme fetched and cached`);

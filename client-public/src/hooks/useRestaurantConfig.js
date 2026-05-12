@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { API_CONFIG } from "shared-api/config/apiConfig.js";
+import { useThemeStore } from "../stores/useThemeStore.js";
 
 /**
  * Hook pour charger la configuration dynamique d'un restaurant (style + menu)
@@ -98,6 +99,25 @@ export default function useRestaurantConfig(restaurantId) {
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [restaurantId]); // ⚠️ Seulement restaurantId, pas config
+
+	// ────────────────────────────────────────────────────────────────
+	// 🔑 Phase 0.3 — TEE vers themeKey (Option A strangler)
+	// Pousse styleKey vers useThemeStore.themeKey dès qu'il est résolu.
+	// PATTERN OBLIGATOIRE: spread de l'état actuel + override partiel,
+	// jamais setSession({ styleKey }) seul — sinon on écraserait
+	// category/themeId déjà alimentés par les autres tees.
+	// Le garde-fou idempotent dans setSession() évite les re-renders
+	// inutiles si la valeur est identique (ex: re-mount d'un écran).
+	// ────────────────────────────────────────────────────────────────
+	useEffect(() => {
+		if (!restaurantId || !config?.styleKey) return;
+		const themeStore = useThemeStore.getState();
+		themeStore.setSession({
+			...themeStore.themeKey,
+			restaurantId,
+			styleKey: config.styleKey,
+		});
+	}, [restaurantId, config?.styleKey]);
 
 	return {
 		config,

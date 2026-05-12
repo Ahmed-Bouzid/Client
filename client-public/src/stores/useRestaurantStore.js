@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { API_CONFIG } from "shared-api/config/apiConfig.js";
 import { useFeatureLevelStore } from "./useFeatureLevelStore.js";
+import { useThemeStore } from "./useThemeStore.js";
 
 export const useRestaurantStore = create((set, get) => ({
 	category: null, // 'restaurant', 'foodtruck', 'snack', etc.
@@ -52,6 +53,21 @@ export const useRestaurantStore = create((set, get) => ({
 				googleUrl: data.googleUrl || null,
 				lastFetchedId: restaurantId, // 🎯 Marquer comme fetch
 				isFetching: false,
+			});
+
+			// ──────────────────────────────────────────────────────────
+			// 🔑 Phase 0.3 — TEE vers themeKey (Option A strangler)
+			// PATTERN OBLIGATOIRE: spread de l'état actuel + override partiel.
+			// JAMAIS setSession({ category }) seul — sinon on écrase à null
+			// les champs déjà résolus par les autres tees (themeId/styleKey).
+			// Le garde-fou idempotent dans setSession() évite les re-renders
+			// inutiles si les valeurs sont identiques.
+			// ──────────────────────────────────────────────────────────
+			const themeStore = useThemeStore.getState();
+			themeStore.setSession({
+				...themeStore.themeKey,
+				restaurantId,
+				category,
 			});
 
 			return true;
