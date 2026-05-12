@@ -302,4 +302,60 @@ export const getPaymentItemTokens = (styleKey) => {
 	};
 };
 
+/**
+ * 🎨 Tokens pour le Container racine + Header de Payment.jsx (Zone B).
+ *
+ * @param {string|null|undefined} styleKey - Clé de style du restaurant courant
+ *   (ex: "grillz", "cucina", null pendant boot).
+ * @returns {{
+ *   containerBackground: string[]|null,
+ *   bgDecorSecondaryKey: string,
+ *   headerIconGradientKey: string,
+ *   headingColor: string|null,
+ *   bodyMutedColor: string|null,
+ *   toggleRowBackground: object|null,
+ *   toggleActiveOverride: object|null,
+ *   toggleIconInactive: string,
+ *   iconOnPrimary: string,
+ * }}
+ */
+export const getPaymentContainerTokens = (styleKey) => {
+	const isGrillz = (styleKey || "").toLowerCase() === "grillz";
+	return {
+		// T1 — Gradient racine du container (3 stops). Côté Cucina retourne null
+		// pour que le JSX puisse appliquer la fallback `theme.background || [theme.dark, theme.card]`
+		// via l'opérateur || (null, pas undefined, pour comportement prévisible).
+		containerBackground: isGrillz
+			? ["#0D0D0D", "#171717", "#0F0F0F"]
+			: null,
+
+		// T2 et T3 retournent une clé de palette du theme, à résoudre côté JSX
+		// via theme[tokens.xxxKey]. Pattern volontaire pour garder le helper pur,
+		// sans couplage runtime au theme.
+		bgDecorSecondaryKey: isGrillz ? "accent" : "success",
+		headerIconGradientKey: isGrillz ? "primary" : "success",
+
+		// T4 / T5 — Couleurs typographiques (override Grillz only)
+		headingColor: isGrillz ? "#F8FAFC" : null,
+		bodyMutedColor: isGrillz ? "#A1A1AA" : null,
+
+		// T6 — Background du toggle row "Mes articles / Toute la table" (Grillz only)
+		toggleRowBackground: isGrillz
+			? { backgroundColor: "rgba(255,255,255,0.08)" }
+			: null,
+
+		// T7 — Override couleur du toggle actif (default Cucina = styles.clientToggleBtnActive
+		// reste actif via le pattern d'array, l'override Grillz écrase juste le bg en dernière position)
+		toggleActiveOverride: isGrillz ? { backgroundColor: "#EA580C" } : null,
+
+		// T8 — Couleur icône du toggle inactif
+		toggleIconInactive: isGrillz ? "#A1A1AA" : "#666",
+
+		// T9 — Icônes sur fond gradient primary/secondary/accent (commun aux 2 thèmes).
+		// ⚠️ DUPLICATION INTENTIONNELLE avec getPaymentItemTokens.iconOnPrimary —
+		// micro-dette Phase 0.6 (factoriser en THEME_CONSTANTS.iconOnPrimary).
+		iconOnPrimary: "#fff",
+	};
+};
+
 export default DEFAULT_THEME;

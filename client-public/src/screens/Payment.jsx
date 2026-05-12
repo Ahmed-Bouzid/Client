@@ -56,7 +56,7 @@ import { useRestaurantStore } from "../stores/useRestaurantStore";
 import { useReservationStatus } from "../hooks/useReservationStatus"; // 🚪 Écoute fermeture réservation
 import FeedbackScreen from "../components/FeedbackScreen"; // 🌟 Feedback & Avis Google
 import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 API Feedback
-import { buildSafeTheme, DEFAULT_THEME, getPaymentItemTokens } from "../theme/defaultTheme";
+import { buildSafeTheme, DEFAULT_THEME, getPaymentItemTokens, getPaymentContainerTokens } from "../theme/defaultTheme";
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
 import useThemeKey from "../hooks/useThemeKey";
 import WebStripeCheckout from "../components/payment/WebStripeCheckout";
@@ -324,6 +324,11 @@ export default function Payment({
 	const themeKey = useThemeKey();
 	const paymentItemTokens = useMemo(
 		() => getPaymentItemTokens(themeKey?.styleKey || config?.styleKey),
+		[themeKey?.styleKey, config?.styleKey],
+	);
+	// Phase 0.3.3-B — tokens scoped Container + Header (cf. getPaymentContainerTokens)
+	const paymentContainerTokens = useMemo(
+		() => getPaymentContainerTokens(themeKey?.styleKey || config?.styleKey),
 		[themeKey?.styleKey, config?.styleKey],
 	);
 
@@ -1110,10 +1115,14 @@ export default function Payment({
 		return (
 			<LinearGradient
 				colors={
+					paymentContainerTokens.containerBackground ||
+					theme.background || [theme.dark, theme.card]
+				}
+				/* LEGACY 0.3.3-B: was
 					isGrillzTheme
 						? ["#0D0D0D", "#171717", "#0F0F0F"]
 						: theme.background || [theme.dark, theme.card]
-				}
+				*/
 				style={styles.container}
 			>
 				<View style={styles.errorContainer}>
@@ -1123,10 +1132,12 @@ export default function Payment({
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 1 }}
 					>
-						<MaterialIcons name="error-outline" size={48} color="#fff" />
+						<MaterialIcons name="error-outline" size={48} color={paymentContainerTokens.iconOnPrimary} />
 					</LinearGradient>
-					<Text style={[styles.errorTitle, isGrillzTheme && { color: "#F8FAFC" }]}>Aucune commande</Text>
-					<Text style={[styles.errorText, isGrillzTheme && { color: "#A1A1AA" }]}>
+					{/* LEGACY 0.3.3-B: was [styles.errorTitle, isGrillzTheme && { color: "#F8FAFC" }] */}
+					<Text style={[styles.errorTitle, paymentContainerTokens.headingColor && { color: paymentContainerTokens.headingColor }]}>Aucune commande</Text>
+					{/* LEGACY 0.3.3-B: was [styles.errorText, isGrillzTheme && { color: "#A1A1AA" }] */}
+					<Text style={[styles.errorText, paymentContainerTokens.bodyMutedColor && { color: paymentContainerTokens.bodyMutedColor }]}>
 						Aucune commande n'a été trouvée pour cette réservation.{"\n"}
 						Retournez au menu et commandez des articles d'abord.
 					</Text>
@@ -1137,7 +1148,7 @@ export default function Payment({
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 0 }}
 						>
-							<MaterialIcons name="arrow-back" size={20} color="#fff" />
+							<MaterialIcons name="arrow-back" size={20} color={paymentContainerTokens.iconOnPrimary} />
 							<Text style={styles.errorBackButtonText}>Retour au Menu</Text>
 						</LinearGradient>
 					</TouchableOpacity>
@@ -1181,10 +1192,14 @@ export default function Payment({
 	return (
 		<LinearGradient
 			colors={
+				paymentContainerTokens.containerBackground ||
+				theme.background || [theme.dark, theme.card]
+			}
+			/* LEGACY 0.3.3-B: was
 				isGrillzTheme
 					? ["#0D0D0D", "#171717", "#0F0F0F"]
 					: theme.background || [theme.dark, theme.card]
-			}
+			*/
 			style={styles.container}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 1 }}
@@ -1196,8 +1211,9 @@ export default function Payment({
 					style={[styles.bgCircle, styles.bgCircle1]}
 				/>
 				<LinearGradient
+					/* LEGACY 0.3.3-B: was [...(isGrillzTheme ? theme.accent : theme.success), "transparent"] */
 					colors={[
-						...(isGrillzTheme ? theme.accent : theme.success),
+						...theme[paymentContainerTokens.bgDecorSecondaryKey],
 						"transparent",
 					]}
 					style={[styles.bgCircle, styles.bgCircle2]}
@@ -1220,16 +1236,18 @@ export default function Payment({
 					]}
 				>
 					<LinearGradient
-						colors={isGrillzTheme ? theme.primary : theme.success}
-						style={styles.headerIcon}
-						start={{ x: 0, y: 0 }}
-						end={{ x: 1, y: 1 }}
-					>
-						<Ionicons name="card" size={36} color="#fff" />
-					</LinearGradient>
-					<Text style={[styles.title, isGrillzTheme && { color: "#F8FAFC" }]}>Paiement</Text>
-					<Text style={[styles.subtitle, isGrillzTheme && { color: "#A1A1AA" }]}>Sélectionnez les articles à payer</Text>
-
+					/* LEGACY 0.3.3-B: was colors={isGrillzTheme ? theme.primary : theme.success} */
+					colors={theme[paymentContainerTokens.headerIconGradientKey]}
+					style={styles.headerIcon}
+					start={{ x: 0, y: 0 }}
+					end={{ x: 1, y: 1 }}
+				>
+					<Ionicons name="card" size={36} color={paymentContainerTokens.iconOnPrimary} />
+				</LinearGradient>
+				{/* LEGACY 0.3.3-B: was [styles.title, isGrillzTheme && { color: "#F8FAFC" }] */}
+				<Text style={[styles.title, paymentContainerTokens.headingColor && { color: paymentContainerTokens.headingColor }]}>Paiement</Text>
+				{/* LEGACY 0.3.3-B: was [styles.subtitle, isGrillzTheme && { color: "#A1A1AA" }] */}
+				<Text style={[styles.subtitle, paymentContainerTokens.bodyMutedColor && { color: paymentContainerTokens.bodyMutedColor }]}>Sélectionnez les articles à payer</Text>
 					{/* 🍔 Bannière statut foodtruck / fast-food */}
 					{(isFoodtruck || isFastFood) && (
 						<View style={styles.statusBanner}>
@@ -1260,7 +1278,7 @@ export default function Payment({
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 0 }}
 								>
-									<MaterialIcons name="pie-chart" size={18} color="#fff" />
+									<MaterialIcons name="pie-chart" size={18} color={paymentContainerTokens.iconOnPrimary} />
 									<Text style={styles.quickSelectText}>1/3</Text>
 								</LinearGradient>
 							</TouchableOpacity>
@@ -1283,7 +1301,7 @@ export default function Payment({
 												: "select-all"
 										}
 										size={18}
-										color="#fff"
+										color={paymentContainerTokens.iconOnPrimary}
 									/>
 									<Text style={styles.quickSelectText}>
 										{selectedItems.size === availableItems.length
@@ -1300,45 +1318,50 @@ export default function Payment({
 				<View style={styles.itemsSection}>
 					{/* 👥 Toggle : Mes articles / Toute la table */}
 					{otherClientsCount > 0 && (
-						<View style={[styles.clientToggleRow, isGrillzTheme && { backgroundColor: "rgba(255,255,255,0.08)" }]}>
-							<TouchableOpacity
-								style={[
-									styles.clientToggleBtn,
-									!payForWholeTable && styles.clientToggleBtnActive,
-									isGrillzTheme && !payForWholeTable && styles.clientToggleBtnActiveGrillz,
-								]}
-								onPress={() => setPayForWholeTable(false)}
-								activeOpacity={0.8}
-							>
-								<MaterialIcons name="person" size={15} color={!payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#666"} />
-								<Text style={[styles.clientToggleText, !payForWholeTable && styles.clientToggleTextActive]}>
-									Mes articles
-								</Text>
-							</TouchableOpacity>
-							<TouchableOpacity
-								style={[
-									styles.clientToggleBtn,
-									payForWholeTable && styles.clientToggleBtnActive,
-									isGrillzTheme && payForWholeTable && styles.clientToggleBtnActiveGrillz,
-								]}
-								onPress={() =>
-									Alert.alert(
-										"Payer pour toute la table",
-										"Vous allez régler les commandes de tous les clients de cette table. Confirmez-vous ?",
-										[
-											{ text: "Annuler", style: "cancel" },
-											{ text: "Confirmer", onPress: () => setPayForWholeTable(true) },
-										],
-									)
-								}
-								activeOpacity={0.8}
-							>
-								<MaterialIcons name="group" size={15} color={payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#666"} />
-								<Text style={[styles.clientToggleText, payForWholeTable && styles.clientToggleTextActive]}>
-									Toute la table
-								</Text>
-							</TouchableOpacity>
-						</View>
+					/* LEGACY 0.3.3-B: was [styles.clientToggleRow, isGrillzTheme && { backgroundColor: "rgba(255,255,255,0.08)" }] */
+					<View style={[styles.clientToggleRow, paymentContainerTokens.toggleRowBackground]}>
+						<TouchableOpacity
+							style={[
+								styles.clientToggleBtn,
+								!payForWholeTable && styles.clientToggleBtnActive,
+								// LEGACY 0.3.3-B: was isGrillzTheme && !payForWholeTable && styles.clientToggleBtnActiveGrillz
+								!payForWholeTable && paymentContainerTokens.toggleActiveOverride,
+							]}
+							onPress={() => setPayForWholeTable(false)}
+							activeOpacity={0.8}
+						>
+							{/* LEGACY 0.3.3-B: was color={!payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#666"} */}
+							<MaterialIcons name="person" size={15} color={!payForWholeTable ? paymentContainerTokens.iconOnPrimary : paymentContainerTokens.toggleIconInactive} />
+							<Text style={[styles.clientToggleText, !payForWholeTable && styles.clientToggleTextActive]}>
+								Mes articles
+							</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={[
+								styles.clientToggleBtn,
+								payForWholeTable && styles.clientToggleBtnActive,
+								// LEGACY 0.3.3-B: was isGrillzTheme && payForWholeTable && styles.clientToggleBtnActiveGrillz
+								payForWholeTable && paymentContainerTokens.toggleActiveOverride,
+							]}
+							onPress={() =>
+								Alert.alert(
+									"Payer pour toute la table",
+									"Vous allez régler les commandes de tous les clients de cette table. Confirmez-vous ?",
+									[
+										{ text: "Annuler", style: "cancel" },
+										{ text: "Confirmer", onPress: () => setPayForWholeTable(true) },
+									],
+								)
+							}
+							activeOpacity={0.8}
+						>
+							{/* LEGACY 0.3.3-B: was color={payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#666"} */}
+							<MaterialIcons name="group" size={15} color={payForWholeTable ? paymentContainerTokens.iconOnPrimary : paymentContainerTokens.toggleIconInactive} />
+							<Text style={[styles.clientToggleText, payForWholeTable && styles.clientToggleTextActive]}>
+								Toute la table
+							</Text>
+						</TouchableOpacity>
+					</View>
 					)}
 
 					{/* Section Header */}
@@ -1350,9 +1373,10 @@ export default function Payment({
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
 							>
-								<MaterialIcons name="shopping-cart" size={18} color="#fff" />
+								<MaterialIcons name="shopping-cart" size={18} color={paymentContainerTokens.iconOnPrimary} />
 							</LinearGradient>
-							<Text style={[styles.sectionTitle, isGrillzTheme && { color: "#F8FAFC" }]}>
+							{/* LEGACY 0.3.3-B: was [styles.sectionTitle, isGrillzTheme && { color: "#F8FAFC" }] */}
+							<Text style={[styles.sectionTitle, paymentContainerTokens.headingColor && { color: paymentContainerTokens.headingColor }]}>
 								Articles à payer ({availableItems.length})
 							</Text>
 						</View>
@@ -1367,7 +1391,7 @@ export default function Payment({
 									<MaterialIcons
 										name={allSelected ? "remove-done" : "done-all"}
 										size={16}
-										color="#fff"
+										color={paymentContainerTokens.iconOnPrimary}
 									/>
 									<Text style={styles.selectAllText}>
 										{allSelected ? "Désélectionner" : "Tout sélectionner"}
@@ -1386,10 +1410,12 @@ export default function Payment({
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
 							>
-								<MaterialIcons name="celebration" size={48} color="#fff" />
+								<MaterialIcons name="celebration" size={48} color={paymentContainerTokens.iconOnPrimary} />
 							</LinearGradient>
-							<Text style={[styles.emptyStateTitle, isGrillzTheme && { color: "#F8FAFC" }]}>Tout est payé !</Text>
-							<Text style={[styles.emptyStateSubtext, isGrillzTheme && { color: "#A1A1AA" }]}>
+							{/* LEGACY 0.3.3-B: was [styles.emptyStateTitle, isGrillzTheme && { color: "#F8FAFC" }] */}
+							<Text style={[styles.emptyStateTitle, paymentContainerTokens.headingColor && { color: paymentContainerTokens.headingColor }]}>Tout est payé !</Text>
+							{/* LEGACY 0.3.3-B: was [styles.emptyStateSubtext, isGrillzTheme && { color: "#A1A1AA" }] */}
+							<Text style={[styles.emptyStateSubtext, paymentContainerTokens.bodyMutedColor && { color: paymentContainerTokens.bodyMutedColor }]}>
 								Vous pouvez retourner au menu.
 							</Text>
 							<TouchableOpacity
@@ -1411,7 +1437,7 @@ export default function Payment({
 									<MaterialIcons
 										name="restaurant-menu"
 										size={20}
-										color="#fff"
+										color={paymentContainerTokens.iconOnPrimary}
 									/>
 									<Text style={styles.emptyStateButtonText}>
 										Retour au menu
@@ -1785,6 +1811,7 @@ const styles = StyleSheet.create({
 		backgroundColor: "#667eea",
 	},
 	clientToggleBtnActiveGrillz: {
+		// LEGACY 0.3.3-B — orphan, cleanup 0.3.3-D
 		backgroundColor: "#EA580C",
 	},
 	clientToggleText: {
