@@ -56,7 +56,7 @@ import { useRestaurantStore } from "../stores/useRestaurantStore";
 import { useReservationStatus } from "../hooks/useReservationStatus"; // 🚪 Écoute fermeture réservation
 import FeedbackScreen from "../components/FeedbackScreen"; // 🌟 Feedback & Avis Google
 import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 API Feedback
-import { buildSafeTheme, DEFAULT_THEME, getPaymentItemTokens, getPaymentContainerTokens, getPaymentButtonsTokens } from "../theme/defaultTheme";
+import { buildSafeTheme, DEFAULT_THEME, getPaymentItemTokens, getPaymentContainerTokens, getPaymentButtonsTokens, getPaymentModalTokens } from "../theme/defaultTheme";
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
 import useThemeKey from "../hooks/useThemeKey";
 import WebStripeCheckout from "../components/payment/WebStripeCheckout";
@@ -334,6 +334,11 @@ export default function Payment({
 	// Phase 0.3.3-C — tokens scoped Boutons paiement (cf. getPaymentButtonsTokens)
 	const paymentButtonsTokens = useMemo(
 		() => getPaymentButtonsTokens(themeKey?.styleKey || config?.styleKey),
+		[themeKey?.styleKey, config?.styleKey],
+	);
+	// Phase 0.3.3-D1 — tokens scoped Modal Stripe web (cf. getPaymentModalTokens)
+	const paymentModalTokens = useMemo(
+		() => getPaymentModalTokens(themeKey?.styleKey || config?.styleKey),
 		[themeKey?.styleKey, config?.styleKey],
 	);
 
@@ -1738,9 +1743,12 @@ export default function Payment({
 					}}
 				>
 					<View style={styles.webModalBackdrop}>
-						<View style={[styles.webModalCard, isGrillzTheme && styles.webModalCardGrillz]}>
-							<Text style={[styles.webModalTitle, isGrillzTheme && styles.webModalTitleGrillz]}>Paiement sécurisé Stripe</Text>
-							<Text style={[styles.webModalSubtitle, isGrillzTheme && styles.webModalSubtitleGrillz]}>
+						{/* LEGACY 0.3.3-D1: was [styles.webModalCard, isGrillzTheme && styles.webModalCardGrillz] */}
+						<View style={[styles.webModalCard, paymentModalTokens.cardOverride]}>
+							{/* LEGACY 0.3.3-D1: was [styles.webModalTitle, isGrillzTheme && styles.webModalTitleGrillz] */}
+							<Text style={[styles.webModalTitle, paymentModalTokens.titleOverride]}>Paiement sécurisé Stripe</Text>
+							{/* LEGACY 0.3.3-D1: was [styles.webModalSubtitle, isGrillzTheme && styles.webModalSubtitleGrillz] */}
+							<Text style={[styles.webModalSubtitle, paymentModalTokens.subtitleOverride]}>
 								Entrez vos informations de carte pour finaliser le paiement.
 							</Text>
 							<WebStripeCheckout
@@ -1793,13 +1801,16 @@ const styles = StyleSheet.create({
 		color: "#475569",
 		marginBottom: 12,
 	},
+	// LEGACY 0.3.3-D1 — orphan, cleanup 0.3.3-D2
 	webModalCardGrillz: {
 		backgroundColor: "#141414",
 		borderColor: "#3F3F46",
 	},
+	// LEGACY 0.3.3-D1 — orphan, cleanup 0.3.3-D2
 	webModalTitleGrillz: {
 		color: "#F8FAFC",
 	},
+	// LEGACY 0.3.3-D1 — orphan, cleanup 0.3.3-D2
 	webModalSubtitleGrillz: {
 		color: "#D4D4D8",
 	},

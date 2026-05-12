@@ -432,4 +432,44 @@ export const getPaymentButtonsTokens = (styleKey) => {
 	};
 };
 
+/**
+ * Phase 0.3.3-D1 — Tokens scopés à la zone Modal Stripe web (Payment.jsx L1728-L1763)
+ *
+ * Couvre uniquement le wrapper Modal RN web (View card + Title + Subtitle).
+ * NE COUVRE PAS l'iframe Stripe Elements (theming via Stripe appearance API
+ * côté WebStripeCheckout — strictement hors périmètre theming SunnyGo).
+ *
+ * Pattern Override : retourne un objet style RN (ou null) à appliquer en seconde
+ * position du tableau JSX [styles.base, tokens.xxxOverride]. Cohérent avec B/C
+ * (toggleRowBackground, infoNoteBorderOverride). Le tableau RN ignore null.
+ *
+ * Pourquoi pas de tokens *Key palette ? Les couleurs Grillz dark (#141414, #3F3F46)
+ * ne mappent à AUCUNE clé de palette du theme. Override inline obligatoire.
+ *
+ * Stratégie strangler : Cucina = défaut visuel via StyleSheet de base
+ * (webModalCard / webModalTitle / webModalSubtitle), Grillz = override via tokens.
+ *
+ * Sites NON-thémables documentés :
+ *  - webModalBackdrop scrim rgba(0,0,0,0.5) : système universel (cross-tenant)
+ *  - Stripe Elements iframe : géré par Stripe appearance API (hors périmètre)
+ *
+ * @param {string} styleKey - "grillz" | "cucina" | autre
+ * @returns {object} tokens scopés à la zone Modal Stripe web
+ */
+export const getPaymentModalTokens = (styleKey) => {
+	const isGrillz = (styleKey || "").toLowerCase() === "grillz";
+	return {
+		// === MODAL CARD (background + border, override Grillz only) ===
+		cardOverride: isGrillz
+			? { backgroundColor: "#141414", borderColor: "#3F3F46" }
+			: null,
+
+		// === MODAL TITLE color (override Grillz only) ===
+		titleOverride: isGrillz ? { color: "#F8FAFC" } : null,
+
+		// === MODAL SUBTITLE color (override Grillz only) ===
+		subtitleOverride: isGrillz ? { color: "#D4D4D8" } : null,
+	};
+};
+
 export default DEFAULT_THEME;
