@@ -35,10 +35,47 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRestaurantStore } from "../stores/useRestaurantStore";
 import { useReservationStatus } from "../hooks/useReservationStatus";
+import useThemeKey from "../hooks/useThemeKey";
+import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
+import {
+  getOrderContainerTokens,
+  getOrderHeaderTokens,
+  getOrderSummaryTokens,
+  getOrderCardTokens,
+  getOrderFooterTokens,
+} from "../theme/defaultTheme";
 
 const { width } = Dimensions.get("window");
 const PANINI_IMAGE = require("../../assets/images/menu/image-fond/panini.png");
-const GRILLZ_RESTAURANT_ID = "695e4300adde654b80f6911a";
+
+// 🔑 LEGACY 0.4-A — Fallback synchrone tant que la tee styleKey n'est pas
+// branchée AVANT OrderScreen dans le flow (MenuScreen / App.jsx ne montent
+// pas useRestaurantConfig en amont, donc themeKey.styleKey peut être null
+// au premier render). À retirer Phase 0.6 quand setSession() sera garanti
+// pre-mount via tee globale au boot.
+const GRILLZ_RESTAURANT_ID_FALLBACK = "695e4300adde654b80f6911a";
+
+// 🚨 BDD-DEBT 0.4-A — La BDD retourne styleKey "grills" (avec S) alors que
+// l'ensemble du code (8 helpers getPayment*/getOrder*Tokens dans defaultTheme.js)
+// compare strictement à "grillz" (avec Z). Bug latent qui affecte aussi Payment.jsx
+// (masqué là-bas car la majorité du look Grillz vient de buildSafeTheme(config.style)
+// qui consomme l'objet palette BDD plutôt qu'une comparaison string).
+// Normalisation locale ici pour débloquer 0.4-A. Fix définitif Phase 0.6 :
+//   — soit migration BDD "grills" → "grillz" (nécessite confirmation user + Render redeploy)
+//   — soit alias global STYLE_KEY_ALIASES dans defaultTheme.js
+const normalizeStyleKey = (key) => {
+  if (!key) return null;
+  const lower = String(key).toLowerCase();
+  if (lower === "grills") return "grillz";
+  return lower;
+};
+
+const resolveStyleKeyFallback = (themeKey, config, effectiveRestaurantId) => {
+  if (themeKey?.styleKey) return normalizeStyleKey(themeKey.styleKey);
+  if (config?.styleKey) return normalizeStyleKey(config.styleKey);
+  if (effectiveRestaurantId === GRILLZ_RESTAURANT_ID_FALLBACK) return "grillz";
+  return null;
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROGRESS BAR
@@ -132,11 +169,44 @@ export default function OrderScreen({
   const storeRestaurantId = useRestaurantStore((state) => state.id);
   const restaurantCategory = useRestaurantStore((state) => state.category);
   const effectiveRestaurantId = restaurantId || storeRestaurantId;
-  const isGrillzTheme = effectiveRestaurantId === GRILLZ_RESTAURANT_ID;
   const isFoodtruck = restaurantCategory === "foodtruck";
   const isFastFood = restaurantCategory === "fast-food";
 
-  // 🚪 Écouter fermeture réservation WebSocket
+  // � Phase 0.4-A — useThemeKey() coexiste avec useRestaurantConfig (strangler).
+  // styleKey est la single source of truth tenant identity (cf. useThemeKey JSDoc).
+  // Fallback sur config?.styleKey tant que la propagation tees Phase 0.3 n'est
+  // pas garantie sur tous les chemins de boot (deep links, refresh).
+  const themeKey = useThemeKey();
+  const { config } = useRestaurantConfig(effectiveRestaurantId);
+  // 🔑 Phase 0.4-A — Résolution styleKey en 3 niveaux :
+  //   1) themeKey.styleKey (canonical Zustand, single source of truth)
+  //   2) config.styleKey (fetch backend, ~300ms après mount)
+  //   3) hash hardcoded fallback (LEGACY 0.4-A — synchrone au 1er render)
+  // Niveau 3 nécessaire car OrderScreen est le 1er écran à monter
+  // useRestaurantConfig dans le flow (MenuScreen ne le fait pas).
+  const resolvedStyleKey = resolveStyleKeyFallback(themeKey, config, effectiveRestaurantId);
+  const orderContainerTokens = useMemo(
+    () => getOrderContainerTokens(resolvedStyleKey),
+    [resolvedStyleKey],
+  );
+  const orderHeaderTokens = useMemo(
+    () => getOrderHeaderTokens(resolvedStyleKey),
+    [resolvedStyleKey],
+  );
+  const orderSummaryTokens = useMemo(
+    () => getOrderSummaryTokens(resolvedStyleKey),
+    [resolvedStyleKey],
+  );
+  const orderCardTokens = useMemo(
+    () => getOrderCardTokens(resolvedStyleKey),
+    [resolvedStyleKey],
+  );
+  const orderFooterTokens = useMemo(
+    () => getOrderFooterTokens(resolvedStyleKey),
+    [resolvedStyleKey],
+  );
+
+  // �🚪 Écouter fermeture réservation WebSocket
   useReservationStatus(effectiveRestaurantId, reservationId, onReservationClosed);
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -212,24 +282,24 @@ export default function OrderScreen({
   // RENDER
   // ═══════════════════════════════════════════════════════════════════════
   return (
-    <View style={[styles.container, isGrillzTheme && styles.grillzContainer]}>
+    <View style={[styles.container, { backgroundColor: orderContainerTokens.background }]}>
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <MaterialIcons name="chevron-left" size={28} color={isGrillzTheme ? "#F59E0B" : "#1F2937"} />
+          <MaterialIcons name="chevron-left" size={28} color={orderHeaderTokens.backIconColor} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, isGrillzTheme && styles.grillzHeaderTitle]}>Ma commande en cours</Text>
+        <Text style={[styles.headerTitle, { color: orderHeaderTokens.titleColor }]}>Ma commande en cours</Text>
       </View>
 
       {/* SUMMARY */}
       <View style={styles.summarySection}>
         <View style={styles.summaryLeft}>
-          <Text style={[styles.summaryText, isGrillzTheme && styles.grillzSummaryText]} numberOfLines={2}>
+          <Text style={[styles.summaryText, { color: orderSummaryTokens.textColor }]} numberOfLines={2}>
             {summaryText || "Aucun article"}
           </Text>
-          <Text style={[styles.summaryDate, isGrillzTheme && styles.grillzSummaryDate]}>{dateText}</Text>
+          <Text style={[styles.summaryDate, { color: orderSummaryTokens.dateColor }]}>{dateText}</Text>
         </View>
-        <Text style={[styles.summaryPrice, isGrillzTheme && styles.grillzSummaryPrice]}>{total.toFixed(2)}€</Text>
+        <Text style={[styles.summaryPrice, { color: orderSummaryTokens.priceColor }]}>{total.toFixed(2)}€</Text>
       </View>
 
       {/* 🍔 STATUS BANNER (foodtruck / fast-food) */}
@@ -255,7 +325,7 @@ export default function OrderScreen({
         {items.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialIcons name="check-circle" size={80} color="#4ECDC4" />
-            <Text style={[styles.emptyText, isGrillzTheme && styles.grillzEmptyText]}>Aucune commande</Text>
+            <Text style={[styles.emptyText, { color: orderContainerTokens.emptyTextColor }]}>Aucune commande</Text>
           </View>
         ) : (
           items.map((item, index) => {
@@ -264,15 +334,15 @@ export default function OrderScreen({
             return (
               <View
                 key={item._id || `item-${index}`}
-                style={[styles.card, isGrillzTheme && styles.grillzCard]}
+                style={[styles.card, { backgroundColor: orderCardTokens.cardBackground }, orderCardTokens.cardBorderOverride]}
               >
                 <View style={styles.cardTop}>
                   <View style={styles.productImageContainer}>
                     <Image source={PANINI_IMAGE} style={styles.productImage} resizeMode="cover" />
                   </View>
                   <View style={styles.infoContainer}>
-                    <Text style={[styles.productName, isGrillzTheme && styles.grillzProductName]}>{item.name}</Text>
-                    <Text style={[styles.productPrice, isGrillzTheme && styles.grillzProductPrice]}>{itemPrice.toFixed(2)}€</Text>
+                    <Text style={[styles.productName, { color: orderCardTokens.productNameColor }]}>{item.name}</Text>
+                    <Text style={[styles.productPrice, { color: orderCardTokens.productPriceColor }]}>{itemPrice.toFixed(2)}€</Text>
                   </View>
                   <View style={styles.quantityBadge}>
                     <Text style={styles.quantityBadgeText}>x{item.quantity || 1}</Text>
@@ -287,12 +357,12 @@ export default function OrderScreen({
 
       {/* FOOTER */}
       {items.length > 0 && (
-        <View style={[styles.footer, isGrillzTheme && styles.grillzFooter]}>
+        <View style={[styles.footer, { backgroundColor: orderFooterTokens.footerBackground }]}>
           {/* 🍔 Fast-food pending: bouton "Payer" désactivé tant que pas soumis */}
           <TouchableOpacity 
             style={[
               styles.payBtn,
-              isGrillzTheme && styles.grillzPayBtn,
+              { backgroundColor: orderFooterTokens.payBtnBackground },
               canCancel && styles.payBtnDisabled,
             ]} 
             onPress={onPayNow} 
@@ -315,7 +385,7 @@ export default function OrderScreen({
             <TouchableOpacity
               style={[
                 styles.cancelBtn,
-                isGrillzTheme && styles.grillzCancelBtn,
+                { borderColor: orderFooterTokens.cancelBtnBorderColor },
                 canCancel && styles.cancelBtnActive,
                 (pendingOrder && !canCancel) && styles.cancelBtnDisabled,
               ]}
@@ -325,7 +395,7 @@ export default function OrderScreen({
             >
               <Text style={[
                 styles.cancelBtnText,
-                isGrillzTheme && styles.grillzCancelBtnText,
+                { color: orderFooterTokens.cancelBtnTextColor },
                 canCancel && styles.cancelBtnTextActive,
                 (pendingOrder && !canCancel) && styles.cancelBtnTextDisabled,
               ]}>
@@ -505,23 +575,4 @@ const styles = StyleSheet.create({
   cancelBtnTextDisabled: {
     color: "#D1D5DB",
   },
-
-  // Grillz theme
-  grillzContainer: { backgroundColor: "#0D0D0D" },
-  grillzHeaderTitle: { color: "#F8FAFC" },
-  grillzSummaryText: { color: "#F8FAFC" },
-  grillzSummaryDate: { color: "#A3A3A3" },
-  grillzSummaryPrice: { color: "#F97316" },
-  grillzEmptyText: { color: "#F8FAFC" },
-  grillzCard: {
-    backgroundColor: "#1A1A1A",
-    borderWidth: 1,
-    borderColor: "#2A2A2A",
-  },
-  grillzProductName: { color: "#F8FAFC" },
-  grillzProductPrice: { color: "#F97316" },
-  grillzFooter: { backgroundColor: "#0D0D0D" },
-  grillzPayBtn: { backgroundColor: "#EA580C" },
-  grillzCancelBtn: { borderColor: "#3F3F46" },
-  grillzCancelBtnText: { color: "#D4D4D8" },
 });

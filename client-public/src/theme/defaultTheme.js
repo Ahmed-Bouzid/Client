@@ -472,4 +472,120 @@ export const getPaymentModalTokens = (styleKey) => {
 	};
 };
 
+/**
+ * Phase 0.4-A — Tokens scopés à la zone Container + Empty state d'OrderScreen.jsx
+ *
+ * Couvre :
+ *  - Background du container racine (View top-level)
+ *  - Couleur du texte "Aucune commande" (empty state)
+ *
+ * @param {string} styleKey - "grillz" | "cucina" | autre
+ * @returns {{ background: string, emptyTextColor: string }}
+ */
+export const getOrderContainerTokens = (styleKey) => {
+	const isGrillz = (styleKey || "").toLowerCase() === "grillz";
+	return {
+		background: isGrillz ? "#0D0D0D" : "#FEF7F0",
+		emptyTextColor: isGrillz ? "#F8FAFC" : "#1F2937",
+	};
+};
+
+/**
+ * Phase 0.4-A — Tokens scopés à la zone Header d'OrderScreen.jsx
+ *
+ * Couvre :
+ *  - Couleur du titre "Ma commande en cours"
+ *  - Couleur de l'icône chevron-left (back button)
+ *
+ * Note : `backIconColor` Grillz = #F59E0B (orange ambré) ≠ #F97316 (orange foncé
+ * utilisé pour les prix). 2 nuances d'orange volontaires dans la palette Grillz.
+ *
+ * @param {string} styleKey - "grillz" | "cucina" | autre
+ * @returns {{ titleColor: string, backIconColor: string }}
+ */
+export const getOrderHeaderTokens = (styleKey) => {
+	const isGrillz = (styleKey || "").toLowerCase() === "grillz";
+	return {
+		titleColor: isGrillz ? "#F8FAFC" : "#1F2937",
+		backIconColor: isGrillz ? "#F59E0B" : "#1F2937",
+	};
+};
+
+/**
+ * Phase 0.4-A — Tokens scopés à la zone Summary d'OrderScreen.jsx
+ *
+ * Couvre la ligne récap (texte article principal + date + prix total).
+ *
+ * @param {string} styleKey - "grillz" | "cucina" | autre
+ * @returns {{ textColor: string, dateColor: string, priceColor: string }}
+ */
+export const getOrderSummaryTokens = (styleKey) => {
+	const isGrillz = (styleKey || "").toLowerCase() === "grillz";
+	return {
+		textColor: isGrillz ? "#F8FAFC" : "#1F2937",
+		dateColor: isGrillz ? "#A3A3A3" : "#9CA3AF",
+		priceColor: isGrillz ? "#F97316" : "#EA580C",
+	};
+};
+
+/**
+ * Phase 0.4-A — Tokens scopés à la zone Card produit d'OrderScreen.jsx
+ *
+ * Couvre :
+ *  - Background de la card produit
+ *  - Bordure (override inline : null côté Cucina, { borderWidth, borderColor }
+ *    côté Grillz). Pattern spread conditionnel pour éviter de polluer Cucina
+ *    avec borderWidth: 0 / borderColor: transparent. Cohérent avec
+ *    `cardOverride` de getPaymentModalTokens (B/C/D1).
+ *  - Couleur nom produit + prix produit
+ *
+ * @param {string} styleKey - "grillz" | "cucina" | autre
+ * @returns {{
+ *   cardBackground: string,
+ *   cardBorderOverride: object|null,
+ *   productNameColor: string,
+ *   productPriceColor: string,
+ * }}
+ */
+export const getOrderCardTokens = (styleKey) => {
+	const isGrillz = (styleKey || "").toLowerCase() === "grillz";
+	return {
+		cardBackground: isGrillz ? "#1A1A1A" : "#FFFFFF",
+		// Override inline : Cucina sans bordure native (null), Grillz bordure foncée
+		cardBorderOverride: isGrillz
+			? { borderWidth: 1, borderColor: "#2A2A2A" }
+			: null,
+		productNameColor: isGrillz ? "#F8FAFC" : "#1F2937",
+		productPriceColor: isGrillz ? "#F97316" : "#EA580C",
+	};
+};
+
+/**
+ * Phase 0.4-A — Tokens scopés à la zone Footer (boutons pay/cancel) d'OrderScreen.jsx
+ *
+ * Couvre :
+ *  - Background du footer (zone fixe en bas)
+ *  - Background du bouton Pay (état idle uniquement — variantes pending fast-food
+ *    `payBtnDisabled` n'ont aucune variante Grillz, préservées telles quelles)
+ *  - Bordure du bouton Cancel
+ *  - Couleur du texte Cancel
+ *
+ * @param {string} styleKey - "grillz" | "cucina" | autre
+ * @returns {{
+ *   footerBackground: string,
+ *   payBtnBackground: string,
+ *   cancelBtnBorderColor: string,
+ *   cancelBtnTextColor: string,
+ * }}
+ */
+export const getOrderFooterTokens = (styleKey) => {
+	const isGrillz = (styleKey || "").toLowerCase() === "grillz";
+	return {
+		footerBackground: isGrillz ? "#0D0D0D" : "#FEF7F0",
+		payBtnBackground: isGrillz ? "#EA580C" : "#F87171",
+		cancelBtnBorderColor: isGrillz ? "#3F3F46" : "#D1D5DB",
+		cancelBtnTextColor: isGrillz ? "#D4D4D8" : "#9CA3AF",
+	};
+};
+
 export default DEFAULT_THEME;
