@@ -1,6 +1,10 @@
 node_modules
 .vercel
+.env
 .env*.local
+dist/
+yarn.lock
+package-lock.json
 
 # Expo runtime artifacts
 .expo/

@@ -3,12 +3,6 @@ import { getRestaurantId } from "../utils/getRestaurantId.js";
 
 export const productService = {
 	async fetchProducts(token = null) {
-		// console.log("=== DEBUG fetchProducts ===");
-		// console.log(
-		// 	"🔐 Token reçu:",
-		// 	token ? token.substring(0, 30) + "..." : "NULL"
-		// );
-
 		const headers = {
 			"Content-Type": "application/json",
 		};
@@ -21,15 +15,9 @@ export const productService = {
 		const restaurantId = await getRestaurantId();
 
 		const url = `${API_CONFIG.BASE_URL}/products/restaurant/${restaurantId}`;
-		// console.log("🌐 URL complète:", url);
-		// console.log("🍽️ Restaurant ID:", API_CONFIG.Resto_id_key);
 
 		try {
-			// console.log("📤 Envoi de la requête...");
 			const response = await fetch(url, { headers });
-
-			// console.log("📥 Réponse reçue - Status:", response.status);
-			// console.log("📥 Réponse reçue - OK?", response.ok);
 
 			if (!response.ok) {
 				const errorText = await response.text();
