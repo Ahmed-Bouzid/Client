@@ -98,6 +98,57 @@ class StripeService {
 	}
 
 	/**
+	 * Crée un PaymentIntent agrégé pour N commandes en 1 seule transaction Stripe
+	 *
+	 * @param {Object} params
+	 * @param {Array<{orderId:string, amount:number}>} params.orderSlices - Slices (centimes)
+	 * @param {string} [params.currency="eur"]
+	 * @param {Array<string>} [params.paymentMethodTypes=["card"]]
+	 * @param {number} [params.tipAmount=0]
+	 * @param {string} [params.paymentMode="client"]
+	 * @returns {Promise<Object>} { clientSecret, paymentIntentId, paymentId, amount, currency, ordersCount }
+	 */
+	async createAggregatedPaymentIntent({
+		orderSlices,
+		currency = "eur",
+		paymentMethodTypes = ["card"],
+		tipAmount = 0,
+		paymentMode = "client",
+	}) {
+		try {
+			const now = Date.now();
+			if (now - this.lastIntentRequestAt < this.intentCooldownMs) {
+				throw new Error("Paiement déjà en cours. Veuillez patienter.");
+			}
+			this.lastIntentRequestAt = now;
+
+			const data = await this.fetchWithAuth(
+				`${this.baseURL}/create-aggregated-intent`,
+				{
+					method: "POST",
+					body: JSON.stringify({
+						orderSlices,
+						currency,
+						paymentMethodTypes,
+						tipAmount,
+						paymentMode,
+					}),
+				},
+			);
+
+			return data;
+		} catch (error) {
+			console.error(
+				"❌ [CLIENT] Erreur création PaymentIntent agrégé:",
+				error,
+			);
+			throw new Error(
+				error.message || "Erreur lors de la création du paiement agrégé",
+			);
+		}
+	}
+
+	/**
 	 * Crée un paiement FAKE (dev only)
 	 *
 	 * @param {string} orderId - ID de la commande

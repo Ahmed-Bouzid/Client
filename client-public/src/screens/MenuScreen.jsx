@@ -36,6 +36,8 @@ import {
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
+import { Easing } from "react-native";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import * as Font from 'expo-font';
@@ -49,9 +51,235 @@ import DietaryPreferences from "./DietaryPreferences";
 import AddOnFlow from "../components/menu/AddOnFlow";
 import { useStyleUpdates } from "../hooks/useSocketClient";
 import useTheme from "../hooks/useThemeNew"; // 🎨 NOUVEAU: Hook thème
+import useThemeKey from "../hooks/useThemeKey";
+import { BAGHERA_PALETTE, BAGHERA_FONTS, getMenuBagheraTokens } from "../theme/bagheraTheme";
 
 // Image placeholder
 const PANINI_IMAGE = require("../../assets/images/menu/image-fond/panini.png");
+const BAGHERA_PRODUCT_IMAGE = require("../../assets/baghera/hero-brunch.jpg");
+
+// =============================================================================
+// 🎨 BAGHERA — Mapping image cohérente par produit (Unsplash + fallback local)
+// =============================================================================
+// Stratégie 3 niveaux :
+//   1. Match exact par nom normalisé (ex. "espresso", "cappuccino", "mimosa")
+//      → URL Unsplash dédiée et photogenique du produit réel.
+//   2. Fallback catégorie : si pas de match exact, on pioche dans une liste
+//      d'URLs cohérentes pour la grande famille (cafés, cocktails, jus, brunch,
+//      desserts, plats, viandes, veggie). Choix déterministe par hash du nom
+//      → 2 produits différents dans la même catégorie ont 2 photos différentes.
+//   3. Fallback local : si l'URL distante 404 (rare), un <BagheraProductImage>
+//      bascule sur l'asset local cohérent (5 visuels Baghera d'ambiance).
+//
+// Toutes les URLs Unsplash sont en 400×400 fit=crop, q=80, auto=format → pèsent
+// ~25-40 KB chacune et sont cachées par défaut par <Image> RN.
+// =============================================================================
+const BAGHERA_IMG_BRUNCH = require("../../assets/baghera/hero-brunch.jpg");
+const BAGHERA_IMG_BAGHEERA = require("../../assets/baghera/signature-bagheera.jpg");
+const BAGHERA_IMG_MOWGLI = require("../../assets/baghera/signature-mowgli.jpg");
+const BAGHERA_IMG_SHEREKAN = require("../../assets/baghera/signature-shere-kan.jpg");
+const BAGHERA_IMG_ATELIER = require("../../assets/baghera/ambiance-atelier.jpg");
+
+// Helper builder Unsplash → 400×400 crop optimisé
+const u = (id) =>
+  `https://images.unsplash.com/photo-${id}?w=400&h=400&fit=crop&q=80&auto=format`;
+
+// Pools catégories — plusieurs URLs par famille pour varier visuellement
+const POOL_COFFEE = [
+  u('1510707577719-ae7c14805e3a'), // espresso shot
+  u('1495474472287-4d71bcdd2085'), // pour-over chemex
+  u('1517256064527-09c73fc73e38'), // latte art top view
+  u('1497935586351-b67a49e012bf'), // cappuccino mug
+];
+const POOL_COCKTAIL = [
+  u('1551538827-9c037cb4f32a'), // aperol spritz
+  u('1551024709-8f23befc6f87'), // red cocktail
+  u('1567696911980-2eed69a46042'), // mimosa flute
+  u('1514362545857-3bc16c4c7d1b'), // bar cocktail dark
+];
+const POOL_JUICE = [
+  u('1600271886742-f049cd451bba'), // orange juice glass
+  u('1610970881699-44a5587cabec'), // green juice
+  u('1546173159-315724a31696'), // detox green
+  u('1564631027894-5bdb17618445'), // smoothie fruits
+];
+const POOL_BRUNCH = [
+  u('1551892589-865f69869476'), // eggs benedict
+  u('1567620905732-2d1ec7ab7445'), // pancakes stack
+  u('1541519481457-763224276691'), // avocado toast
+  u('1525351484163-7529414344d8'), // brunch table flat lay
+];
+const POOL_VEGGIE = [
+  u('1546069901-ba9599a7e63c'), // buddha bowl
+  u('1505253758473-96b7015fcd40'), // green salad
+  u('1540420773420-3366772f4999'), // veggie bowl
+  u('1543353071-10c8ba85a904'), // hummus mezze
+];
+const POOL_MEAT = [
+  u('1546833999-b9f581a1996d'), // burger
+  u('1565299624946-b28f40a0ca4b'), // pizza slice
+  u('1432139509613-5c4255815697'), // steak plate
+  u('1551183053-bf91a1d81141'), // pasta bowl
+];
+const POOL_DESSERT = [
+  u('1565958011703-44f9829ba187'), // cheesecake
+  u('1551024601-bec78aea704b'), // tiramisu
+  u('1488477181946-6428a0291777'), // chocolate cake
+  u('1505253213348-5fa3e9a1a1c8'), // dessert plated
+];
+
+// Mapping par catégorie (sortie : [pool, fallbackLocal])
+const BAGHERA_CATEGORY_MAP = {
+  drink: [POOL_COFFEE, BAGHERA_IMG_ATELIER],
+  cocktail: [POOL_COCKTAIL, BAGHERA_IMG_ATELIER],
+  juice: [POOL_JUICE, BAGHERA_IMG_MOWGLI],
+  brunch: [POOL_BRUNCH, BAGHERA_IMG_BRUNCH],
+  veggie: [POOL_VEGGIE, BAGHERA_IMG_MOWGLI],
+  meat: [POOL_MEAT, BAGHERA_IMG_SHEREKAN],
+  dessert: [POOL_DESSERT, BAGHERA_IMG_BAGHEERA],
+};
+
+// Mapping exact par nom normalisé (priorité absolue)
+// Clé = stripAccents(item.name) en lowercase
+const BAGHERA_EXACT_MAP = {
+  // Cafés
+  'espresso': u('1510707577719-ae7c14805e3a'),
+  'cappuccino': u('1497935586351-b67a49e012bf'),
+  'flat white': u('1517256064527-09c73fc73e38'),
+  'latte': u('1517256064527-09c73fc73e38'),
+  'filter — origines': u('1495474472287-4d71bcdd2085'),
+  'filter origines': u('1495474472287-4d71bcdd2085'),
+  'filter': u('1495474472287-4d71bcdd2085'),
+  'cafe filtre': u('1495474472287-4d71bcdd2085'),
+  'noisette': u('1497935586351-b67a49e012bf'),
+  'macchiato': u('1497935586351-b67a49e012bf'),
+  'americano': u('1510707577719-ae7c14805e3a'),
+  'matcha': u('1545048702-79362596cdc9'),
+  'chai latte': u('1545048702-79362596cdc9'),
+  // Cocktails
+  'bloody baghera': u('1551024709-8f23befc6f87'),
+  'bloody mary': u('1551024709-8f23befc6f87'),
+  'mimosa': u('1567696911980-2eed69a46042'),
+  'spritz sauvage': u('1551538827-9c037cb4f32a'),
+  'spritz': u('1551538827-9c037cb4f32a'),
+  'aperol spritz': u('1551538827-9c037cb4f32a'),
+  'mojito': u('1551538827-9c037cb4f32a'),
+  // Jus
+  'sun booster': u('1600271886742-f049cd451bba'),
+  'detox green': u('1610970881699-44a5587cabec'),
+  'jus orange': u('1600271886742-f049cd451bba'),
+  'jus pomme': u('1564631027894-5bdb17618445'),
+  // Brunch / Salé
+  'shere kan': u('1525351484163-7529414344d8'), // brunch table — saumon fumé / œufs / toast
+  'baloo': u('1567620905732-2d1ec7ab7445'),     // pancakes stack
+  'shanti': u('1546069901-ba9599a7e63c'),       // bowl houmous / légumes
+  'raksha': u('1541519481457-763224276691'),    // avocado toast / œuf poché
+  'mowgli': u('1505253758473-96b7015fcd40'),    // salade fraîche
+  'bagheera': u('1488477181946-6428a0291777'),  // chocolate cake — dessert signature
+};
+
+// Normalise une string (lowercase + retire accents)
+const stripAccents = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+// Hash 32-bit déterministe
+const hashString = (s) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+};
+
+// Détecte la catégorie d'un produit via mots-clés (ordre = priorité)
+const detectBagheraCategory = (item) => {
+  const hay = stripAccents(`${item?.name || ''} ${item?.category || ''} ${item?.description || ''}`);
+  // Boissons sucrées / alcool
+  if (/(spritz|mojito|cocktail|mocktail|bloody|mimosa|gin|vodka|rhum|aperol|martini|negroni|margarita|champagne|prosecco|vin|wine|biere|bière|beer|ipa|lager)/.test(hay)) return 'cocktail';
+  if (/(jus|juice|smoothie|milkshake|detox|booster|limonade|lemonade)/.test(hay)) return 'juice';
+  if (/(cafe|espresso|cappuccino|cappucino|latte|flat white|ristretto|americano|macchiato|noisette|matcha|the |thé|tea|chai|chocolat chaud|cacao|infusion|rooibos)/.test(hay)) return 'drink';
+  // Sucré
+  if (/(dessert|gateau|gâteau|cake|tarte|patisserie|pâtisserie|cookie|brownie|tiramisu|cheesecake|fondant|mousse|panna|cotta|glace|sorbet|macaron|eclair|éclair|crème|creme|caramel|praline|praliné|sucre|sucré)/.test(hay)) return 'dessert';
+  // Veggie / salade / bowl
+  if (/(salade|salad|bowl|buddha|veggie|vegan|végé|legume|légume|crudité|quinoa|houmous|hummus|burrata|gaspacho|soupe)/.test(hay)) return 'veggie';
+  // Brunch / œufs / toast
+  if (/(brunch|oeuf|œuf|egg|omelette|benedict|pancake|gaufre|crêpe|crepe|granola|porridge|toast|tartine|avocat|avocado|saumon)/.test(hay)) return 'brunch';
+  // Plats / viandes / pizzas / pâtes
+  if (/(burger|sandwich|panini|pizza|pasta|pâtes|pates|risotto|lasagne|spaghetti|steak|tartare|boeuf|bœuf|poulet|chicken|magret|saumon|thon|crevette|gambas|frites)/.test(hay)) return 'meat';
+  return null;
+};
+
+/**
+ * Retourne { uri, fallback } pour un produit Baghera.
+ *  - uri      → URL Unsplash (ou BDD si présente)
+ *  - fallback → require local Baghera utilisé si l'URL 404
+ *  - Si pas de match du tout, retourne directement le require local.
+ */
+const getBagheraProductSource = (item) => {
+  if (!item) return { local: BAGHERA_IMG_BRUNCH };
+
+  // 1) URL BDD prioritaire
+  if (item.image && typeof item.image === 'string' && item.image.startsWith('http')) {
+    return { uri: item.image, fallback: BAGHERA_IMG_BRUNCH };
+  }
+
+  const nameKey = stripAccents(item.name || '');
+
+  // 2) Match exact par nom
+  if (nameKey && BAGHERA_EXACT_MAP[nameKey]) {
+    return { uri: BAGHERA_EXACT_MAP[nameKey], fallback: BAGHERA_IMG_BRUNCH };
+  }
+
+  // 3) Détection catégorie + pool d'URLs
+  const cat = detectBagheraCategory(item);
+  if (cat && BAGHERA_CATEGORY_MAP[cat]) {
+    const [pool, fallbackLocal] = BAGHERA_CATEGORY_MAP[cat];
+    const uri = pool[hashString(nameKey || cat) % pool.length];
+    return { uri, fallback: fallbackLocal };
+  }
+
+  // 4) Fallback local pur (rotation par hash)
+  const fallbacks = [BAGHERA_IMG_BAGHEERA, BAGHERA_IMG_MOWGLI, BAGHERA_IMG_SHEREKAN, BAGHERA_IMG_BRUNCH];
+  return { local: fallbacks[hashString(nameKey || 'baghera') % fallbacks.length] };
+};
+
+/**
+ * Composant <Image> wrapper : tente l'URI distante, bascule sur le require
+ * local si erreur réseau (404, offline, timeout). Évite les icônes "image
+ * cassée" disgracieuses.
+ */
+const BagheraProductImage = React.memo(function BagheraProductImage({ item, style, resizeMode = 'cover' }) {
+  const source = useMemo(() => getBagheraProductSource(item), [item?.name, item?.category, item?.image]);
+  const [errored, setErrored] = useState(false);
+
+  // Cas 1 : pas d'URI → directement le local
+  if (source.local) {
+    return <Image source={source.local} style={style} resizeMode={resizeMode} />;
+  }
+
+  // Cas 2 : URI + fallback local
+  if (errored && source.fallback) {
+    return <Image source={source.fallback} style={style} resizeMode={resizeMode} />;
+  }
+
+  return (
+    <Image
+      source={{ uri: source.uri }}
+      style={style}
+      resizeMode={resizeMode}
+      onError={() => setErrored(true)}
+    />
+  );
+});
+
+// Compat ancien call site (renvoie un source RN-ready)
+const getBagheraProductImage = (item) => {
+  const s = getBagheraProductSource(item);
+  if (s.local) return s.local;
+  return { uri: s.uri };
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎨 COULEURS
@@ -80,9 +308,16 @@ export default function MenuScreen({
   // 🍝 CUCINA: Détection restaurant
   const isCucina = restaurantId === '6970ef6594abf8bacd9d804d';
   const isGrillz = restaurantId === '695e4300adde654b80f6911a';
+
+  // 🆕 Phase 3.3 — BAGHERA tenant (démo 13 mai 2026)
+  // Basé sur styleKey (single source of truth useThemeKey) au lieu d'un hash
+  // restaurantId hardcodé, car Baghera n'a pas encore d'entrée en BDD.
+  const { styleKey } = useThemeKey();
+  const isBaghera = styleKey === 'baghera';
+  const bagheraTokens = getMenuBagheraTokens(styleKey);
   
-  // States - Cucina et Grillz commencent sans catégorie sélectionnée (message commercial)
-  const [selectedCategory, setSelectedCategory] = useState((isCucina || isGrillz) ? null : "sandwich");
+  // States - Cucina, Grillz et Baghera commencent sans catégorie sélectionnée (message commercial)
+  const [selectedCategory, setSelectedCategory] = useState((isCucina || isGrillz || isBaghera) ? null : "sandwich");
   const [fontLoaded, setFontLoaded] = useState(false);
   const [showOrderSummary, setShowOrderSummary] = useState(false);
   const [showDietaryModal, setShowDietaryModal] = useState(false);
@@ -95,6 +330,91 @@ export default function MenuScreen({
   const [detailQty, setDetailQty] = useState(1);
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // 🎨 BAGHERA — underline animée qui glisse entre les catégories
+  const tabLayoutsRef = useRef({}); // { catId: { x, width } }
+  const underlineX = useRef(new Animated.Value(0)).current;
+  const underlineW = useRef(new Animated.Value(0)).current;
+  const underlineOpacity = useRef(new Animated.Value(0)).current;
+
+  // 🎨 BAGHERA — modale "Le mot du chef" (storytelling au tap sur le logo panthère)
+  const [showStoryModal, setShowStoryModal] = useState(false);
+  const [storyMounted, setStoryMounted] = useState(false); // garde la modale montée pendant l'anim de sortie
+  const storyBackdrop = useRef(new Animated.Value(0)).current;
+  const storyCard = useRef(new Animated.Value(0)).current;
+  const storyLogoPulse = useRef(new Animated.Value(1)).current;
+
+  const openStoryModal = () => {
+    // micro-feedback sur le logo (pulse léger)
+    Animated.sequence([
+      Animated.timing(storyLogoPulse, { toValue: 0.94, duration: 90, useNativeDriver: true }),
+      Animated.timing(storyLogoPulse, { toValue: 1, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]).start();
+    setStoryMounted(true);
+    setShowStoryModal(true);
+  };
+
+  const closeStoryModal = () => {
+    Animated.parallel([
+      Animated.timing(storyCard, {
+        toValue: 0,
+        duration: 280,
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
+        useNativeDriver: true,
+      }),
+      Animated.timing(storyBackdrop, {
+        toValue: 0,
+        duration: 320,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) {
+        setShowStoryModal(false);
+        setStoryMounted(false);
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (!showStoryModal) return;
+    storyBackdrop.setValue(0);
+    storyCard.setValue(0);
+    Animated.parallel([
+      Animated.timing(storyBackdrop, {
+        toValue: 1,
+        duration: 320,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(storyCard, {
+        toValue: 1,
+        duration: 560,
+        delay: 80,
+        easing: Easing.bezier(0.6, 0.05, 0.1, 1), // BAGHERA silk
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [showStoryModal]);
+
+  useEffect(() => {
+    if (!isBaghera) return;
+    if (!selectedCategory) {
+      Animated.timing(underlineOpacity, {
+        toValue: 0, duration: 120, useNativeDriver: false,
+      }).start();
+      return;
+    }
+    const layout = tabLayoutsRef.current[selectedCategory];
+    if (!layout) return;
+    const targetW = layout.width * 0.7;
+    const targetX = layout.x + (layout.width - targetW) / 2;
+    Animated.parallel([
+      Animated.timing(underlineX, { toValue: targetX, duration: 180, useNativeDriver: false }),
+      Animated.timing(underlineW, { toValue: targetW, duration: 180, useNativeDriver: false }),
+      Animated.timing(underlineOpacity, { toValue: 1, duration: 140, useNativeDriver: false }),
+    ]).start();
+  }, [selectedCategory, isBaghera]);
   
   // Stores - EXACTEMENT comme Menu.jsx
   const products = useProductStore((state) => state.products);
@@ -412,6 +732,45 @@ export default function MenuScreen({
   const renderCategory = (category) => {
     const isSelected = selectedCategory === category.id;
     
+    // 🎨 BAGHERA — catégories minimalistes : texte serif italique + underline ember
+    if (isBaghera) {
+      return (
+        <TouchableOpacity
+          key={category.id}
+          onPress={() => setSelectedCategory(category.id)}
+          activeOpacity={0.7}
+          onLayout={(e) => {
+            const { x, width } = e.nativeEvent.layout;
+            tabLayoutsRef.current[category.id] = { x, width };
+            if (selectedCategory === category.id) {
+              const targetW = width * 0.7;
+              const targetX = x + (width - targetW) / 2;
+              underlineX.setValue(targetX);
+              underlineW.setValue(targetW);
+              underlineOpacity.setValue(1);
+            }
+          }}
+          style={{
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            marginHorizontal: 16,
+            paddingTop: 6,
+            height: 38,
+          }}
+        >
+          <Text style={{
+            fontFamily: BAGHERA_FONTS.serifItalic,
+            fontSize: 18,
+            lineHeight: 22,
+            color: isSelected ? BAGHERA_PALETTE.ink : BAGHERA_PALETTE.smoke,
+            letterSpacing: 0.3,
+          }}>
+            {category.name}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+    
     if (isGrillzTheme) {
       // 🔥 GRILLZ: Catégories avec underline indicator
       return (
@@ -609,32 +968,81 @@ export default function MenuScreen({
       );
     }
     
-    // Style par défaut pour autres restos (Cucina inclus)
+    // Style par défaut pour autres restos (Cucina + Baghera inclus)
+    // 🆕 Phase 3.3 — Baghera overrides inline (creamSoft + sand border + ember price)
+    const bagheraCardOverride = isBaghera && bagheraTokens ? {
+      backgroundColor: bagheraTokens.cardBackground,
+      borderColor: bagheraTokens.cardBorderColor,
+      borderWidth: 1,
+      borderRadius: 24,
+      padding: 16,
+      shadowOpacity: 0,
+      elevation: 0,
+    } : null;
+    const bagheraNameOverride = isBaghera && bagheraTokens ? {
+      color: bagheraTokens.productNameColor,
+      fontFamily: BAGHERA_FONTS.serif,
+      fontSize: 19,
+      fontWeight: '400',
+      letterSpacing: -0.2,
+      marginBottom: 6,
+    } : null;
+    const bagheraDescOverride = isBaghera && bagheraTokens ? {
+      color: bagheraTokens.productDescriptionColor,
+      fontFamily: BAGHERA_FONTS.sansItalic,
+      fontSize: 13,
+      lineHeight: 19,
+    } : null;
+    const bagheraPriceOverride = isBaghera && bagheraTokens ? {
+      color: bagheraTokens.productPriceColor,
+      fontFamily: BAGHERA_FONTS.serifItalic,
+      fontSize: 20,
+      fontWeight: '400',
+    } : null;
+    const bagheraAddOverride = isBaghera && bagheraTokens ? {
+      backgroundColor: bagheraTokens.ctaAddBackground,
+      borderRadius: 22,
+      paddingHorizontal: 18,
+      paddingVertical: 9,
+    } : null;
+    const bagheraQtyBtnOverride = isBaghera && bagheraTokens ? {
+      backgroundColor: bagheraTokens.ctaAddBackground,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+    } : null;
+
     // Si Cucina: wrap dans TouchableOpacity pour ouvrir la modale
     const CardContent = (
       <>
         <View style={styles.productImageContainer}>
-          <Image source={PANINI_IMAGE} style={styles.productImage} resizeMode="cover" />
+          {isBaghera ? (
+            <BagheraProductImage item={item} style={styles.productImage} />
+          ) : (
+            <Image source={PANINI_IMAGE} style={styles.productImage} resizeMode="cover" />
+          )}
         </View>
         <View style={styles.productInfo}>
-          <Text style={styles.productName}>{item.name}</Text>
-          <Text style={styles.productDescription} numberOfLines={2}>
+          <Text style={[styles.productName, bagheraNameOverride]}>{item.name}</Text>
+          <Text style={[styles.productDescription, bagheraDescOverride]} numberOfLines={2}>
             {item.description}
           </Text>
           <View style={styles.priceRow}>
-            <Text style={styles.price}>{item.price?.toFixed(2) || '0.00'}€</Text>
+            <Text style={[styles.price, bagheraPriceOverride]}>{item.price?.toFixed(2) || '0.00'}€</Text>
             {qty === 0 ? (
-              <TouchableOpacity style={styles.addButton} onPress={() => handleAddProduct(item)}>
+              <TouchableOpacity style={[styles.addButton, bagheraAddOverride]} onPress={() => handleAddProduct(item)}>
                 <Text style={styles.addButtonText}>Ajouter</Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.quantityControls}>
-                <TouchableOpacity style={styles.quantityBtn} onPress={() => handleRemoveProduct(item)}>
-                  <Ionicons name="remove" size={16} color="#FFF" />
+                <TouchableOpacity style={[styles.quantityBtn, bagheraQtyBtnOverride]} onPress={() => handleRemoveProduct(item)}>
+                  <Ionicons name="remove" size={18} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={styles.quantityText}>{qty}</Text>
-                <TouchableOpacity style={styles.quantityBtn} onPress={() => handleAddProduct(item)}>
-                  <Ionicons name="add" size={16} color="#FFF" />
+                <TouchableOpacity style={[styles.quantityBtn, bagheraQtyBtnOverride]} onPress={() => handleAddProduct(item)}>
+                  <Ionicons name="add" size={18} color="#FFF" />
                 </TouchableOpacity>
               </View>
             )}
@@ -656,9 +1064,9 @@ export default function MenuScreen({
       );
     }
     
-    // Autres restos: carte non cliquable
+    // Autres restos (Baghera + default): carte non cliquable, override Baghera inline
     return (
-      <View style={styles.productCard}>
+      <View style={[styles.productCard, bagheraCardOverride]}>
         {CardContent}
       </View>
     );
@@ -669,6 +1077,69 @@ export default function MenuScreen({
   const renderBanner = () => {
     const isCucinaRestaurant = restaurantId === '6970ef6594abf8bacd9d804d';
     const isGrillzRestaurant = restaurantId === '695e4300adde654b80f6911a';
+    
+    // 🎨 BAGHERA — header croisé avec WelcomeScreenBaghera (wordmark serif + ember dot)
+    if (isBaghera) {
+      return (
+        <View style={{
+          backgroundColor: BAGHERA_PALETTE.cream,
+          paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 20,
+          paddingHorizontal: 22,
+          paddingBottom: 22,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <TouchableOpacity
+            onPress={onBack}
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="chevron-back" size={24} color={BAGHERA_PALETTE.ink} />
+          </TouchableOpacity>
+
+          <View style={{ alignItems: 'center', flex: 1 }}>
+            <TouchableOpacity
+              onPress={openStoryModal}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Découvrir le mot du chef"
+              hitSlop={{ top: 10, bottom: 10, left: 24, right: 24 }}
+              style={{ alignItems: 'center' }}
+            >
+              <Animated.Image
+                source={require("../../assets/baghera/logo.png")}
+                style={{ width: 140, height: 56, transform: [{ scale: storyLogoPulse }] }}
+                resizeMode="contain"
+              />
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                <Text style={{
+                  fontFamily: BAGHERA_FONTS.serifItalic,
+                  fontSize: 12,
+                  color: BAGHERA_PALETTE.smoke,
+                  letterSpacing: 0.5,
+                }}>
+                  la carte
+                </Text>
+                <View style={{
+                  width: 3, height: 3, borderRadius: 1.5,
+                  backgroundColor: BAGHERA_PALETTE.ember,
+                  marginLeft: 6, opacity: 0.8,
+                }} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => setShowDietaryModal(true)}
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="no-food" size={20} color={BAGHERA_PALETTE.smoke} />
+          </TouchableOpacity>
+        </View>
+      );
+    }
     
     if (isGrillzRestaurant) {
       // 🔥 HEADER selon spec exacte
@@ -825,6 +1296,16 @@ export default function MenuScreen({
       bottom: 0,
       backgroundColor: '#146845',
     };
+  } else if (isBaghera) {
+    // 🆕 Phase 3.3 — Baghera : canvas cream, position absolute pour fullscreen
+    containerStyle = {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: bagheraTokens?.background || BAGHERA_PALETTE.cream,
+    };
   }
 
   // 🔥 BBQ Grill Lines Component - Lignes de grill visibles
@@ -887,10 +1368,11 @@ export default function MenuScreen({
       <View style={[
         styles.navContainer, 
         isGrillz && { backgroundColor: 'transparent' },
-        isCucina && { backgroundColor: '#146845' }
+        isCucina && { backgroundColor: '#146845' },
+        isBaghera && { backgroundColor: BAGHERA_PALETTE.cream }
       ]}>
-        {/* Fond dégradé principal - caché pour Grillz et Cucina */}
-        {!isGrillz && !isCucina && (
+        {/* Fond dégradé principal - caché pour Grillz, Cucina et Baghera */}
+        {!isGrillz && !isCucina && !isBaghera && (
           <LinearGradient
             colors={[COLORS.primary + "25", COLORS.accent + "20", COLORS.background]}
             style={styles.headerGradient}
@@ -899,8 +1381,8 @@ export default function MenuScreen({
           />
         )}
         
-        {/* Formes organiques complexes - cachées pour Grillz et Cucina */}
-        {!isGrillz && !isCucina && (
+        {/* Formes organiques complexes - cachées pour Grillz, Cucina et Baghera */}
+        {!isGrillz && !isCucina && !isBaghera && (
           <View style={styles.decorativeElements}>
             {/* Grande forme principale */}
             <View style={styles.mainBlob} />
@@ -961,6 +1443,36 @@ export default function MenuScreen({
               }}
             >
               {categories.map(renderCategory)}
+            </ScrollView>
+          </View>
+        ) : isBaghera ? (
+          <View style={{ height: 48 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                gap: 8,
+                position: 'relative',
+                alignItems: 'flex-start',
+              }}
+              style={{ height: 48 }}
+            >
+              {categories.map(renderCategory)}
+              <Animated.View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: 36,
+                  left: 0,
+                  height: 2,
+                  borderRadius: 1,
+                  backgroundColor: BAGHERA_PALETTE.ember,
+                  width: underlineW,
+                  opacity: underlineOpacity,
+                  transform: [{ translateX: underlineX }],
+                }}
+              />
             </ScrollView>
           </View>
         ) : (
@@ -1062,7 +1574,72 @@ export default function MenuScreen({
             contentContainerStyle={styles.productsContainer}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              isCucina && selectedCategory === null ? (
+              isBaghera && selectedCategory === null ? (
+                <View style={{
+                  flex: 1,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingHorizontal: 36,
+                  paddingTop: 80,
+                }}>
+                  {/* Filet décoratif supérieur */}
+                  <View style={{
+                    width: 40,
+                    height: 1,
+                    backgroundColor: BAGHERA_PALETTE.sand,
+                    marginBottom: 28,
+                  }} />
+
+                  <Text style={{
+                    fontFamily: BAGHERA_FONTS.serifItalic,
+                    fontSize: 14,
+                    color: BAGHERA_PALETTE.smoke,
+                    letterSpacing: 1.2,
+                    textTransform: 'uppercase',
+                    marginBottom: 18,
+                  }}>
+                    — Bienvenue {userName || ''}
+                  </Text>
+
+                  <Text style={{
+                    fontFamily: BAGHERA_FONTS.serif,
+                    fontSize: 30,
+                    color: BAGHERA_PALETTE.ink,
+                    textAlign: 'center',
+                    lineHeight: 38,
+                    letterSpacing: -0.4,
+                    marginBottom: 18,
+                  }}>
+                    Une carte pensée{'\n'}comme un{' '}
+                    <Text style={{
+                      fontFamily: BAGHERA_FONTS.serifItalic,
+                      color: BAGHERA_PALETTE.ember,
+                    }}>
+                      art de vivre
+                    </Text>
+                    .
+                  </Text>
+
+                  <Text style={{
+                    fontFamily: BAGHERA_FONTS.sansItalic,
+                    fontSize: 15,
+                    color: BAGHERA_PALETTE.smoke,
+                    textAlign: 'center',
+                    lineHeight: 23,
+                    marginBottom: 32,
+                    maxWidth: 320,
+                  }}>
+                    Choisissez une catégorie ci-dessus pour commencer votre voyage gourmand.
+                  </Text>
+
+                  {/* Filet décoratif inférieur */}
+                  <View style={{
+                    width: 40,
+                    height: 1,
+                    backgroundColor: BAGHERA_PALETTE.sand,
+                  }} />
+                </View>
+              ) : isCucina && selectedCategory === null ? (
                 <View style={{ 
                   flex: 1, 
                   justifyContent: 'center', 
@@ -1141,9 +1718,35 @@ export default function MenuScreen({
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.bottomBar}>
-            <TouchableOpacity style={styles.placeOrderBtn} onPress={onNavigateToPayment}>
-              <Text style={styles.placeOrderText}>Payer ma commande</Text>
+          <View style={[
+            styles.bottomBar,
+            isBaghera && {
+              backgroundColor: BAGHERA_PALETTE.cream,
+              borderTopWidth: 1,
+              borderTopColor: BAGHERA_PALETTE.sand,
+              shadowOpacity: 0,
+              elevation: 0,
+              justifyContent: 'center',
+            },
+          ]}>
+            <TouchableOpacity
+              style={[
+                styles.placeOrderBtn,
+                isBaghera && {
+                  backgroundColor: BAGHERA_PALETTE.ember,
+                  borderWidth: 0,
+                  borderRadius: 28,
+                  paddingHorizontal: 32,
+                  paddingVertical: 14,
+                  shadowOpacity: 0,
+                },
+              ]}
+              onPress={onNavigateToPayment}
+            >
+              <Text style={[
+                styles.placeOrderText,
+                isBaghera && { fontFamily: BAGHERA_FONTS.sans, fontSize: 15 },
+              ]}>Payer ma commande</Text>
             </TouchableOpacity>
           </View>
         )
@@ -1151,7 +1754,92 @@ export default function MenuScreen({
 
       {/* Barre du bas - Style identique à l'image de référence pour Le Grillz */}
       {totalItems > 0 && (
-        isGrillz ? (
+        isBaghera ? (
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: BAGHERA_PALETTE.creamSoft,
+            marginHorizontal: 16,
+            marginBottom: 20,
+            paddingHorizontal: 18,
+            paddingVertical: 14,
+            borderRadius: 22,
+            borderWidth: 1,
+            borderColor: BAGHERA_PALETTE.sand,
+            shadowColor: BAGHERA_PALETTE.ink,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.06,
+            shadowRadius: 14,
+            elevation: 4,
+          }}>
+            {/* Gauche: cercle ember + total */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{
+                width: 46,
+                height: 46,
+                borderRadius: 23,
+                backgroundColor: BAGHERA_PALETTE.ember,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 14,
+              }}>
+                <Ionicons name="cart-outline" size={22} color="#FFFFFF" />
+                <View style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -4,
+                  backgroundColor: BAGHERA_PALETTE.cream,
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: BAGHERA_PALETTE.ember,
+                }}>
+                  <Text style={{ color: BAGHERA_PALETTE.ember, fontSize: 11, fontFamily: BAGHERA_FONTS.sans, fontWeight: '700' }}>{totalItems}</Text>
+                </View>
+              </View>
+
+              <View>
+                <Text style={{
+                  fontFamily: BAGHERA_FONTS.sansItalic,
+                  color: BAGHERA_PALETTE.smoke,
+                  fontSize: 12,
+                }}>— total</Text>
+                <Text style={{
+                  fontFamily: BAGHERA_FONTS.serifItalic,
+                  color: BAGHERA_PALETTE.ember,
+                  fontSize: 22,
+                  marginTop: 2,
+                }}>{totalAmount.toFixed(2)}€</Text>
+              </View>
+            </View>
+
+            {/* Droite: bouton Commander pill ember */}
+            <TouchableOpacity
+              onPress={handlePayPress}
+              activeOpacity={0.9}
+              style={{
+                backgroundColor: BAGHERA_PALETTE.ember,
+                paddingHorizontal: 22,
+                paddingVertical: 13,
+                borderRadius: 26,
+              }}
+            >
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontFamily: BAGHERA_FONTS.sans,
+                fontWeight: '600',
+                letterSpacing: 0.3,
+              }}>
+                Commander
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : isGrillz ? (
           <View style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -1259,6 +1947,7 @@ export default function MenuScreen({
           onConfirm={handleConfirmOrder}
           onBackToMenu={() => setShowOrderSummary(false)}
           isGrillzTheme={isGrillz}
+          isBaghera={isBaghera}
         />
       </Modal>
 
@@ -1266,6 +1955,7 @@ export default function MenuScreen({
       <DietaryPreferences
         visible={showDietaryModal}
         onClose={() => setShowDietaryModal(false)}
+        isBaghera={isBaghera}
       />
 
       {/* Modal AddOn Flow */}
@@ -1437,6 +2127,226 @@ export default function MenuScreen({
               </View>
             </View>
           </Animated.View>
+        </Modal>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════
+          🐆 BAGHERA — Modale "Le mot du chef"
+          Storytelling poétique au tap sur le logo panthère.
+          Animation : backdrop blur fade + card silk-ease scale/translate.
+          ═══════════════════════════════════════════════════════════════ */}
+      {isBaghera && storyMounted && (
+        <Modal
+          transparent
+          visible={showStoryModal}
+          animationType="none"
+          statusBarTranslucent
+          onRequestClose={closeStoryModal}
+        >
+          {/* Backdrop blur + dim — tap-to-dismiss */}
+          <Animated.View
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              opacity: storyBackdrop,
+            }}
+          >
+            <BlurView
+              intensity={28}
+              tint="dark"
+              style={StyleSheet.absoluteFillObject}
+            />
+            <Animated.View
+              style={{
+                ...StyleSheet.absoluteFillObject,
+                backgroundColor: BAGHERA_PALETTE.ink,
+                opacity: storyBackdrop.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 0.42],
+                }),
+              }}
+            />
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={closeStoryModal}
+              style={StyleSheet.absoluteFillObject}
+            />
+          </Animated.View>
+
+          {/* Carte poétique */}
+          <View
+            pointerEvents="box-none"
+            style={{
+              flex: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: 24,
+            }}
+          >
+            <Animated.View
+              style={{
+                width: '100%',
+                maxWidth: 420,
+                backgroundColor: BAGHERA_PALETTE.creamSoft,
+                borderRadius: 22,
+                paddingTop: 38,
+                paddingBottom: 32,
+                paddingHorizontal: 30,
+                borderWidth: 1,
+                borderColor: BAGHERA_PALETTE.sand,
+                // Ombre douce, presque tirage papier
+                shadowColor: BAGHERA_PALETTE.ink,
+                shadowOffset: { width: 0, height: 18 },
+                shadowOpacity: 0.28,
+                shadowRadius: 32,
+                elevation: 14,
+                opacity: storyCard,
+                transform: [
+                  {
+                    translateY: storyCard.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [22, 0],
+                    }),
+                  },
+                  {
+                    scale: storyCard.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.97, 1],
+                    }),
+                  },
+                ],
+              }}
+            >
+              {/* Filigrane logo panthère, très discret */}
+              <Image
+                source={require("../../assets/baghera/logo.png")}
+                resizeMode="contain"
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: -28,
+                  right: -24,
+                  width: 200,
+                  height: 200,
+                  opacity: 0.05,
+                  tintColor: BAGHERA_PALETTE.ink,
+                }}
+              />
+
+              {/* Point ember signature */}
+              <View style={{ alignItems: 'center', marginBottom: 14 }}>
+                <View style={{
+                  width: 7, height: 7, borderRadius: 3.5,
+                  backgroundColor: BAGHERA_PALETTE.ember,
+                }} />
+              </View>
+
+              {/* Eyebrow */}
+              <Text style={{
+                textAlign: 'center',
+                fontFamily: BAGHERA_FONTS.sans,
+                fontSize: 10.5,
+                letterSpacing: 3,
+                color: BAGHERA_PALETTE.smoke,
+                textTransform: 'uppercase',
+                marginBottom: 12,
+              }}>
+                Le mot du chef
+              </Text>
+
+              {/* Titre serif — poétique */}
+              <Text style={{
+                textAlign: 'center',
+                fontFamily: BAGHERA_FONTS.serifItalic,
+                fontSize: 34,
+                lineHeight: 38,
+                color: BAGHERA_PALETTE.ink,
+                letterSpacing: -0.5,
+                marginBottom: 22,
+              }}>
+                Une carte qui{"\n"}raconte.
+              </Text>
+
+              {/* Filet ember + sand, centré */}
+              <View style={{ alignItems: 'center', marginBottom: 22 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ width: 28, height: 1, backgroundColor: BAGHERA_PALETTE.sand }} />
+                  <View style={{
+                    width: 5, height: 5, borderRadius: 2.5,
+                    backgroundColor: BAGHERA_PALETTE.ember,
+                    marginHorizontal: 8,
+                  }} />
+                  <View style={{ width: 28, height: 1, backgroundColor: BAGHERA_PALETTE.sand }} />
+                </View>
+              </View>
+
+              {/* Corps — prose */}
+              <Text style={{
+                fontFamily: BAGHERA_FONTS.sans,
+                fontSize: 14.5,
+                lineHeight: 24,
+                color: BAGHERA_PALETTE.coal,
+                textAlign: 'center',
+                marginBottom: 14,
+              }}>
+                Notre carte n’est pas une liste.{"\n"}
+                C’est un{" "}
+                <Text style={{ fontFamily: BAGHERA_FONTS.serifItalic, color: BAGHERA_PALETTE.ink }}>
+                  carnet de saisons
+                </Text>
+                , écrit à quatre mains avec nos producteurs, et redessiné chaque
+                semaine au gré du marché.
+              </Text>
+
+              <Text style={{
+                fontFamily: BAGHERA_FONTS.sans,
+                fontSize: 14.5,
+                lineHeight: 24,
+                color: BAGHERA_PALETTE.smoke,
+                textAlign: 'center',
+                marginBottom: 26,
+              }}>
+                Chaque plat est pensé comme une{" "}
+                <Text style={{ fontFamily: BAGHERA_FONTS.serifItalic, color: BAGHERA_PALETTE.ink }}>
+                  petite histoire
+                </Text>
+                {" "}— un produit juste, un geste précis, et juste assez de
+                silence autour pour qu’il puisse parler.
+              </Text>
+
+              {/* Signature */}
+              <Text style={{
+                textAlign: 'center',
+                fontFamily: BAGHERA_FONTS.serifItalic,
+                fontSize: 16,
+                color: BAGHERA_PALETTE.ink,
+                marginBottom: 24,
+              }}>
+                — Baghera.
+              </Text>
+
+              {/* Bouton refermer — croix discrète dans un rond */}
+              <TouchableOpacity
+                onPress={closeStoryModal}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Refermer"
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={{
+                  alignSelf: 'center',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: BAGHERA_PALETTE.sand,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'transparent',
+                }}
+              >
+                <Ionicons name="close" size={18} color={BAGHERA_PALETTE.ink} />
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
         </Modal>
       )}
     </View>

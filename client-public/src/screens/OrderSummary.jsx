@@ -16,8 +16,28 @@ import {
   Alert,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { BAGHERA_PALETTE, BAGHERA_FONTS } from "../theme/bagheraTheme";
 
 const PANINI_IMAGE = require("../../assets/images/menu/image-fond/panini.png");
+const BAGHERA_LOGO = require("../../assets/baghera/logo.png");
+const BAGHERA_IMG_BRUNCH = require("../../assets/baghera/hero-brunch.jpg");
+const BAGHERA_IMG_BAGHEERA = require("../../assets/baghera/signature-bagheera.jpg");
+const BAGHERA_IMG_MOWGLI = require("../../assets/baghera/signature-mowgli.jpg");
+const BAGHERA_IMG_SHEREKAN = require("../../assets/baghera/signature-shere-kan.jpg");
+const BAGHERA_IMG_ATELIER = require("../../assets/baghera/ambiance-atelier.jpg");
+const BAGHERA_FALLBACKS = [BAGHERA_IMG_BAGHEERA, BAGHERA_IMG_MOWGLI, BAGHERA_IMG_SHEREKAN];
+const getBagheraSummaryImage = (item) => {
+  if (!item) return BAGHERA_IMG_BRUNCH;
+  if (item.image && typeof item.image === 'string' && item.image.startsWith('http')) return { uri: item.image };
+  const h = `${item.name || ''} ${item.category || ''} ${item.description || ''}`.toLowerCase();
+  if (/(café|cafe|the|thé|latte|cappuccino|espresso|moka|chocolat|boisson|jus|smoothie|tea|coffee|vodka|cocktail|spritz|mimosa|champagne|aperol)/.test(h)) return BAGHERA_IMG_ATELIER;
+  if (/(brunch|œuf|oeuf|egg|pancake|avocat|avocado|toast|granola|yaourt|porridge|tartine)/.test(h)) return BAGHERA_IMG_BRUNCH;
+  if (/(burger|sandwich|panini|wrap|club|bagel|viande|bœuf|boeuf|poulet|chicken|steak)/.test(h)) return BAGHERA_IMG_SHEREKAN;
+  if (/(salade|salad|bowl|veggie|végé|vegan|légume|legume|crudité|quinoa|buddha)/.test(h)) return BAGHERA_IMG_MOWGLI;
+  if (/(dessert|sucré|sucre|gâteau|gateau|tarte|cake|pâtisserie|patisserie|cookie|brownie|crème|creme|glace)/.test(h)) return BAGHERA_IMG_BAGHEERA;
+  const idx = (item.name || '').length % BAGHERA_FALLBACKS.length;
+  return BAGHERA_FALLBACKS[idx];
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -28,6 +48,7 @@ export default function OrderSummary({
   onConfirm = () => {},
   onBackToMenu = () => {},
   isGrillzTheme = false,
+  isBaghera = false,
 }) {
   const total = currentOrder.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0);
 
@@ -56,28 +77,75 @@ export default function OrderSummary({
   };
 
   return (
-    <View style={[styles.container, isGrillzTheme && styles.grillzContainer]}>
-      {/* ═══════════════════════════════════════════════════════════
-          HEADER
-      ═══════════════════════════════════════════════════════════ */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBackToMenu} style={styles.backBtn}>
-          <MaterialIcons name="chevron-left" size={28} color={isGrillzTheme ? "#F59E0B" : "#1F2937"} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, isGrillzTheme && styles.grillzHeaderTitle]}>Récapitulatif</Text>
-      </View>
+    <View style={[
+      styles.container,
+      isGrillzTheme && styles.grillzContainer,
+      isBaghera && { backgroundColor: BAGHERA_PALETTE.cream },
+    ]}>
+      {/* HEADER */}
+      {isBaghera ? (
+        <View style={{
+          paddingTop: Platform.OS === "ios" ? 60 : (StatusBar.currentHeight || 0) + 16,
+          paddingHorizontal: 16,
+          paddingBottom: 12,
+          alignItems: 'center',
+          position: 'relative',
+        }}>
+          <TouchableOpacity onPress={onBackToMenu} style={{ position: 'absolute', left: 12, top: Platform.OS === "ios" ? 56 : (StatusBar.currentHeight || 0) + 12, padding: 6 }}>
+            <MaterialIcons name="chevron-left" size={28} color={BAGHERA_PALETTE.ink} />
+          </TouchableOpacity>
+          <View style={{ alignItems: 'center', position: 'relative' }}>
+            <Image
+              source={BAGHERA_LOGO}
+              style={{ position: 'absolute', width: 180, height: 90, opacity: 0.08, top: -8 }}
+              resizeMode="contain"
+            />
+            <Text style={{
+              fontFamily: BAGHERA_FONTS.serif,
+              fontSize: 38,
+              color: BAGHERA_PALETTE.ink,
+              letterSpacing: -0.5,
+            }}>
+              Bag<Text style={{ color: BAGHERA_PALETTE.ember }}>h</Text>era<Text style={{ color: BAGHERA_PALETTE.ember }}>.</Text>
+            </Text>
+            <Text style={{
+              fontFamily: BAGHERA_FONTS.serifItalic,
+              fontSize: 14,
+              color: BAGHERA_PALETTE.smoke,
+              marginTop: 2,
+            }}>— récapitulatif</Text>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBackToMenu} style={styles.backBtn}>
+            <MaterialIcons name="chevron-left" size={28} color={isGrillzTheme ? "#F59E0B" : "#1F2937"} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, isGrillzTheme && styles.grillzHeaderTitle]}>Récapitulatif</Text>
+        </View>
+      )}
 
-      {/* ═══════════════════════════════════════════════════════════
-          SUMMARY
-      ═══════════════════════════════════════════════════════════ */}
+      {/* SUMMARY */}
       <View style={styles.summarySection}>
         <View style={styles.summaryLeft}>
-          <Text style={[styles.summaryText, isGrillzTheme && styles.grillzSummaryText]} numberOfLines={2}>
+          <Text style={[
+            styles.summaryText,
+            isGrillzTheme && styles.grillzSummaryText,
+            isBaghera && { fontFamily: BAGHERA_FONTS.sansItalic, fontWeight: '400', color: BAGHERA_PALETTE.ink, fontSize: 14 },
+          ]} numberOfLines={2}>
             {summaryText || "Aucun article"}
           </Text>
-          <Text style={[styles.summaryDate, isGrillzTheme && styles.grillzSummaryDate]}>{dateText}</Text>
+          <Text style={[
+            styles.summaryDate,
+            isGrillzTheme && styles.grillzSummaryDate,
+            isBaghera && { fontFamily: BAGHERA_FONTS.sansItalic, color: BAGHERA_PALETTE.smoke },
+          ]}>{dateText}</Text>
         </View>
-        <Text style={[styles.summaryPrice, isGrillzTheme && styles.grillzSummaryPrice]}>{total.toFixed(2)}€</Text>
+        <Text style={[
+          styles.summaryPrice,
+          isGrillzTheme && styles.grillzSummaryPrice,
+          isBaghera && { fontFamily: BAGHERA_FONTS.serifItalic, fontWeight: '400', color: BAGHERA_PALETTE.ember, fontSize: 26 },
+        ]}>{total.toFixed(2)}€</Text>
       </View>
 
       {/* ═══════════════════════════════════════════════════════════
@@ -97,12 +165,26 @@ export default function OrderSummary({
             const itemPrice = (item.price || 0) * (item.quantity || 1);
 
             return (
-              <View key={item._id || index} style={[styles.card, isGrillzTheme && styles.grillzCard]}>
+              <View key={item._id || index} style={[
+                styles.card,
+                isGrillzTheme && styles.grillzCard,
+                isBaghera && {
+                  backgroundColor: BAGHERA_PALETTE.creamSoft,
+                  borderWidth: 1,
+                  borderColor: BAGHERA_PALETTE.sand,
+                  borderRadius: 20,
+                  padding: 14,
+                  shadowOpacity: 0,
+                  elevation: 0,
+                },
+              ]}>
                 <View style={styles.cardTop}>
                   {/* Image */}
-                  <View style={styles.productImageContainer}>
+                  <View style={[styles.productImageContainer, isBaghera && { borderRadius: 14, overflow: 'hidden' }]}>
                     <Image 
-                      source={item.image && item.image.trim() !== "" ? {uri: item.image} : PANINI_IMAGE} 
+                      source={isBaghera
+                        ? getBagheraSummaryImage(item)
+                        : (item.image && item.image.trim() !== "" ? {uri: item.image} : PANINI_IMAGE)}
                       style={styles.productImage} 
                       resizeMode="cover" 
                     />
@@ -110,31 +192,59 @@ export default function OrderSummary({
 
                   {/* Infos */}
                   <View style={styles.infoContainer}>
-                    <Text style={[styles.productName, isGrillzTheme && styles.grillzProductName]}>{item.name}</Text>
-                    <Text style={[styles.productPrice, isGrillzTheme && styles.grillzProductPrice]}>{itemPrice.toFixed(2)}€</Text>
+                    <Text style={[
+                      styles.productName,
+                      isGrillzTheme && styles.grillzProductName,
+                      isBaghera && { fontFamily: BAGHERA_FONTS.serif, fontSize: 18, fontWeight: '400', color: BAGHERA_PALETTE.ink },
+                    ]}>{item.name}</Text>
+                    <Text style={[
+                      styles.productPrice,
+                      isGrillzTheme && styles.grillzProductPrice,
+                      isBaghera && { fontFamily: BAGHERA_FONTS.serifItalic, fontSize: 18, fontWeight: '400', color: BAGHERA_PALETTE.ember },
+                    ]}>{itemPrice.toFixed(2)}€</Text>
                   </View>
 
                   {/* Quantity controls */}
-                  <View style={[styles.quantityControls, isGrillzTheme && styles.grillzQuantityControls]}>
+                  <View style={[
+                    styles.quantityControls,
+                    isGrillzTheme && styles.grillzQuantityControls,
+                    isBaghera && { backgroundColor: 'transparent' },
+                  ]}>
                     <TouchableOpacity 
-                      style={[styles.quantityBtn, isGrillzTheme && styles.grillzQuantityBtn]} 
+                      style={[
+                        styles.quantityBtn,
+                        isGrillzTheme && styles.grillzQuantityBtn,
+                        isBaghera && { backgroundColor: BAGHERA_PALETTE.ember, width: 30, height: 30, borderRadius: 15 },
+                      ]} 
                       onPress={() => handleQuantityChange(item, -1)}
                     >
-                      <MaterialIcons name="remove" size={20} color={isGrillzTheme ? "#F59E0B" : "#1F2937"} />
+                      <MaterialIcons name="remove" size={18} color={isBaghera ? "#FFFFFF" : (isGrillzTheme ? "#F59E0B" : "#1F2937")} />
                     </TouchableOpacity>
-                    <Text style={[styles.quantityText, isGrillzTheme && styles.grillzQuantityText]}>{item.quantity || 1}</Text>
+                    <Text style={[
+                      styles.quantityText,
+                      isGrillzTheme && styles.grillzQuantityText,
+                      isBaghera && { fontFamily: BAGHERA_FONTS.serif, color: BAGHERA_PALETTE.ink, fontSize: 16 },
+                    ]}>{item.quantity || 1}</Text>
                     <TouchableOpacity 
-                      style={[styles.quantityBtn, isGrillzTheme && styles.grillzQuantityBtn]} 
+                      style={[
+                        styles.quantityBtn,
+                        isGrillzTheme && styles.grillzQuantityBtn,
+                        isBaghera && { backgroundColor: BAGHERA_PALETTE.ember, width: 30, height: 30, borderRadius: 15 },
+                      ]} 
                       onPress={() => handleQuantityChange(item, 1)}
                     >
-                      <MaterialIcons name="add" size={20} color={isGrillzTheme ? "#F59E0B" : "#1F2937"} />
+                      <MaterialIcons name="add" size={18} color={isBaghera ? "#FFFFFF" : (isGrillzTheme ? "#F59E0B" : "#1F2937")} />
                     </TouchableOpacity>
                   </View>
                 </View>
 
                 {/* Description */}
                 {item.description && (
-                  <Text style={[styles.productDescription, isGrillzTheme && styles.grillzProductDescription]} numberOfLines={2}>
+                  <Text style={[
+                    styles.productDescription,
+                    isGrillzTheme && styles.grillzProductDescription,
+                    isBaghera && { fontFamily: BAGHERA_FONTS.sansItalic, color: BAGHERA_PALETTE.smoke, fontSize: 13, marginTop: 8 },
+                  ]} numberOfLines={2}>
                     {item.description}
                   </Text>
                 )}
@@ -144,19 +254,44 @@ export default function OrderSummary({
         )}
       </ScrollView>
 
-      {/* ═══════════════════════════════════════════════════════════
-          FOOTER
-      ═══════════════════════════════════════════════════════════ */}
+      {/* FOOTER */}
       {currentOrder.length > 0 && (
-        <View style={[styles.footer, isGrillzTheme && styles.grillzFooter]}>
+        <View style={[
+          styles.footer,
+          isGrillzTheme && styles.grillzFooter,
+          isBaghera && { backgroundColor: BAGHERA_PALETTE.cream, borderTopWidth: 0 },
+        ]}>
           {/* Confirm button */}
-          <TouchableOpacity style={[styles.confirmBtn, isGrillzTheme && styles.grillzConfirmBtn]} onPress={handleConfirm} activeOpacity={0.9}>
-            <Text style={styles.confirmBtnText}>Confirmer la commande • {total.toFixed(2)}€</Text>
+          <TouchableOpacity
+            style={[
+              styles.confirmBtn,
+              isGrillzTheme && styles.grillzConfirmBtn,
+              isBaghera && { backgroundColor: BAGHERA_PALETTE.ember, borderRadius: 28, paddingVertical: 16, shadowOpacity: 0 },
+            ]}
+            onPress={handleConfirm}
+            activeOpacity={0.9}
+          >
+            <Text style={[
+              styles.confirmBtnText,
+              isBaghera && { fontFamily: BAGHERA_FONTS.sans, fontWeight: '600', letterSpacing: 0.3 },
+            ]}>Confirmer la commande • {total.toFixed(2)}€</Text>
           </TouchableOpacity>
 
           {/* Back button */}
-          <TouchableOpacity style={[styles.backButton, isGrillzTheme && styles.grillzBackButton]} onPress={onBackToMenu} activeOpacity={0.9}>
-            <Text style={[styles.backButtonText, isGrillzTheme && styles.grillzBackButtonText]}>Retour au menu</Text>
+          <TouchableOpacity
+            style={[
+              styles.backButton,
+              isGrillzTheme && styles.grillzBackButton,
+              isBaghera && { borderColor: BAGHERA_PALETTE.sand, backgroundColor: 'transparent' },
+            ]}
+            onPress={onBackToMenu}
+            activeOpacity={0.9}
+          >
+            <Text style={[
+              styles.backButtonText,
+              isGrillzTheme && styles.grillzBackButtonText,
+              isBaghera && { fontFamily: BAGHERA_FONTS.sansItalic, color: BAGHERA_PALETTE.smoke },
+            ]}>Retour au menu</Text>
           </TouchableOpacity>
         </View>
       )}

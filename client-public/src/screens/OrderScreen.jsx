@@ -31,6 +31,8 @@ import {
   StatusBar,
   Image,
   Dimensions,
+  Animated,
+  PanResponder,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRestaurantStore } from "../stores/useRestaurantStore";
@@ -44,9 +46,29 @@ import {
   getOrderCardTokens,
   getOrderFooterTokens,
 } from "../theme/defaultTheme";
+import { BAGHERA_PALETTE, BAGHERA_FONTS } from "../theme/bagheraTheme";
 
 const { width } = Dimensions.get("window");
 const PANINI_IMAGE = require("../../assets/images/menu/image-fond/panini.png");
+const BAGHERA_LOGO = require("../../assets/baghera/logo.png");
+const BAGHERA_IMG_BRUNCH = require("../../assets/baghera/hero-brunch.jpg");
+const BAGHERA_IMG_BAGHEERA = require("../../assets/baghera/signature-bagheera.jpg");
+const BAGHERA_IMG_MOWGLI = require("../../assets/baghera/signature-mowgli.jpg");
+const BAGHERA_IMG_SHEREKAN = require("../../assets/baghera/signature-shere-kan.jpg");
+const BAGHERA_IMG_ATELIER = require("../../assets/baghera/ambiance-atelier.jpg");
+const BAGHERA_FALLBACKS = [BAGHERA_IMG_BAGHEERA, BAGHERA_IMG_MOWGLI, BAGHERA_IMG_SHEREKAN];
+const getBagheraOrderImage = (item) => {
+  if (!item) return BAGHERA_IMG_BRUNCH;
+  if (item.image && typeof item.image === 'string' && item.image.startsWith('http')) return { uri: item.image };
+  const h = `${item.name || ''} ${item.category || ''} ${item.description || ''}`.toLowerCase();
+  if (/(café|cafe|the|thé|latte|cappuccino|espresso|moka|chocolat|boisson|jus|smoothie|tea|coffee)/.test(h)) return BAGHERA_IMG_ATELIER;
+  if (/(brunch|œuf|oeuf|egg|pancake|avocat|avocado|toast|granola|yaourt|porridge|tartine)/.test(h)) return BAGHERA_IMG_BRUNCH;
+  if (/(burger|sandwich|panini|wrap|club|bagel|viande|bœuf|boeuf|poulet|chicken|steak)/.test(h)) return BAGHERA_IMG_SHEREKAN;
+  if (/(salade|salad|bowl|veggie|végé|vegan|légume|legume|crudité|quinoa|buddha)/.test(h)) return BAGHERA_IMG_MOWGLI;
+  if (/(dessert|sucré|sucre|gâteau|gateau|tarte|cake|pâtisserie|patisserie|cookie|brownie|crème|creme|glace)/.test(h)) return BAGHERA_IMG_BAGHEERA;
+  const idx = (item.name || '').length % BAGHERA_FALLBACKS.length;
+  return BAGHERA_FALLBACKS[idx];
+};
 
 // 🔑 LEGACY 0.4-A — Fallback synchrone tant que la tee styleKey n'est pas
 // branchée AVANT OrderScreen dans le flow (MenuScreen / App.jsx ne montent
@@ -146,6 +168,87 @@ const pbStyles = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// SEND-NOW SLIDER (slide pour envoyer immédiatement avant la fin du timer)
+// ═══════════════════════════════════════════════════════════════════════════
+const SendNowSlider = ({ countdown, onConfirm, isBaghera = false }) => {
+  const TRACK_W = width - 48;
+  const THUMB_W = 56;
+  const TRAVEL = TRACK_W - THUMB_W - 8;
+  const translateX = useRef(new Animated.Value(0)).current;
+  const confirmedRef = useRef(false);
+  const palette = isBaghera
+    ? { track: BAGHERA_PALETTE.creamSoft, border: BAGHERA_PALETTE.sand, thumb: BAGHERA_PALETTE.ember, label: BAGHERA_PALETTE.smoke, hint: BAGHERA_PALETTE.ember }
+    : { track: "#FFF7ED", border: "#FDBA74", thumb: "#F97316", label: "#9A6938", hint: "#C2410C" };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, g) => {
+        const x = Math.max(0, Math.min(g.dx, TRAVEL));
+        translateX.setValue(x);
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dx >= TRAVEL * 0.85 && !confirmedRef.current) {
+          confirmedRef.current = true;
+          Animated.timing(translateX, { toValue: TRAVEL, duration: 120, useNativeDriver: true }).start(() => {
+            onConfirm?.();
+          });
+        } else {
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 7, tension: 60 }).start();
+        }
+      },
+    })
+  ).current;
+
+  return (
+    <View style={{ paddingHorizontal: 16, marginTop: 12, marginBottom: 4 }}>
+      <View style={{
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: palette.track,
+        borderWidth: 1,
+        borderColor: palette.border,
+        justifyContent: "center",
+        overflow: "hidden",
+      }}>
+        <Text style={{
+          textAlign: "center",
+          color: palette.label,
+          fontSize: 14,
+          fontStyle: isBaghera ? "italic" : "normal",
+          fontFamily: isBaghera ? "InstrumentSerif-Italic" : undefined,
+        }}>
+          Glissez pour envoyer maintenant ({countdown}s)
+        </Text>
+        <Animated.View
+          {...panResponder.panHandlers}
+          style={{
+            position: "absolute",
+            top: 4,
+            left: 4,
+            width: THUMB_W,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: palette.thumb,
+            justifyContent: "center",
+            alignItems: "center",
+            transform: [{ translateX }],
+            shadowColor: palette.thumb,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 4,
+          }}
+        >
+          <MaterialIcons name="chevron-right" size={32} color="#FFFFFF" />
+        </Animated.View>
+      </View>
+    </View>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 export default function OrderScreen({
@@ -185,25 +288,49 @@ export default function OrderScreen({
   // Niveau 3 nécessaire car OrderScreen est le 1er écran à monter
   // useRestaurantConfig dans le flow (MenuScreen ne le fait pas).
   const resolvedStyleKey = resolveStyleKeyFallback(themeKey, config, effectiveRestaurantId);
+  // 🆕 Phase 3.4 — Baghera tenant override (démo client 13 mai 2026)
+  // Iso-strict cucina/grillz : on délègue aux helpers existants pour ces styleKey,
+  // et on shortcut vers les tokens Baghera quand styleKey === 'baghera'.
+  const isBaghera = resolvedStyleKey === 'baghera';
   const orderContainerTokens = useMemo(
-    () => getOrderContainerTokens(resolvedStyleKey),
-    [resolvedStyleKey],
+    () => isBaghera ? {
+      background: BAGHERA_PALETTE.cream,
+      emptyTextColor: BAGHERA_PALETTE.smoke,
+    } : getOrderContainerTokens(resolvedStyleKey),
+    [resolvedStyleKey, isBaghera],
   );
   const orderHeaderTokens = useMemo(
-    () => getOrderHeaderTokens(resolvedStyleKey),
-    [resolvedStyleKey],
+    () => isBaghera ? {
+      titleColor: BAGHERA_PALETTE.ink,
+      backIconColor: BAGHERA_PALETTE.ink,
+    } : getOrderHeaderTokens(resolvedStyleKey),
+    [resolvedStyleKey, isBaghera],
   );
   const orderSummaryTokens = useMemo(
-    () => getOrderSummaryTokens(resolvedStyleKey),
-    [resolvedStyleKey],
+    () => isBaghera ? {
+      textColor: BAGHERA_PALETTE.ink,
+      dateColor: BAGHERA_PALETTE.smoke,
+      priceColor: BAGHERA_PALETTE.ember,
+    } : getOrderSummaryTokens(resolvedStyleKey),
+    [resolvedStyleKey, isBaghera],
   );
   const orderCardTokens = useMemo(
-    () => getOrderCardTokens(resolvedStyleKey),
-    [resolvedStyleKey],
+    () => isBaghera ? {
+      cardBackground: BAGHERA_PALETTE.creamSoft,
+      cardBorderOverride: { borderWidth: 1, borderColor: BAGHERA_PALETTE.sand },
+      productNameColor: BAGHERA_PALETTE.ink,
+      productPriceColor: BAGHERA_PALETTE.ember,
+    } : getOrderCardTokens(resolvedStyleKey),
+    [resolvedStyleKey, isBaghera],
   );
   const orderFooterTokens = useMemo(
-    () => getOrderFooterTokens(resolvedStyleKey),
-    [resolvedStyleKey],
+    () => isBaghera ? {
+      footerBackground: BAGHERA_PALETTE.cream,
+      payBtnBackground: BAGHERA_PALETTE.ember,
+      cancelBtnBorderColor: BAGHERA_PALETTE.sand,
+      cancelBtnTextColor: BAGHERA_PALETTE.smoke,
+    } : getOrderFooterTokens(resolvedStyleKey),
+    [resolvedStyleKey, isBaghera],
   );
 
   // �🚪 Écouter fermeture réservation WebSocket
@@ -253,6 +380,19 @@ export default function OrderScreen({
   // L'annulation est possible UNIQUEMENT pendant le countdown
   const canCancel = pendingOrder && !isSubmitted && countdown > 0;
 
+  // 🚀 Slide-to-send-now : court-circuite le timer et envoie immédiatement
+  const triggerSendNow = useCallback(() => {
+    if (hasAutoSubmitted.current) return;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    hasAutoSubmitted.current = true;
+    setCountdown(0);
+    setIsSubmitted(true);
+    onAutoSubmitRef.current?.();
+  }, []);
+
   // ═══════════════════════════════════════════════════════════════════════
   // MULTI-CLIENTS : Filtrage par clientId
   // ═══════════════════════════════════════════════════════════════════════
@@ -284,38 +424,83 @@ export default function OrderScreen({
   return (
     <View style={[styles.container, { backgroundColor: orderContainerTokens.background }]}>
       {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <MaterialIcons name="chevron-left" size={28} color={orderHeaderTokens.backIconColor} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: orderHeaderTokens.titleColor }]}>Ma commande en cours</Text>
-      </View>
+      {isBaghera ? (
+        <View style={{
+          paddingTop: Platform.OS === "ios" ? 60 : (StatusBar.currentHeight || 0) + 16,
+          paddingHorizontal: 16,
+          paddingBottom: 12,
+          alignItems: 'center',
+          position: 'relative',
+        }}>
+          <TouchableOpacity onPress={onBack} style={{ position: 'absolute', left: 12, top: Platform.OS === "ios" ? 56 : (StatusBar.currentHeight || 0) + 12, padding: 6 }}>
+            <MaterialIcons name="chevron-left" size={28} color={BAGHERA_PALETTE.ink} />
+          </TouchableOpacity>
+          <View style={{ alignItems: 'center', position: 'relative' }}>
+            <Image
+              source={BAGHERA_LOGO}
+              style={{ position: 'absolute', width: 180, height: 90, opacity: 0.08, top: -8 }}
+              resizeMode="contain"
+            />
+            <Text style={{
+              fontFamily: BAGHERA_FONTS.serif,
+              fontSize: 38,
+              color: BAGHERA_PALETTE.ink,
+              letterSpacing: -0.5,
+            }}>
+              Bag<Text style={{ color: BAGHERA_PALETTE.ember }}>h</Text>era<Text style={{ color: BAGHERA_PALETTE.ember }}>.</Text>
+            </Text>
+            <Text style={{
+              fontFamily: BAGHERA_FONTS.serifItalic,
+              fontSize: 14,
+              color: BAGHERA_PALETTE.smoke,
+              marginTop: 2,
+            }}>— votre commande</Text>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+            <MaterialIcons name="chevron-left" size={28} color={orderHeaderTokens.backIconColor} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: orderHeaderTokens.titleColor }]}>Ma commande en cours</Text>
+        </View>
+      )}
 
       {/* SUMMARY */}
       <View style={styles.summarySection}>
         <View style={styles.summaryLeft}>
-          <Text style={[styles.summaryText, { color: orderSummaryTokens.textColor }]} numberOfLines={2}>
+          <Text style={[
+            styles.summaryText,
+            { color: orderSummaryTokens.textColor },
+            isBaghera && { fontFamily: BAGHERA_FONTS.sansItalic, fontSize: 14 },
+          ]} numberOfLines={2}>
             {summaryText || "Aucun article"}
           </Text>
-          <Text style={[styles.summaryDate, { color: orderSummaryTokens.dateColor }]}>{dateText}</Text>
+          <Text style={[
+            styles.summaryDate,
+            { color: orderSummaryTokens.dateColor },
+            isBaghera && { fontFamily: BAGHERA_FONTS.sansItalic },
+          ]}>{dateText}</Text>
         </View>
-        <Text style={[styles.summaryPrice, { color: orderSummaryTokens.priceColor }]}>{total.toFixed(2)}€</Text>
+        <Text style={[
+          styles.summaryPrice,
+          { color: orderSummaryTokens.priceColor },
+          isBaghera && { fontFamily: BAGHERA_FONTS.serifItalic, fontWeight: '400', fontSize: 24 },
+        ]}>{total.toFixed(2)}€</Text>
       </View>
 
-      {/* 🍔 STATUS BANNER (foodtruck / fast-food) */}
-      {(isFoodtruck || isFastFood) && (
+      {/* 🍔 STATUS BANNER (foodtruck / fast-food) — masqué pendant le countdown (le slider fait foi) */}
+      {(isFoodtruck || isFastFood) && !canCancel && (
         <View style={[styles.statusBanner, isFoodtruck ? styles.statusBannerFoodtruck : styles.statusBannerFastfood]}>
           <MaterialIcons
-            name={isFoodtruck ? "delivery-dining" : (canCancel ? "hourglass-top" : "restaurant")}
+            name={isFoodtruck ? "delivery-dining" : "restaurant"}
             size={20}
             color={isFoodtruck ? "#FF6B00" : "#4CAF50"}
           />
           <Text style={styles.statusBannerText}>
             {isFoodtruck
               ? "Commande reçue — Payez pour lancer la préparation"
-              : canCancel
-                ? `Envoi dans ${countdown}s — Vous pouvez encore annuler`
-                : "Préparation en cours — Payez quand vous êtes prêt"}
+              : "Préparation en cours — Payez quand vous êtes prêt"}
           </Text>
         </View>
       )}
@@ -334,18 +519,41 @@ export default function OrderScreen({
             return (
               <View
                 key={item._id || `item-${index}`}
-                style={[styles.card, { backgroundColor: orderCardTokens.cardBackground }, orderCardTokens.cardBorderOverride]}
+                style={[
+                  styles.card,
+                  { backgroundColor: orderCardTokens.cardBackground },
+                  orderCardTokens.cardBorderOverride,
+                  isBaghera && { borderRadius: 20, padding: 14 },
+                ]}
               >
                 <View style={styles.cardTop}>
-                  <View style={styles.productImageContainer}>
-                    <Image source={PANINI_IMAGE} style={styles.productImage} resizeMode="cover" />
+                  <View style={[styles.productImageContainer, isBaghera && { borderRadius: 14, overflow: 'hidden' }]}>
+                    <Image
+                      source={isBaghera ? getBagheraOrderImage(item) : PANINI_IMAGE}
+                      style={styles.productImage}
+                      resizeMode="cover"
+                    />
                   </View>
                   <View style={styles.infoContainer}>
-                    <Text style={[styles.productName, { color: orderCardTokens.productNameColor }]}>{item.name}</Text>
-                    <Text style={[styles.productPrice, { color: orderCardTokens.productPriceColor }]}>{itemPrice.toFixed(2)}€</Text>
+                    <Text style={[
+                      styles.productName,
+                      { color: orderCardTokens.productNameColor },
+                      isBaghera && { fontFamily: BAGHERA_FONTS.serif, fontSize: 18, fontWeight: '400' },
+                    ]}>{item.name}</Text>
+                    <Text style={[
+                      styles.productPrice,
+                      { color: orderCardTokens.productPriceColor },
+                      isBaghera && { fontFamily: BAGHERA_FONTS.serifItalic, fontSize: 18, fontWeight: '400' },
+                    ]}>{itemPrice.toFixed(2)}€</Text>
                   </View>
-                  <View style={styles.quantityBadge}>
-                    <Text style={styles.quantityBadgeText}>x{item.quantity || 1}</Text>
+                  <View style={[
+                    styles.quantityBadge,
+                    isBaghera && { backgroundColor: BAGHERA_PALETTE.ember },
+                  ]}>
+                    <Text style={[
+                      styles.quantityBadgeText,
+                      isBaghera && { fontFamily: BAGHERA_FONTS.sans, fontWeight: '600' },
+                    ]}>x{item.quantity || 1}</Text>
                   </View>
                 </View>
                 <ProgressBar step={1} />
@@ -358,23 +566,31 @@ export default function OrderScreen({
       {/* FOOTER */}
       {items.length > 0 && (
         <View style={[styles.footer, { backgroundColor: orderFooterTokens.footerBackground }]}>
-          {/* 🍔 Fast-food pending: bouton "Payer" désactivé tant que pas soumis */}
-          <TouchableOpacity 
-            style={[
-              styles.payBtn,
-              { backgroundColor: orderFooterTokens.payBtnBackground },
-              canCancel && styles.payBtnDisabled,
-            ]} 
-            onPress={onPayNow} 
-            activeOpacity={0.9}
-            disabled={canCancel}
-          >
-            <Text style={[styles.payBtnText, canCancel && styles.payBtnTextDisabled]}>
-              {canCancel
-                ? `Envoi en cours (${countdown}s)…`
-                : `Payer maintenant • ${total.toFixed(2)}€`}
-            </Text>
-          </TouchableOpacity>
+          {/* 🚀 Pendant le countdown : slide-to-send-now à la place du bouton Payer */}
+          {canCancel ? (
+            <SendNowSlider
+              countdown={countdown}
+              onConfirm={triggerSendNow}
+              isBaghera={isBaghera}
+            />
+          ) : (
+            <TouchableOpacity 
+              style={[
+                styles.payBtn,
+                { backgroundColor: orderFooterTokens.payBtnBackground },
+                isBaghera && { borderRadius: 28, paddingVertical: 16, shadowOpacity: 0 },
+              ]} 
+              onPress={onPayNow} 
+              activeOpacity={0.9}
+            >
+              <Text style={[
+                styles.payBtnText,
+                isBaghera && { fontFamily: BAGHERA_FONTS.sans, fontWeight: '600', letterSpacing: 0.3 },
+              ]}>
+                {`Payer maintenant • ${total.toFixed(2)}€`}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <View style={styles.btnRow}>
             <TouchableOpacity style={styles.backButton} onPress={onBack} activeOpacity={0.9}>
@@ -400,7 +616,7 @@ export default function OrderScreen({
                 (pendingOrder && !canCancel) && styles.cancelBtnTextDisabled,
               ]}>
                 {canCancel
-                  ? `Annuler (${countdown}s)`
+                  ? `Annuler`
                   : pendingOrder
                     ? "Commande envoyée ✓"
                     : "Annuler la commande"}

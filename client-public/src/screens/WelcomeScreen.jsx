@@ -49,8 +49,12 @@ import { secureSessionStore } from "shared-api/utils/secureSessionStore";
 import { deviceIdentity } from "shared-api/utils/deviceIdentity";
 import RNUUID from "react-native-uuid";
 
-import { getRestaurantAssets, getRestaurantFont } from "../utils/restaurantAssets";
+import { getRestaurantAssets } from "../utils/restaurantAssets";
 import useOrderLookup from "../hooks/useOrderLookup";
+import useThemeKey from "../hooks/useThemeKey";
+import { getWelcomeFormTokens } from "../theme/defaultTheme";
+import WelcomeScreenGrillz from "./WelcomeScreenGrillz";
+import WelcomeScreenBaghera from "./WelcomeScreenBaghera";
 
 export default function WelcomeScreen({
   tableId = null,
@@ -79,7 +83,14 @@ export default function WelcomeScreen({
     font: restaurantAssets.font,
   };
   // ═══════════════════════════════════════════════════════════════════════════
-  
+
+  // Phase 0.4-C.3 — Tokens du formulaire Welcome (input + CTA + erreur).
+  // styleKey lu via useThemeKey (single source of truth, Phase 0.2.5).
+  // Null-safe: getWelcomeFormTokens normalise styleKey null/undefined vers
+  // la branche default (cucina) iso-strict avec valeurs hardcoded actuelles.
+  const { styleKey } = useThemeKey();
+  const welcomeFormTokens = getWelcomeFormTokens(styleKey);
+
   // States
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
@@ -209,17 +220,7 @@ export default function WelcomeScreen({
   const DESIGN_HEIGHT = 956; // iPhone 16 Pro Max height
   const scale = SCREEN_WIDTH / DESIGN_WIDTH;
   const vScale = SCREEN_HEIGHT / DESIGN_HEIGHT;
-  
-  // 🔒 GRILLZ LOCKED VALUES - Valeurs responsive verrouillées
-  const GRILLZ_RESPONSIVE = {
-    chicken1: { width: 224 * scale, height: 224 * scale, top: -50 * vScale, left: -50 * scale },
-    chicken2: { width: 192 * scale, height: 192 * scale, top: -10 * vScale, right: -60 * scale },
-    chicken3: { width: 192 * scale, height: 192 * scale, bottom: 220 * vScale, left: -110 * scale },
-    chicken4: { width: 208 * scale, height: 208 * scale, bottom: 100 * vScale, right: -130 * scale },
-    logo: { width: 290 * scale, height: 325 * scale, top: '28%' },
-    bienvenue: { top: '26%', fontSize: 28 * scale },
-  };
-  
+
   // Stores
   const restaurantName = useRestaurantStore((state) => state.name);
   const fetchRestaurantInfo = useRestaurantStore((state) => state.fetchRestaurantInfo);
@@ -340,13 +341,14 @@ export default function WelcomeScreen({
   };
 
   // Handler pour démarrer une nouvelle session
+  // ⚠️ On garde currentTableId + currentReservationId pour que le 2e client
+  // rejoigne la MÊME table/réservation (sinon il crée une résa séparée et ne
+  // voit pas les commandes des autres clients de la table).
+  // On efface uniquement l'identité client (clientId + nom) pour forcer la
+  // génération d'un nouveau clientId stable côté backend.
   const handleNewSession = async () => {
-    // Effacer la session existante
     await AsyncStorage.multiRemove([
-      "currentTableId",
-      "currentReservationId", 
       "currentClientName",
-      "currentTableNumber",
     ]);
 	await secureSessionStore.remove(secureSessionStore.keys.CLIENT_ID);
     setExistingSession(null);
@@ -573,7 +575,12 @@ export default function WelcomeScreen({
       
       if (!response.ok) {
         console.error("❌ [JOIN] Réponse non-OK:", response.status, data.message);
-        Alert.alert("Erreur", data.message || "Erreur lors de la création de la réservation.");
+        const isDuplicateName =
+          response.status === 409 && data?.error === "duplicate_client_name";
+        Alert.alert(
+          isDuplicateName ? "Prénom déjà utilisé" : "Erreur",
+          data.message || "Erreur lors de la création de la réservation.",
+        );
         setLoading(false);
         return;
       }
@@ -590,6 +597,25 @@ export default function WelcomeScreen({
         setLoading(false);
         return;
       }
+
+      // 🔐 Identité stable : si le backend a réémis un token + résolu un clientId
+      // (cas reco / réinstall app), on adopte la nouvelle identité.
+      let effectiveClientId = clientId;
+      if (data.resolvedClientId && data.resolvedClientId !== clientId) {
+        effectiveClientId = data.resolvedClientId;
+        await secureSessionStore.setString(
+          secureSessionStore.keys.CLIENT_ID,
+          String(effectiveClientId),
+        );
+        console.log("🔐 [JOIN] clientId stable adopté:", effectiveClientId);
+      }
+      if (data.token) {
+        await secureSessionStore.setString(
+          secureSessionStore.keys.CLIENT_TOKEN,
+          data.token,
+        );
+        console.log("🔐 [JOIN] token réémis et stocké");
+      }
       
       // ⭐ Stocker les infos importantes dans AsyncStorage
       const storePairs = [
@@ -603,14 +629,14 @@ export default function WelcomeScreen({
       await AsyncStorage.multiSet(storePairs);
 		await secureSessionStore.setString(
 			secureSessionStore.keys.CLIENT_ID,
-			String(clientId),
+			String(effectiveClientId),
 		);
       
       // ⭐ Appeler onJoin avec un objet (format attendu par App.jsx)
       console.log("🎉 [JOIN] Succès! Appel onJoin callback");
       onJoin?.({
         reservationId: reservationId,
-        clientId: clientId,
+        clientId: effectiveClientId,
         userName: name.trim(),
       });
       
@@ -753,539 +779,84 @@ export default function WelcomeScreen({
   };
   
   // Page d'onboarding principale
-  // 🔥 LE GRILLZ = fond BBQ avec image poulet
-  const isGrillz = restaurantId === '695e4300adde654b80f6911a';
-  // 🍝 CUCINA = fond panini italien
-  const isCucina = restaurantId === '6970ef6594abf8bacd9d804d';
+  // Phase 0.4-C.4 — isGrillz/isCucina dérivés du styleKey (single source of truth
+  // useThemeKey, Phase 0.2.5) plutôt que des hash MongoDB hardcodés. Le hack
+  // BDD 'grills'→'grillz' est géré cf. Phase 0.6 (consolidation BDD).
+  // Iso-comportement steady-state préservé ; pendant le boot, le remplissage
+  // est progressif (Phase 0.3 strangler) — isGrillz reste false jusqu'à ce
+  // que styleKey soit résolu, même sémantique qu'avec restaurantId=null.
+  const isGrillz = styleKey === 'grillz' || styleKey === 'grills';
+  const isCucina = styleKey === 'cucina';
+  // 🆕 Phase 3.2 — Baghera tenant (démo client 13 mai 2026)
+  const isBaghera = styleKey === 'baghera';
   const isNameLookupMode = !isGrillz && name.startsWith("#");
   const isNameLookupValid = /^#[A-Z0-9]{4}$/.test(name);
-  
-  // Images de fond pour Grillz (pré-découpées)
-  const GRILLZ_BG_LEFT = require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/chickenleft.png");
-  const GRILLZ_BG_RIGHT = require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/chickenright.png");
-  const GRILLZ_MENU_PREVIEW = require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/screenMenu.png");
-  
+
+  // 🆕 Phase 3.2 — Routing Baghera (avant Grillz/Cucina pour priorité démo)
+  // Composant autonome avec sa propre palette/fonts (PAS de spread d'animations
+  // parent comme Grillz — Baghera utilise des animations internes simples).
+  if (isBaghera) {
+    return (
+      <WelcomeScreenBaghera
+        tableNumber={tableNumber}
+        name={name}
+        setName={setName}
+        loading={loading}
+        error={error}
+        existingSession={existingSession}
+        handleResumeSession={handleResumeSession}
+        handleContinueWithEmail={handleContinueWithEmail}
+        handleNewSession={handleNewSession}
+        handleClearStorage={handleClearStorage}
+      />
+    );
+  }
+
   // Si Grillz, on utilise ImageBackground avec overlay sombre
   // Position absolute pour passer PAR-DESSUS le SafeAreaView parent
   if (isGrillz) {
-    const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-    const isWeb = Platform.OS === 'web';
-    
     return (
-      <View style={{ 
-        position: isWeb ? 'fixed' : 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        // Sur web, utiliser height: 100% pour edge-to-edge
-        ...(isWeb ? { 
-          width: '100%', 
-          height: '100%',
-          minHeight: '100dvh', // Dynamic viewport height
-        } : {}),
-        zIndex: 9999,
-        backgroundColor: '#000', // Fallback noir
-      }}>
-        {/* 🖼️ Menu preview en arrière-plan (visible quand les images se séparent) */}
-        <ImageBackground 
-          source={GRILLZ_MENU_PREVIEW} 
-          style={{ ...StyleSheet.absoluteFillObject }}
-          resizeMode="cover"
-        />
-        
-        {/* 🎬 Background split en 2 pour l'animation de sortie */}
-        <View style={{ flex: 1, flexDirection: 'row', overflow: 'hidden' }}>
-          {/* Moitié gauche */}
-          <Animated.View 
-            style={{ 
-              width: screenWidth, // 100% pour afficher l'image complète
-              height: '100%',
-              transform: [{
-                translateX: bgLeftAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, -screenWidth * 0.5],
-                }),
-              }],
-            }}
-          >
-            <ImageBackground 
-              source={GRILLZ_BG_LEFT} 
-              style={{ width: '100%', height: '100%', marginLeft: -screenWidth * 0.5 }}
-              resizeMode="cover"
-              imageStyle={{ alignSelf: 'flex-end' }}
-            >
-              {/* Overlay sombre */}
-              <View style={{ 
-                ...StyleSheet.absoluteFillObject, 
-                backgroundColor: 'rgba(0, 0, 0, 0.6)' 
-              }} />
-            </ImageBackground>
-          </Animated.View>
-          
-          {/* Moitié droite */}
-          <Animated.View 
-            style={{ 
-              width: screenWidth, // 100% pour afficher l'image complète
-              height: '100%',
-              transform: [{
-                translateX: bgRightAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, screenWidth * 0.5],
-                }),
-              }],
-            }}
-          >
-            <ImageBackground 
-              source={GRILLZ_BG_RIGHT} 
-              style={{ width: '100%', height: '100%', marginLeft: -screenWidth * 0.5 }}
-              resizeMode="cover"
-              imageStyle={{ alignSelf: 'flex-start' }}
-            >
-              {/* Overlay sombre */}
-              <View style={{ 
-                ...StyleSheet.absoluteFillObject, 
-                backgroundColor: 'rgba(0, 0, 0, 0.6)' 
-              }} />
-            </ImageBackground>
-          </Animated.View>
-        </View>
-        
-        {/* Container de contenu (par-dessus le background) */}
-        <View style={{ ...StyleSheet.absoluteFillObject }}>
-          {/* StatusBar transparent pour fullscreen */}
-          <StatusBar
-            translucent
-            backgroundColor="transparent"
-            barStyle="light-content"
-          />
-          
-          {/* Clear button (debug) */}
-          <TouchableOpacity
-            style={styles.clearButton}
-            onPress={handleClearStorage}
-          >
-            <Ionicons name="trash-outline" size={18} color="#888" />
-          </TouchableOpacity>
-
-          {/* 🔄 REPRISE DE SESSION - si session active détectée */}
-          {existingSession && (
-            <View style={styles.resumeSessionCard}>
-              <View style={styles.resumeSessionContent}>
-                <Ionicons name="refresh" size={28} color="#F87171" />
-                <View style={styles.resumeSessionText}>
-                  <Text style={styles.resumeSessionTitle}>Session en cours</Text>
-                  <Text style={styles.resumeSessionSubtitle}>
-                    Reprendre la commande de{" "}
-                    <Text style={{ fontWeight: "700" }}>{existingSession.clientName}</Text> ?
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.resumeSessionButtons}>
-                <TouchableOpacity
-                  style={styles.resumeBtn}
-                  onPress={handleResumeSession}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.resumeBtnText}>Reprendre</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.resumeBtnSecondary}
-                  onPress={handleNewSession}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.resumeBtnSecondaryText}>Nouvelle session</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          
-          {/* 🍗 4 Images de nourriture dans les coins - GRILLZ (RESPONSIVE + FADE) */}
-          {/* Image 1 - Haut gauche */}
-          <Animated.Image 
-            source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/chicken1.png")}
-            style={{
-              position: 'absolute',
-              top: GRILLZ_RESPONSIVE.chicken1.top,
-              left: GRILLZ_RESPONSIVE.chicken1.left,
-              width: GRILLZ_RESPONSIVE.chicken1.width,
-              height: GRILLZ_RESPONSIVE.chicken1.height,
-              transform: [{ rotate: '15deg' }],
-              zIndex: 2,
-              opacity: exitImage1Anim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 0],
-              }),
-            }}
-            resizeMode="contain"
-          />
-          {/* Image 2 - Haut droit */}
-          <Animated.Image 
-            source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/chicken2.png")}
-            style={{
-              position: 'absolute',
-              top: GRILLZ_RESPONSIVE.chicken2.top,
-              right: GRILLZ_RESPONSIVE.chicken2.right,
-              width: GRILLZ_RESPONSIVE.chicken2.width,
-              height: GRILLZ_RESPONSIVE.chicken2.height,
-              transform: [{ rotate: '-10deg' }],
-              zIndex: 2,
-              opacity: exitImage2Anim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 0],
-              }),
-            }}
-            resizeMode="contain"
-          />
-          {/* Image 3 - Bas gauche */}
-          <Animated.Image 
-            source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/chicken3.png")}
-            style={{
-              position: 'absolute',
-              bottom: GRILLZ_RESPONSIVE.chicken3.bottom,
-              left: GRILLZ_RESPONSIVE.chicken3.left,
-              width: GRILLZ_RESPONSIVE.chicken3.width,
-              height: GRILLZ_RESPONSIVE.chicken3.height,
-              transform: [{ rotate: '25deg' }],
-              zIndex: 2,
-              opacity: exitImage3Anim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 0],
-              }),
-            }}
-            resizeMode="contain"
-          />
-          {/* Image 4 - Bas droit */}
-          <Animated.Image 
-            source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/chicken4.png")}
-            style={{
-              position: 'absolute',
-              bottom: GRILLZ_RESPONSIVE.chicken4.bottom,
-              right: GRILLZ_RESPONSIVE.chicken4.right,
-              width: GRILLZ_RESPONSIVE.chicken4.width,
-              height: GRILLZ_RESPONSIVE.chicken4.height,
-              transform: [{ rotate: '-20deg' }],
-              zIndex: 2,
-              opacity: exitImage4Anim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 0],
-              }),
-            }}
-            resizeMode="contain"
-          />
-        
-        {/* Contenu sans scroll */}
-        <Animated.View
-          style={[
-            styles.content,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-              flex: 1,
-              zIndex: 5,
-            },
-          ]}
-        >
-          {/* 🎬 Food Images avec animations de sortie */}
-          <Animated.View style={[
-            styles.foodImageWrapper, 
-            styles.foodImage1, 
-            { 
-              opacity: image1Anim,
-              transform: [{
-                translateX: exitImage1Anim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, -400],
-                }),
-              }],
-            }
-          ]}>
-            <Image
-              source={RESTAURANT_CONFIG.images.image1}
-              style={styles.foodImage}
-              resizeMode="cover"
-            />
-          </Animated.View>
-          
-          <Animated.View style={[
-            styles.foodImageWrapper, 
-            styles.foodImage2, 
-            { 
-              opacity: image2Anim,
-              transform: [{
-                translateX: exitImage2Anim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, 400],
-                }),
-              }],
-            }
-          ]}>
-            <Image
-              source={RESTAURANT_CONFIG.images.image2}
-              style={styles.foodImage}
-              resizeMode="cover"
-            />
-          </Animated.View>
-          
-          <Animated.View style={[
-            styles.foodImageWrapper, 
-            styles.foodImage3, 
-            { 
-              opacity: image3Anim,
-              transform: [{
-                translateX: exitImage3Anim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, -400],
-                }),
-              }],
-            }
-          ]}>
-            <Image
-              source={RESTAURANT_CONFIG.images.image3}
-              style={styles.foodImage}
-              resizeMode="cover"
-            />
-          </Animated.View>
-          
-          <Animated.View style={[
-            styles.foodImageWrapper, 
-            styles.foodImage4, 
-            { 
-              opacity: image4Anim,
-              transform: [{
-                translateX: exitImage4Anim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, 400],
-                }),
-              }],
-            }
-          ]}>
-            <Image
-              source={RESTAURANT_CONFIG.images.image4}
-              style={styles.foodImage}
-              resizeMode="cover"
-            />
-          </Animated.View>
-          
-        </Animated.View>
-        
-        {/* 🔒 Bienvenue chez - HORS du content, comme les chickens */}
-        <View style={{
-          position: 'absolute',
-          top: GRILLZ_RESPONSIVE.bienvenue.top,
-          left: 0,
-          right: 0,
-          alignItems: 'center',
-          zIndex: 20,
-        }}>
-          <Animated.Text style={[styles.welcomeText, { 
-            top: 0,
-            marginTop: 0,
-            color: '#FF8A50',
-            fontSize: GRILLZ_RESPONSIVE.bienvenue.fontSize, 
-            letterSpacing: 6 * scale, 
-            textTransform: 'uppercase',
-            fontFamily: fontLoaded ? RESTAURANT_CONFIG.font.family : undefined,
-            textShadowColor: 'rgba(0, 0, 0, 0.9)',
-            textShadowOffset: { width: 0, height: 4 * scale },
-            textShadowRadius: 12 * scale,
-            opacity: exitTextAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [1, 0],
-            }),
-          }]}>
-            Bienvenue chez
-          </Animated.Text>
-        </View>
-          
-        {/* 🔥 Logo Grillz - HORS du content, comme les chickens */}
-        <View style={{
-          position: 'absolute',
-          top: GRILLZ_RESPONSIVE.logo.top,
-          left: 0,
-          right: 0,
-          alignItems: 'center',
-          zIndex: 15,
-        }}>
-          <Animated.Image
-            source={require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/logo.png")}
-            style={{ 
-              width: GRILLZ_RESPONSIVE.logo.width, 
-              height: GRILLZ_RESPONSIVE.logo.height,
-              opacity: exitLogoAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 0],
-              }),
-            }}
-            resizeMode="contain"
-          />
-        </View>
-        
-        {/* 🔥 GRILLZ: Floating Input Section avec animations de sortie */}
-        <Animated.View
-          style={[
-            styles.floatingInputSection,
-            {
-              zIndex: 50,
-              opacity: exitInputAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 0],
-              }),
-              transform: [
-                {
-                  translateY: keyboardAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -310],
-                  }),
-                },
-                {
-                  translateY: exitInputAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 300],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          {/* Google button + Input sur la même ligne */}
-          <View style={styles.inputRow}>
-            {/* Google button carré */}
-            <TouchableOpacity
-              style={[styles.googleButtonSquare, { 
-                backgroundColor: '#1E1E1E', 
-                borderColor: '#D35400', 
-              }]}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="logo-google" size={22} color="#DB4437" />
-            </TouchableOpacity>
-            
-            {/* Input Nom */}
-            <View style={[
-              styles.inputContainerInline, 
-              { 
-                backgroundColor: '#1E1E1E', 
-                borderColor: '#D35400',
-                marginRight: 62,
-              }
-            ]}>
-              <Ionicons name="person-outline" size={20} color="#FF8A50" style={styles.inputIconMain} />
-              <TextInput
-                style={[styles.textInputMain, { color: '#FFFFFF', backgroundColor: 'transparent' }]}
-                placeholder="Votre nom"
-                placeholderTextColor="#777"
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-                autoCorrect={false}
-              />
-            </View>
-          </View>
-          
-          {/* Input Téléphone / Order Lookup */}
-          <View style={styles.inputRow}>
-            <View style={[styles.googleButtonSquare, { opacity: 0 }]} />
-            <View style={[
-              styles.inputContainerInline, 
-              { 
-                backgroundColor: '#1E1E1E', 
-                borderColor: isOrderLookupMode ? (orderLookup.isValid ? '#4CAF50' : '#D35400') : '#D35400',
-                marginRight: 62,
-              }
-            ]}>
-              <Ionicons 
-                name={isOrderLookupMode ? "receipt-outline" : "call-outline"} 
-                size={20} 
-                color={isOrderLookupMode ? (orderLookup.isValid ? '#4CAF50' : '#FF8A50') : '#FF8A50'} 
-                style={styles.inputIconMain} 
-              />
-              <TextInput
-                style={[styles.textInputMain, { color: '#FFFFFF', backgroundColor: 'transparent' }]}
-                placeholder={isOrderLookupMode ? "Code commande ex: #FA24" : "Votre téléphone"}
-                placeholderTextColor="#777"
-                value={phone}
-                onChangeText={handlePhoneChange}
-                keyboardType={isOrderLookupMode ? "default" : "phone-pad"}
-                autoCorrect={false}
-                autoCapitalize={isOrderLookupMode ? "characters" : "none"}
-                maxLength={isOrderLookupMode ? 5 : 14}
-              />
-              {isOrderLookupMode && phone.length > 1 && (
-                <Ionicons
-                  name={orderLookup.isValid ? "checkmark-circle" : "close-circle"}
-                  size={20}
-                  color={orderLookup.isValid ? "#4CAF50" : "#FF6B6B"}
-                />
-              )}
-            </View>
-          </View>
-          
-          {/* Error message */}
-          {error ? (
-            <Text style={[styles.errorText, { color: '#FF6B6B' }]}>{error}</Text>
-          ) : null}
-          {orderLookup.error && isOrderLookupMode ? (
-            <Text style={[styles.errorText, { color: '#FF6B6B' }]}>{orderLookup.error}</Text>
-          ) : null}
-          
-          {/* CTA Button — switch entre "Rejoindre" et "Retrouver" selon le mode */}
-          <TouchableOpacity
-            onPress={() => {
-              const action = isOrderLookupMode ? "lookup" : "start-with-animation";
-              logPrimaryCtaPress("grillz-hero", action);
-              if (isOrderLookupMode) {
-                handleLookupOrder();
-                return;
-              }
-              handleExitAnimation();
-            }}
-            activeOpacity={0.8}
-            disabled={isOrderLookupMode ? (!orderLookup.isValid || orderLookup.loading) : (!name.trim() || loading)}
-            style={{ marginTop: 16 }}
-          >
-            <LinearGradient
-              colors={isOrderLookupMode 
-                ? (orderLookup.isValid ? ['#D35400', '#E67E22'] : ['#444', '#555'])
-                : ['#D35400', '#E67E22']
-              }
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{
-                paddingVertical: 16,
-                borderRadius: 14,
-                alignItems: 'center',
-                flexDirection: 'row',
-                justifyContent: 'center',
-                gap: 8,
-                opacity: isOrderLookupMode 
-                  ? (orderLookup.isValid && !orderLookup.loading ? 1 : 0.5)
-                  : (name.trim() ? 1 : 0.5),
-                shadowColor: '#FF5722',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.4,
-                shadowRadius: 8,
-              }}
-            >
-              {isOrderLookupMode && (
-                <Ionicons name="search" size={18} color="#FFFFFF" />
-              )}
-              <Text style={{
-                color: '#FFFFFF',
-                fontSize: 17,
-                fontWeight: '700',
-                letterSpacing: 0.5,
-              }}>
-                {isOrderLookupMode
-                  ? (orderLookup.loading ? "Recherche..." : "Retrouver ma commande")
-                  : (loading ? "Chargement..." : `Rejoindre la table ${tableNumber || ""}`)
-                }
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-        </View>
-      </View>
+      <WelcomeScreenGrillz
+        // === STATE & DERIVED ===
+        tableNumber={tableNumber}
+        name={name}
+        setName={setName}
+        phone={phone}
+        loading={loading}
+        error={error}
+        existingSession={existingSession}
+        fontLoaded={fontLoaded}
+        orderLookup={orderLookup}
+        isOrderLookupMode={isOrderLookupMode}
+        // === HANDLERS ===
+        handleClearStorage={handleClearStorage}
+        handleResumeSession={handleResumeSession}
+        handleNewSession={handleNewSession}
+        handlePhoneChange={handlePhoneChange}
+        handleLookupOrder={handleLookupOrder}
+        handleExitAnimation={handleExitAnimation}
+        logPrimaryCtaPress={logPrimaryCtaPress}
+        // === ANIMS — Grillz-only ===
+        bgLeftAnim={bgLeftAnim}
+        bgRightAnim={bgRightAnim}
+        exitTextAnim={exitTextAnim}
+        exitLogoAnim={exitLogoAnim}
+        exitInputAnim={exitInputAnim}
+        keyboardAnim={keyboardAnim}
+        // === ANIMS — Shared ===
+        fadeAnim={fadeAnim}
+        slideAnim={slideAnim}
+        image1Anim={image1Anim}
+        image2Anim={image2Anim}
+        image3Anim={image3Anim}
+        image4Anim={image4Anim}
+        exitImage1Anim={exitImage1Anim}
+        exitImage2Anim={exitImage2Anim}
+        exitImage3Anim={exitImage3Anim}
+        exitImage4Anim={exitImage4Anim}
+        // === STYLES ===
+        styles={styles}
+      />
     );
   }
 
@@ -1489,19 +1060,19 @@ export default function WelcomeScreen({
             <View style={{
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+              backgroundColor: welcomeFormTokens.inputBackground,
               borderRadius: 12,
               paddingHorizontal: 16,
               paddingVertical: 14,
               marginBottom: 12,
               borderWidth: 1,
-              borderColor: 'rgba(255, 255, 255, 0.3)',
+              borderColor: welcomeFormTokens.inputBorderColor,
             }}>
-              <Ionicons name="person-outline" size={20} color="#FFFFFF" style={{ marginRight: 12 }} />
+              <Ionicons name="person-outline" size={20} color={welcomeFormTokens.inputIconColor} style={{ marginRight: 12 }} />
               <TextInput
-                style={{ flex: 1, color: '#FFFFFF', fontSize: 16 }}
+                style={{ flex: 1, color: welcomeFormTokens.inputTextColor, fontSize: 16 }}
                 placeholder={isNameLookupMode ? "Code commande ex: #FA24" : "Votre nom"}
-                placeholderTextColor="rgba(255, 255, 255, 0.6)"
+                placeholderTextColor={welcomeFormTokens.inputPlaceholderColor}
                 value={name}
                 onChangeText={handleNameChange}
                 autoCapitalize={isNameLookupMode ? "characters" : "words"}
@@ -1513,10 +1084,10 @@ export default function WelcomeScreen({
             
             {/* Error message */}
             {error ? (
-              <Text style={{ color: '#FF6B6B', textAlign: 'center', marginBottom: 10 }}>{error}</Text>
+              <Text style={{ color: welcomeFormTokens.errorTextColor, textAlign: 'center', marginBottom: 10 }}>{error}</Text>
             ) : null}
             {orderLookup.error && isNameLookupMode ? (
-              <Text style={{ color: '#FF6B6B', textAlign: 'center', marginBottom: 10 }}>{orderLookup.error}</Text>
+              <Text style={{ color: welcomeFormTokens.errorTextColor, textAlign: 'center', marginBottom: 10 }}>{orderLookup.error}</Text>
             ) : null}
             
             {/* Bouton Rejoindre */}
@@ -1528,7 +1099,7 @@ export default function WelcomeScreen({
               disabled={isNameLookupMode ? (!isNameLookupValid || orderLookup.loading) : (loading || !name.trim())}
               activeOpacity={0.8}
               style={{
-                backgroundColor: '#E74C3C',
+                backgroundColor: welcomeFormTokens.ctaBackground,
                 borderRadius: 12,
                 paddingVertical: 16,
                 alignItems: 'center',
@@ -1538,7 +1109,7 @@ export default function WelcomeScreen({
               }}
             >
               <Text style={{ 
-                color: '#FFFFFF', 
+                color: welcomeFormTokens.ctaTextColor, 
                 fontSize: 18, 
                 fontWeight: '700',
               }}>
@@ -1665,7 +1236,10 @@ export default function WelcomeScreen({
           </Animated.View>
           
           {/* Logo + Restaurant Name - Layout différent selon restaurant */}
-          {restaurantId === '695e4300adde654b80f6911a' ? (
+          {/* Phase 0.4-C.4 — Hash literal Grillz remplacé par isGrillz (dérivé styleKey).
+              NOTE: dead code path — Grillz return early L770, ce sous-arbre n'est
+              jamais atteint pour styleKey='grillz'. Cleanup décision Phase 0.6. */}
+          {isGrillz ? (
             // 🔥 LE GRILLZ: Bienvenue en haut, Logo en bas, tout descendu
             <View style={[styles.logoContainer, { marginTop: 180 }]}>
               <Text style={[styles.welcomeText, { 

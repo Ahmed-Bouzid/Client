@@ -588,4 +588,43 @@ export const getOrderFooterTokens = (styleKey) => {
 	};
 };
 
+/**
+ * 📝 WELCOME FORM TOKENS — Phase 0.4-C.3
+ *
+ * Tokens du formulaire Welcome (input nom + bouton CTA) sur fond image
+ * tenant (Cucina panini bg / Baghera hero bg / etc.).
+ *
+ * Iso-strict avec les valeurs hardcoded actuelles du bloc Cucina inline
+ * (WelcomeScreen.jsx L1004-1067) : input glassmorphism blanc semi-transparent
+ * + CTA rouge brique #E74C3C + erreur #FF6B6B + texte blanc.
+ *
+ * Branche grillz tient les valeurs équivalentes pour cohérence référentielle
+ * (utilisées par WelcomeScreenGrillz Phase 0.4-C.4 cleanup destructif), mais
+ * Grillz a un design d'inputs différent (#1E1E1E + bordure orange #D35400)
+ * et son propre helper sera factorisé en Phase 0.6.
+ *
+ * 🛡️ Universel non-thémable : errorTextColor = #FF6B6B (signal d'erreur).
+ *
+ * @param {string} styleKey - Identifiant du style ("cucina", "grillz", ...)
+ * @returns {object} Tokens du formulaire Welcome
+ */
+export const getWelcomeFormTokens = (styleKey) => {
+	const isGrillz = (styleKey || "").toLowerCase() === "grillz";
+	return {
+		// === INPUT (glassmorphism Cucina sur fond image) ===
+		inputBackground: isGrillz ? "#1E1E1E" : "rgba(255, 255, 255, 0.15)",
+		inputBorderColor: isGrillz ? "#D35400" : "rgba(255, 255, 255, 0.3)",
+		inputTextColor: "#FFFFFF",
+		inputIconColor: isGrillz ? "#FF8A50" : "#FFFFFF",
+		inputPlaceholderColor: isGrillz ? "#777" : "rgba(255, 255, 255, 0.6)",
+
+		// === CTA BUTTON ===
+		ctaBackground: isGrillz ? "#D35400" : "#E74C3C",
+		ctaTextColor: "#FFFFFF",
+
+		// === ERROR (universel non-thémable) ===
+		errorTextColor: "#FF6B6B",
+	};
+};
+
 export default DEFAULT_THEME;

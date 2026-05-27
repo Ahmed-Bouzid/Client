@@ -10,12 +10,15 @@ import {
 	Modal,
 	ScrollView,
 	Animated,
+	Easing,
+	StyleSheet,
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAllergyStore } from "../stores/useAllergyStore";
 import { useRestrictionStore } from "../stores/useRestrictionStore";
 import { clientAuthService } from "shared-api/services/clientAuthService.js";
+import { BAGHERA_PALETTE, BAGHERA_FONTS } from "../theme/bagheraTheme";
 
 // 🎯 Allergènes par défaut (fallback si API échoue)
 const DEFAULT_ALLERGENS = [
@@ -139,7 +142,7 @@ const RESTRICTIONS_OPTIONS = [
 	},
 ];
 
-export default function DietaryPreferences({ visible, onClose }) {
+export default function DietaryPreferences({ visible, onClose, isBaghera = false }) {
 	const [activeTab, setActiveTab] = useState("allergies"); // "allergies" ou "restrictions"
 
 	const { userAllergenIds, toggleAllergen, allergensCache, setAllergensCache } =
@@ -149,25 +152,72 @@ export default function DietaryPreferences({ visible, onClose }) {
 	const [allergens, setAllergens] = useState([]);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [loading, setLoading] = useState(true);
-	const fadeAnim = useRef(new Animated.Value(0)).current; // 🎯 Fade in/out
+	const fadeAnim = useRef(new Animated.Value(0)).current; // 🎯 Fade in/out (Cucina/Grillz)
+
+	// 🎨 BAGHERA — silk modal animation (même courbe que la modale panthère)
+	const [mounted, setMounted] = useState(false);
+	const bagheraBackdrop = useRef(new Animated.Value(0)).current;
+	const bagheraCard = useRef(new Animated.Value(0)).current;
 
 	// Animation d'apparition/disparition
 	useEffect(() => {
 		if (visible) {
 			loadAllergens();
-			Animated.timing(fadeAnim, {
-				toValue: 1,
-				duration: 300,
-				useNativeDriver: false,
-			}).start();
+			setMounted(true);
+			if (isBaghera) {
+				bagheraBackdrop.setValue(0);
+				bagheraCard.setValue(0);
+				Animated.parallel([
+					Animated.timing(bagheraBackdrop, {
+						toValue: 1,
+						duration: 320,
+						easing: Easing.out(Easing.quad),
+						useNativeDriver: true,
+					}),
+					Animated.timing(bagheraCard, {
+						toValue: 1,
+						duration: 560,
+						delay: 80,
+						easing: Easing.bezier(0.6, 0.05, 0.1, 1), // BAGHERA silk
+						useNativeDriver: true,
+					}),
+				]).start();
+			} else {
+				Animated.timing(fadeAnim, {
+					toValue: 1,
+					duration: 300,
+					useNativeDriver: false,
+				}).start();
+			}
 		} else {
-			Animated.timing(fadeAnim, {
-				toValue: 0,
-				duration: 200,
-				useNativeDriver: false,
-			}).start();
+			if (isBaghera) {
+				Animated.parallel([
+					Animated.timing(bagheraCard, {
+						toValue: 0,
+						duration: 280,
+						easing: Easing.bezier(0.4, 0, 0.2, 1),
+						useNativeDriver: true,
+					}),
+					Animated.timing(bagheraBackdrop, {
+						toValue: 0,
+						duration: 320,
+						easing: Easing.out(Easing.quad),
+						useNativeDriver: true,
+					}),
+				]).start(({ finished }) => {
+					if (finished) setMounted(false);
+				});
+			} else {
+				Animated.timing(fadeAnim, {
+					toValue: 0,
+					duration: 200,
+					useNativeDriver: false,
+				}).start(({ finished }) => {
+					if (finished) setMounted(false);
+				});
+			}
 		}
-	}, [visible]);
+	}, [visible, isBaghera]);
 
 	const loadAllergens = async () => {
 		setLoading(true);
@@ -213,6 +263,7 @@ export default function DietaryPreferences({ visible, onClose }) {
 
 	const renderAllergenItem = ({ item }) => {
 		const isSelected = userAllergenIds.includes(item._id);
+		const accent = isBaghera ? BAGHERA_PALETTE.ember : "#ff512f";
 
 		return (
 			<TouchableOpacity
@@ -222,15 +273,17 @@ export default function DietaryPreferences({ visible, onClose }) {
 					padding: 16,
 					marginVertical: 6,
 					marginHorizontal: 16,
-					backgroundColor: "#fff",
-					borderRadius: 12,
-					shadowColor: "#000",
+					backgroundColor: isBaghera ? BAGHERA_PALETTE.creamSoft : "#fff",
+					borderRadius: isBaghera ? 18 : 12,
+					shadowColor: isBaghera ? BAGHERA_PALETTE.ink : "#000",
 					shadowOffset: { width: 0, height: 2 },
-					shadowOpacity: 0.1,
-					shadowRadius: 4,
-					elevation: 3,
-					borderWidth: 2,
-					borderColor: isSelected ? "#ff512f" : "transparent",
+					shadowOpacity: isBaghera ? 0.04 : 0.1,
+					shadowRadius: isBaghera ? 8 : 4,
+					elevation: isBaghera ? 1 : 3,
+					borderWidth: isBaghera ? 1 : 2,
+					borderColor: isSelected
+						? accent
+						: (isBaghera ? BAGHERA_PALETTE.sand : "transparent"),
 				}}
 				onPress={() => toggleAllergen(item._id)}
 				activeOpacity={0.7}
@@ -240,7 +293,9 @@ export default function DietaryPreferences({ visible, onClose }) {
 						width: 32,
 						height: 32,
 						borderRadius: 16,
-						backgroundColor: isSelected ? "#ff512f" : "#f5f5f5",
+						backgroundColor: isSelected
+							? accent
+							: (isBaghera ? BAGHERA_PALETTE.cream : "#f5f5f5"),
 						alignItems: "center",
 						justifyContent: "center",
 						marginRight: 12,
@@ -249,16 +304,17 @@ export default function DietaryPreferences({ visible, onClose }) {
 					{isSelected ? (
 						<Ionicons name="checkmark" size={20} color="#fff" />
 					) : (
-						<Ionicons name="warning-outline" size={20} color="#999" />
+						<Ionicons name="warning-outline" size={20} color={isBaghera ? BAGHERA_PALETTE.smoke : "#999"} />
 					)}
 				</View>
 
 				<View style={{ flex: 1 }}>
 					<Text
 						style={{
-							fontSize: 16,
-							fontWeight: isSelected ? "700" : "600",
-							color: isSelected ? "#ff512f" : "#333",
+							fontSize: isBaghera ? 17 : 16,
+							fontFamily: isBaghera ? BAGHERA_FONTS.serif : undefined,
+							fontWeight: isBaghera ? "400" : (isSelected ? "700" : "600"),
+							color: isSelected ? accent : (isBaghera ? BAGHERA_PALETTE.ink : "#333"),
 							marginBottom: 2,
 						}}
 					>
@@ -268,7 +324,8 @@ export default function DietaryPreferences({ visible, onClose }) {
 						<Text
 							style={{
 								fontSize: 13,
-								color: "#666",
+								fontFamily: isBaghera ? BAGHERA_FONTS.sansItalic : undefined,
+								color: isBaghera ? BAGHERA_PALETTE.smoke : "#666",
 							}}
 							numberOfLines={2}
 						>
@@ -280,13 +337,13 @@ export default function DietaryPreferences({ visible, onClose }) {
 				{isSelected && (
 					<View
 						style={{
-							backgroundColor: "#fff5f0",
+							backgroundColor: isBaghera ? BAGHERA_PALETTE.cream : "#fff5f0",
 							paddingHorizontal: 8,
 							paddingVertical: 4,
 							borderRadius: 6,
 						}}
 					>
-						<Text style={{ fontSize: 11, color: "#ff512f", fontWeight: "600" }}>
+						<Text style={{ fontSize: 11, color: accent, fontWeight: "600", fontFamily: isBaghera ? BAGHERA_FONTS.sans : undefined, letterSpacing: 0.5 }}>
 							ACTIF
 						</Text>
 					</View>
@@ -297,6 +354,7 @@ export default function DietaryPreferences({ visible, onClose }) {
 
 	const renderRestrictionItem = ({ item }) => {
 		const isSelected = userRestrictions.includes(item.id);
+		const accent = isBaghera ? BAGHERA_PALETTE.ember : "#ff9800";
 
 		return (
 			<TouchableOpacity
@@ -306,15 +364,17 @@ export default function DietaryPreferences({ visible, onClose }) {
 					padding: 16,
 					marginVertical: 6,
 					marginHorizontal: 16,
-					backgroundColor: "#fff",
-					borderRadius: 12,
-					shadowColor: "#000",
+					backgroundColor: isBaghera ? BAGHERA_PALETTE.creamSoft : "#fff",
+					borderRadius: isBaghera ? 18 : 12,
+					shadowColor: isBaghera ? BAGHERA_PALETTE.ink : "#000",
 					shadowOffset: { width: 0, height: 2 },
-					shadowOpacity: 0.1,
-					shadowRadius: 4,
-					elevation: 3,
-					borderWidth: 2,
-					borderColor: isSelected ? "#ff9800" : "transparent",
+					shadowOpacity: isBaghera ? 0.04 : 0.1,
+					shadowRadius: isBaghera ? 8 : 4,
+					elevation: isBaghera ? 1 : 3,
+					borderWidth: isBaghera ? 1 : 2,
+					borderColor: isSelected
+						? accent
+						: (isBaghera ? BAGHERA_PALETTE.sand : "transparent"),
 				}}
 				onPress={() => toggleRestriction(item.id)}
 				activeOpacity={0.7}
@@ -324,7 +384,9 @@ export default function DietaryPreferences({ visible, onClose }) {
 						width: 32,
 						height: 32,
 						borderRadius: 16,
-						backgroundColor: isSelected ? "#ff9800" : "#f5f5f5",
+						backgroundColor: isSelected
+							? accent
+							: (isBaghera ? BAGHERA_PALETTE.cream : "#f5f5f5"),
 						alignItems: "center",
 						justifyContent: "center",
 						marginRight: 12,
@@ -333,16 +395,17 @@ export default function DietaryPreferences({ visible, onClose }) {
 					{isSelected ? (
 						<Ionicons name="checkmark" size={20} color="#fff" />
 					) : (
-						<MaterialIcons name="restaurant-menu" size={20} color="#999" />
+						<MaterialIcons name="restaurant-menu" size={20} color={isBaghera ? BAGHERA_PALETTE.smoke : "#999"} />
 					)}
 				</View>
 
 				<View style={{ flex: 1 }}>
 					<Text
 						style={{
-							fontSize: 16,
-							fontWeight: isSelected ? "700" : "600",
-							color: isSelected ? "#ff9800" : "#333",
+							fontSize: isBaghera ? 17 : 16,
+							fontFamily: isBaghera ? BAGHERA_FONTS.serif : undefined,
+							fontWeight: isBaghera ? "400" : (isSelected ? "700" : "600"),
+							color: isSelected ? accent : (isBaghera ? BAGHERA_PALETTE.ink : "#333"),
 							marginBottom: 2,
 						}}
 					>
@@ -352,7 +415,8 @@ export default function DietaryPreferences({ visible, onClose }) {
 						<Text
 							style={{
 								fontSize: 13,
-								color: "#666",
+								fontFamily: isBaghera ? BAGHERA_FONTS.sansItalic : undefined,
+								color: isBaghera ? BAGHERA_PALETTE.smoke : "#666",
 							}}
 							numberOfLines={2}
 						>
@@ -364,13 +428,13 @@ export default function DietaryPreferences({ visible, onClose }) {
 				{isSelected && (
 					<View
 						style={{
-							backgroundColor: "#fff9e6",
+							backgroundColor: isBaghera ? BAGHERA_PALETTE.cream : "#fff9e6",
 							paddingHorizontal: 8,
 							paddingVertical: 4,
 							borderRadius: 6,
 						}}
 					>
-						<Text style={{ fontSize: 11, color: "#ff9800", fontWeight: "600" }}>
+						<Text style={{ fontSize: 11, color: accent, fontWeight: "600", fontFamily: isBaghera ? BAGHERA_FONTS.sans : undefined, letterSpacing: 0.5 }}>
 							ACTIF
 						</Text>
 					</View>
@@ -381,78 +445,156 @@ export default function DietaryPreferences({ visible, onClose }) {
 
 	return (
 		<Modal
-			visible={visible}
+			visible={mounted || visible}
 			transparent
 			animationType="none"
+			statusBarTranslucent
 			onRequestClose={onClose}
 		>
 			<View
 				style={{
 					flex: 1,
-					backgroundColor: "rgba(0,0,0,0.5)",
 					justifyContent: "flex-start",
 				}}
 			>
-				{/* Backdrop cliquable */}
-				<TouchableOpacity
-					style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-					activeOpacity={1}
-					onPress={onClose}
-				/>
+				{/* Backdrop dim animé */}
+				<Animated.View
+					style={{
+						...StyleSheet.absoluteFillObject,
+						backgroundColor: isBaghera ? BAGHERA_PALETTE.ink : "#000",
+						opacity: isBaghera
+							? bagheraBackdrop.interpolate({ inputRange: [0, 1], outputRange: [0, 0.42] })
+							: 0.5,
+					}}
+				>
+					<TouchableOpacity
+						style={StyleSheet.absoluteFillObject}
+						activeOpacity={1}
+						onPress={onClose}
+					/>
+				</Animated.View>
 
 				{/* Container animé */}
 				<Animated.View
 					style={{
 						height: "50%",
-						backgroundColor: "#f8f9fa",
+						backgroundColor: isBaghera ? BAGHERA_PALETTE.cream : "#f8f9fa",
 						borderBottomLeftRadius: 24,
 						borderBottomRightRadius: 24,
-						shadowColor: "#000",
-						shadowOffset: { width: 0, height: 4 },
-						shadowOpacity: 0.2,
-						shadowRadius: 12,
-						elevation: 10,
-						opacity: fadeAnim,
+						shadowColor: isBaghera ? BAGHERA_PALETTE.ink : "#000",
+						shadowOffset: { width: 0, height: isBaghera ? 18 : 4 },
+						shadowOpacity: isBaghera ? 0.28 : 0.2,
+						shadowRadius: isBaghera ? 32 : 12,
+						elevation: isBaghera ? 14 : 10,
+						opacity: isBaghera ? bagheraCard : fadeAnim,
+						transform: isBaghera
+							? [
+								{
+									translateY: bagheraCard.interpolate({
+										inputRange: [0, 1],
+										outputRange: [-22, 0],
+									}),
+								},
+								{
+									scale: bagheraCard.interpolate({
+										inputRange: [0, 1],
+										outputRange: [0.97, 1],
+									}),
+								},
+							]
+							: undefined,
 					}}
 				>
 					{/* Header */}
-					<LinearGradient
-						colors={["#ff9800", "#ff6f00"]}
-						start={{ x: 0, y: 0 }}
-						end={{ x: 1, y: 0 }}
-						style={{
-							paddingTop: 50,
-							paddingBottom: 16,
-							paddingHorizontal: 20,
-							flexDirection: "row",
-							alignItems: "center",
-							justifyContent: "space-between",
-						}}
-					>
-						<Text
+					{isBaghera ? (
+						<View
 							style={{
-								fontSize: 24,
-								fontWeight: "bold",
-								color: "#fff",
-								flex: 1,
+								paddingTop: 50,
+								paddingBottom: 18,
+								paddingHorizontal: 20,
+								flexDirection: "row",
+								alignItems: "flex-end",
+								justifyContent: "space-between",
+								backgroundColor: BAGHERA_PALETTE.cream,
+								borderBottomWidth: 1,
+								borderBottomColor: BAGHERA_PALETTE.sand,
 							}}
 						>
-							Préférences alimentaires
-						</Text>
-						<TouchableOpacity
-							onPress={onClose}
+							<View style={{ flex: 1 }}>
+								<Text
+									style={{
+										fontFamily: BAGHERA_FONTS.serif,
+										fontSize: 26,
+										color: BAGHERA_PALETTE.ink,
+										letterSpacing: -0.3,
+									}}
+								>
+									Préférences<Text style={{ color: BAGHERA_PALETTE.ember }}>.</Text>
+								</Text>
+								<Text
+									style={{
+										fontFamily: BAGHERA_FONTS.serifItalic,
+										fontSize: 13,
+										color: BAGHERA_PALETTE.smoke,
+										marginTop: 2,
+									}}
+								>— allergies & restrictions</Text>
+							</View>
+							<TouchableOpacity
+								onPress={onClose}
+								style={{
+									width: 38,
+									height: 38,
+									borderRadius: 19,
+									backgroundColor: BAGHERA_PALETTE.creamSoft,
+									borderWidth: 1,
+									borderColor: BAGHERA_PALETTE.sand,
+									alignItems: "center",
+									justifyContent: "center",
+								}}
+							>
+								<Ionicons name="close" size={20} color={BAGHERA_PALETTE.ink} />
+							</TouchableOpacity>
+						</View>
+					) : (
+						<LinearGradient
+							colors={["#ff9800", "#ff6f00"]}
+							start={{ x: 0, y: 0 }}
+							end={{ x: 1, y: 0 }}
 							style={{
-								width: 40,
-								height: 40,
-								borderRadius: 20,
-								backgroundColor: "rgba(255,255,255,0.2)",
+								paddingTop: 50,
+								paddingBottom: 16,
+								paddingHorizontal: 20,
+								flexDirection: "row",
 								alignItems: "center",
-								justifyContent: "center",
+								justifyContent: "space-between",
 							}}
 						>
-							<Ionicons name="close" size={24} color="#fff" />
-						</TouchableOpacity>
-					</LinearGradient>
+							<Text
+								style={{
+									fontSize: 24,
+									fontWeight: "bold",
+									color: "#fff",
+									flex: 1,
+								}}
+							>
+								Préférences alimentaires
+							</Text>
+							<TouchableOpacity
+								onPress={onClose}
+								style={{
+									width: 40,
+									height: 40,
+									borderRadius: 20,
+									backgroundColor: "rgba(255,255,255,0.2)",
+									alignItems: "center",
+									justifyContent: "center",
+								}}
+							>
+								<Ionicons name="close" size={24} color="#fff" />
+							</TouchableOpacity>
+						</LinearGradient>
+					)}
 
 					{/* Tabs */}
 					<View
@@ -460,51 +602,67 @@ export default function DietaryPreferences({ visible, onClose }) {
 							flexDirection: "row",
 							paddingHorizontal: 16,
 							paddingVertical: 16,
-							backgroundColor: "#fff",
+							backgroundColor: isBaghera ? BAGHERA_PALETTE.cream : "#fff",
 							borderBottomWidth: 1,
-							borderBottomColor: "#eee",
+							borderBottomColor: isBaghera ? BAGHERA_PALETTE.sand : "#eee",
 						}}
 					>
 						<TouchableOpacity
 							style={{
 								flex: 1,
 								paddingVertical: 12,
-								borderBottomWidth: 3,
+								borderBottomWidth: isBaghera ? 2 : 3,
 								borderBottomColor:
-									activeTab === "allergies" ? "#ff512f" : "transparent",
+									activeTab === "allergies"
+										? (isBaghera ? BAGHERA_PALETTE.ember : "#ff512f")
+										: "transparent",
 							}}
 							onPress={() => setActiveTab("allergies")}
 						>
 							<Text
 								style={{
 									textAlign: "center",
-									fontSize: 16,
-									fontWeight: activeTab === "allergies" ? "bold" : "500",
-									color: activeTab === "allergies" ? "#ff512f" : "#666",
+									fontSize: isBaghera ? 17 : 16,
+									fontFamily: isBaghera
+										? (activeTab === "allergies" ? BAGHERA_FONTS.serifItalic : BAGHERA_FONTS.sans)
+										: undefined,
+									fontWeight: isBaghera ? "400" : (activeTab === "allergies" ? "bold" : "500"),
+									color:
+										activeTab === "allergies"
+											? (isBaghera ? BAGHERA_PALETTE.ember : "#ff512f")
+											: (isBaghera ? BAGHERA_PALETTE.smoke : "#666"),
 								}}
 							>
-								⚠️ Allergies
+								{isBaghera ? "Allergies" : "⚠️ Allergies"}
 							</Text>
 						</TouchableOpacity>
 						<TouchableOpacity
 							style={{
 								flex: 1,
 								paddingVertical: 12,
-								borderBottomWidth: 3,
+								borderBottomWidth: isBaghera ? 2 : 3,
 								borderBottomColor:
-									activeTab === "restrictions" ? "#ff9800" : "transparent",
+									activeTab === "restrictions"
+										? (isBaghera ? BAGHERA_PALETTE.ember : "#ff9800")
+										: "transparent",
 							}}
 							onPress={() => setActiveTab("restrictions")}
 						>
 							<Text
 								style={{
 									textAlign: "center",
-									fontSize: 16,
-									fontWeight: activeTab === "restrictions" ? "bold" : "500",
-									color: activeTab === "restrictions" ? "#ff9800" : "#666",
+									fontSize: isBaghera ? 17 : 16,
+									fontFamily: isBaghera
+										? (activeTab === "restrictions" ? BAGHERA_FONTS.serifItalic : BAGHERA_FONTS.sans)
+										: undefined,
+									fontWeight: isBaghera ? "400" : (activeTab === "restrictions" ? "bold" : "500"),
+									color:
+										activeTab === "restrictions"
+											? (isBaghera ? BAGHERA_PALETTE.ember : "#ff9800")
+											: (isBaghera ? BAGHERA_PALETTE.smoke : "#666"),
 								}}
 							>
-								🍴 Restrictions
+								{isBaghera ? "Restrictions" : "🍴 Restrictions"}
 							</Text>
 						</TouchableOpacity>
 					</View>
@@ -517,36 +675,39 @@ export default function DietaryPreferences({ visible, onClose }) {
 								style={{
 									paddingHorizontal: 16,
 									paddingVertical: 12,
-									backgroundColor: "#fff",
+									backgroundColor: isBaghera ? BAGHERA_PALETTE.cream : "#fff",
 									borderBottomWidth: 1,
-									borderBottomColor: "#eee",
+									borderBottomColor: isBaghera ? BAGHERA_PALETTE.sand : "#eee",
 								}}
 							>
 								<View
 									style={{
 										flexDirection: "row",
 										alignItems: "center",
-										backgroundColor: "#f5f5f5",
-										borderRadius: 12,
+										backgroundColor: isBaghera ? BAGHERA_PALETTE.creamSoft : "#f5f5f5",
+										borderRadius: isBaghera ? 16 : 12,
+										borderWidth: isBaghera ? 1 : 0,
+										borderColor: isBaghera ? BAGHERA_PALETTE.sand : "transparent",
 										paddingHorizontal: 12,
 									}}
 								>
-									<Ionicons name="search" size={20} color="#999" />
+									<Ionicons name="search" size={20} color={isBaghera ? BAGHERA_PALETTE.smoke : "#999"} />
 									<TextInput
 										style={{
 											flex: 1,
 											padding: 12,
 											fontSize: 16,
-											color: "#333",
+											fontFamily: isBaghera ? BAGHERA_FONTS.sans : undefined,
+											color: isBaghera ? BAGHERA_PALETTE.ink : "#333",
 										}}
 										placeholder="Rechercher un allergène..."
 										value={searchQuery}
 										onChangeText={setSearchQuery}
-										placeholderTextColor="#999"
+										placeholderTextColor={isBaghera ? BAGHERA_PALETTE.smoke : "#999"}
 									/>
 									{searchQuery.length > 0 && (
 										<TouchableOpacity onPress={() => setSearchQuery("")}>
-											<Ionicons name="close-circle" size={20} color="#999" />
+											<Ionicons name="close-circle" size={20} color={isBaghera ? BAGHERA_PALETTE.smoke : "#999"} />
 										</TouchableOpacity>
 									)}
 								</View>
@@ -561,7 +722,7 @@ export default function DietaryPreferences({ visible, onClose }) {
 										alignItems: "center",
 									}}
 								>
-									<ActivityIndicator size="large" color="#ff512f" />
+									<ActivityIndicator size="large" color={isBaghera ? BAGHERA_PALETTE.ember : "#ff512f"} />
 								</View>
 							) : (
 								<FlatList
@@ -576,7 +737,7 @@ export default function DietaryPreferences({ visible, onClose }) {
 												alignItems: "center",
 											}}
 										>
-											<Text style={{ fontSize: 16, color: "#999" }}>
+											<Text style={{ fontSize: 16, color: isBaghera ? BAGHERA_PALETTE.smoke : "#999", fontFamily: isBaghera ? BAGHERA_FONTS.sansItalic : undefined }}>
 												Aucun allergène trouvé
 											</Text>
 										</View>

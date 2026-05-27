@@ -41,6 +41,8 @@ import { useOrderStore } from "./src/stores/useOrderStore";
 import { useAllergyStore } from "./src/stores/useAllergyStore";
 import { useRestrictionStore } from "./src/stores/useRestrictionStore";
 import { useRestaurantStore } from "./src/stores/useRestaurantStore";
+import { useThemeStore } from "./src/stores/useThemeStore";
+import { BAGHERA_PALETTE } from "./src/theme/bagheraTheme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getUrlParams } from "./src/utils/getUrlParams";
 import { Platform, View, StyleSheet, AppState } from "react-native";
@@ -84,7 +86,44 @@ function AppContent() {
 
 	// Restaurant category
 	const restaurantCategory = useRestaurantStore((state) => state.category);
+	// 13 mai 2026 — Tenant cream sous la status bar (Baghera)
+	const rootStyleKey = useThemeStore((state) => state.themeKey?.styleKey);
+	const isBagheraTenant = rootStyleKey === "baghera";
 	const isFastFood = restaurantCategory === "fast-food";
+
+	// ════════════════════════════════════════════════════════════════════
+	// 🚨 SEED THEMEKEY OBLIGATOIRE — DÉMO BAGHERA (13 mai 2026 14h00)
+	// ════════════════════════════════════════════════════════════════════
+	// ⛔️ NE JAMAIS RETIRER CE useEffect SANS LIRE LE MÉMO :
+	//    /memories/repo/baghera-themekey-seed-bug-2026-05-13.md
+	//
+	// PROBLÈME RÉSOLU :
+	//   `useThemeStore.themeKey.styleKey` est `null` à l'init. Tous les
+	//   écrans Baghera lisent `useThemeKey().styleKey === 'baghera'` au 1er
+	//   render. `useRestaurantConfig` ne pousse `styleKey` qu'APRÈS résolution
+	//   du `restaurantId` (QR scan / cache async) → race condition : sur cold
+	//   reload, le 1er render tombe en fallback Cucina/Grillz et tout le style
+	//   Baghera disparaît tant que le restaurantId n'est pas résolu (ou pour
+	//   toujours si le restaurantId ne match pas BAGHERA_RESTAURANT_IDS).
+	//
+	// RÈGLE ABSOLUE :
+	//   Tout consommateur de `styleKey` exige un seed GARANTI au boot AVANT
+	//   son 1er render. Ce useEffect est ce seed pour la démo.
+	//
+	// POST-DÉMO :
+	//   Retirer uniquement quand la BDD pousse un styleKey valide pour TOUS
+	//   les tenants concernés ET que le seed est fait dans un autre point
+	//   d'entrée garanti (ex: ThemeProvider).
+	// ════════════════════════════════════════════════════════════════════
+	useEffect(() => {
+		const themeStore = useThemeStore.getState();
+		if (themeStore.themeKey?.styleKey !== "baghera") {
+			themeStore.setSession({
+				...themeStore.themeKey,
+				styleKey: "baghera",
+			});
+		}
+	}, []);
 
 	// En production, tableId et restaurantId viennent du QR code (URL param)
 	// Pas d'ID hardcodé - l'app doit être scannée via QR code
@@ -651,7 +690,7 @@ function AppContent() {
 			{/* Sur web tablette/desktop, centrer le contenu et limiter la largeur */}
 			<View style={Platform.OS === "web" ? styles.webWrapper : { flex: 1 }}>
 			<SafeAreaView
-				style={{ flex: 1, backgroundColor: "whitesmoke" }}
+				style={{ flex: 1, backgroundColor: isBagheraTenant ? BAGHERA_PALETTE.cream : "whitesmoke" }}
 				edges={Platform.OS === "web" ? [] : ["top", "left", "right"]}
 			>
 				{/* 🔐 Mode Admin: écran de déverrouillage */}

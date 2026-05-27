@@ -2,6 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { API_CONFIG } from "shared-api/config/apiConfig.js";
 import { useThemeStore } from "../stores/useThemeStore.js";
 
+// 🎨 Phase 3.2 — Mapping ciblé restaurantId → styleKey 'baghera' (démo 13 mai 2026)
+// Le compte BDD réel a styleKey='premium' / category='fast-food'. On force le
+// theme à 'baghera' UNIQUEMENT pour ce restaurantId, sans toucher la BDD ni
+// impacter les autres tenants. Post-démo : supprimer cette constante + la
+// branche `nextStyleKey` ci-dessous.
+const BAGHERA_RESTAURANT_IDS = new Set([
+	"6a0381c865b4fbf2f219e0f0", // Baghera — Marseille
+]);
+
 /**
  * Hook pour charger la configuration dynamique d'un restaurant (style + menu)
  * 🎯 AVEC CACHE : ne refetch pas si déjà chargé pour cet ID
@@ -112,10 +121,24 @@ export default function useRestaurantConfig(restaurantId) {
 	useEffect(() => {
 		if (!restaurantId || !config?.styleKey) return;
 		const themeStore = useThemeStore.getState();
+		// 🎨 Phase 3.2 — Activation BAGHERA (démo 13 mai 2026)
+		// Ordre de priorité du styleKey :
+		//   1. Si themeStore déjà sur 'baghera' (DEMO_TENANT_OVERRIDE App.jsx) → garde
+		//   2. Sinon si restaurantId ∈ BAGHERA_RESTAURANT_IDS → force 'baghera'
+		//   3. Sinon → respecte le styleKey API (cucina/grillz/default)
+		const currentStyleKey = themeStore.themeKey?.styleKey;
+		let nextStyleKey;
+		if (currentStyleKey === "baghera") {
+			nextStyleKey = "baghera";
+		} else if (BAGHERA_RESTAURANT_IDS.has(restaurantId)) {
+			nextStyleKey = "baghera";
+		} else {
+			nextStyleKey = config.styleKey;
+		}
 		themeStore.setSession({
 			...themeStore.themeKey,
 			restaurantId,
-			styleKey: config.styleKey,
+			styleKey: nextStyleKey,
 		});
 	}, [restaurantId, config?.styleKey]);
 

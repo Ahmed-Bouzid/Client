@@ -56,13 +56,16 @@ import { useRestaurantStore } from "../stores/useRestaurantStore";
 import { useReservationStatus } from "../hooks/useReservationStatus"; // 🚪 Écoute fermeture réservation
 import FeedbackScreen from "../components/FeedbackScreen"; // 🌟 Feedback & Avis Google
 import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 API Feedback
-import { buildSafeTheme, DEFAULT_THEME, getPaymentItemTokens, getPaymentContainerTokens, getPaymentButtonsTokens, getPaymentModalTokens } from "../theme/defaultTheme";
+import { buildSafeTheme, DEFAULT_THEME } from "../theme/defaultTheme";
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
-import useThemeKey from "../hooks/useThemeKey";
 import WebStripeCheckout from "../components/payment/WebStripeCheckout";
 import { orderService } from "shared-api/services/orderService.js";
+import clientAuthService from "shared-api/services/clientAuthService.js";
+import { BAGHERA_PALETTE, BAGHERA_FONTS } from "../theme/bagheraTheme";
+import useThemeKey from "../hooks/useThemeKey";
 
 const { width, height } = Dimensions.get("window");
+const GRILLZ_RESTAURANT_ID = "695e4300adde654b80f6911a";
 
 // 🎴 Premium Payment Item Card
 const PremiumPaymentItem = ({
@@ -72,8 +75,17 @@ const PremiumPaymentItem = ({
 	isPaid,
 	onToggle,
 	theme = DEFAULT_THEME,
-	paymentTokens, // 🔑 Phase 0.3.3-A — tokens component-scoped (cf. getPaymentItemTokens)
+	isGrillzTheme = false,
+	isBaghera = false,
+	currentClientId = null,
+	currentUserName = null,
 }) => {
+	const isOwnItem = !item?.clientId || (currentClientId && item.clientId === currentClientId);
+	// Fallback : si l'item n'a pas de clientName (anciennes cmd), on utilise
+	// le nom courant pour les items "propres". On affiche toujours le badge.
+	const orderedBy =
+		item?.clientName ||
+		(isOwnItem ? currentUserName : null);
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(20)).current;
 	const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -129,12 +141,35 @@ const PremiumPaymentItem = ({
 				<LinearGradient
 					colors={
 						isPaid
-							? paymentTokens.itemBackground.paid
+							? (isBaghera
+								? [BAGHERA_PALETTE.creamSoft, BAGHERA_PALETTE.creamSoft]
+								: ["rgba(56, 239, 125, 0.2)", "rgba(17, 153, 142, 0.1)"])
 							: isSelected
-								? paymentTokens.itemBackground.selected
-								: paymentTokens.itemBackground.idle
+								? (isBaghera
+									? [BAGHERA_PALETTE.creamSoft, BAGHERA_PALETTE.creamSoft]
+									: isGrillzTheme
+										? ["rgba(234, 88, 12, 0.35)", "rgba(249, 115, 22, 0.2)"]
+										: ["rgba(102, 126, 234, 0.3)", "rgba(118, 75, 162, 0.2)"])
+								: (isBaghera
+									? [BAGHERA_PALETTE.creamSoft, BAGHERA_PALETTE.creamSoft]
+									: isGrillzTheme
+										? ["rgba(26, 26, 26, 0.95)", "rgba(20, 20, 20, 0.95)"]
+										: ["rgba(255,255,255,0.95)", "rgba(248,249,250,0.95)"])
 					}
-					style={[styles.paymentItem, isPaid && styles.paymentItemPaid]}
+					style={[
+						styles.paymentItem,
+						isPaid && styles.paymentItemPaid,
+						isBaghera && {
+							borderWidth: 1,
+							borderColor: isSelected ? BAGHERA_PALETTE.ember : BAGHERA_PALETTE.sand,
+							borderRadius: 18,
+							shadowOpacity: 0.05,
+							flexDirection: 'row',
+							alignItems: 'center',
+							paddingVertical: 18,
+							paddingHorizontal: 18,
+						},
+					]}
 					start={{ x: 0, y: 0 }}
 					end={{ x: 1, y: 1 }}
 				>
@@ -142,25 +177,33 @@ const PremiumPaymentItem = ({
 					<View style={styles.checkboxWrapper}>
 						{isPaid ? (
 							<LinearGradient
-								colors={theme.success}
+								colors={isBaghera ? [BAGHERA_PALETTE.ember, BAGHERA_PALETTE.ember] : theme.success}
 								style={styles.checkboxChecked}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
 							>
-								<MaterialIcons name="check" size={18} color={paymentTokens.iconOnPrimary} />
+								<MaterialIcons name="check" size={18} color="#fff" />
 							</LinearGradient>
 						) : isSelected ? (
 							<LinearGradient
-								colors={theme.primary}
+								colors={isBaghera ? [BAGHERA_PALETTE.ember, BAGHERA_PALETTE.ember] : theme.primary}
 								style={styles.checkboxChecked}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
 							>
-								<MaterialIcons name="check" size={18} color={paymentTokens.iconOnPrimary} />
+								<MaterialIcons name="check" size={18} color="#fff" />
 							</LinearGradient>
 						) : (
-							<View style={[styles.checkboxEmpty, paymentTokens.checkboxEmpty]}>
-								<View style={[styles.checkboxInner, paymentTokens.checkboxInner]} />
+							<View style={[
+								styles.checkboxEmpty,
+								isGrillzTheme && { backgroundColor: "#1A1A1A", borderColor: "#3F3F46" },
+								isBaghera && { backgroundColor: BAGHERA_PALETTE.cream, borderColor: BAGHERA_PALETTE.sand },
+							]}>
+								<View style={[
+									styles.checkboxInner,
+									isGrillzTheme && { backgroundColor: "#2A2A2A" },
+									isBaghera && { backgroundColor: BAGHERA_PALETTE.creamSoft },
+								]} />
 							</View>
 						)}
 					</View>
@@ -172,7 +215,12 @@ const PremiumPaymentItem = ({
 								styles.paymentItemName,
 								isPaid && styles.paymentItemNamePaid,
 								!isSelected && !isPaid && styles.paymentItemNameUnselected,
-								!isSelected && !isPaid && paymentTokens.itemTextIdle && { color: paymentTokens.itemTextIdle },
+								!isSelected && !isPaid && isGrillzTheme && { color: "#D4D4D8" },
+								isBaghera && {
+									color: isSelected ? BAGHERA_PALETTE.ember : BAGHERA_PALETTE.ink,
+									fontFamily: BAGHERA_FONTS.serif,
+									fontWeight: '400',
+								},
 							]}
 						>
 							{item.name}
@@ -182,24 +230,61 @@ const PremiumPaymentItem = ({
 								styles.paymentItemDetails,
 								isPaid && styles.paymentItemDetailsPaid,
 								!isSelected && !isPaid && styles.paymentItemDetailsUnselected,
-								!isSelected && !isPaid && paymentTokens.itemSubtextIdle && { color: paymentTokens.itemSubtextIdle },
+								!isSelected && !isPaid && isGrillzTheme && { color: "#A1A1AA" },
+								isBaghera && { color: BAGHERA_PALETTE.smoke, fontFamily: BAGHERA_FONTS.sansItalic },
 							]}
 						>
 							{item.price}€ × {item.quantity || 1}
 						</Text>
+						{orderedBy || !isOwnItem ? (
+							<View
+								style={[
+									styles.orderedByBadge,
+									isGrillzTheme && { backgroundColor: "rgba(234, 88, 12, 0.15)", borderColor: "rgba(234, 88, 12, 0.35)" },
+									isBaghera && { backgroundColor: BAGHERA_PALETTE.cream, borderColor: BAGHERA_PALETTE.sand },
+									!isOwnItem && !isGrillzTheme && !isBaghera && { backgroundColor: "rgba(234, 88, 12, 0.10)", borderColor: "rgba(234, 88, 12, 0.30)" },
+								]}
+							>
+								<MaterialIcons
+									name={isOwnItem ? "person" : "group"}
+									size={11}
+									color={isBaghera ? BAGHERA_PALETTE.ember : isGrillzTheme ? "#FB923C" : isOwnItem ? "#6c757d" : "#EA580C"}
+								/>
+								<Text
+									style={[
+										styles.orderedByText,
+										isGrillzTheme && { color: "#FB923C" },
+										isBaghera && { color: BAGHERA_PALETTE.ember, fontFamily: BAGHERA_FONTS.sans },
+										!isOwnItem && !isGrillzTheme && !isBaghera && { color: "#EA580C" },
+									]}
+								>
+									{isOwnItem
+										? orderedBy
+											? `Vous · ${orderedBy}`
+											: "Vous"
+										: orderedBy
+											? `Commandé par ${orderedBy}`
+											: "Commandé par un autre client"}
+								</Text>
+							</View>
+						) : null}
 					</View>
 
 					{/* Price Badge */}
 					<View style={styles.priceBadgeWrapper}>
 						{isPaid ? (
-							<View style={styles.paidBadge}>
-								<MaterialIcons name="check-circle" size={14} color={paymentTokens.successIcon} />
-								<Text style={styles.paidBadgeText}>Payé</Text>
+							<View style={[styles.paidBadge, isBaghera && { backgroundColor: BAGHERA_PALETTE.cream, borderColor: BAGHERA_PALETTE.ember, borderWidth: 1 }]}>
+								<MaterialIcons name="check-circle" size={14} color={isBaghera ? BAGHERA_PALETTE.ember : "#38ef7d"} />
+								<Text style={[styles.paidBadgeText, isBaghera && { color: BAGHERA_PALETTE.ember, fontFamily: BAGHERA_FONTS.sans }]}>Payé</Text>
 							</View>
 						) : (
 							<LinearGradient
-								colors={isSelected ? theme.primary : paymentTokens.itemGradientIdle}
-								style={styles.priceBadge}
+								colors={
+									isBaghera
+										? (isSelected ? [BAGHERA_PALETTE.ember, BAGHERA_PALETTE.ember] : [BAGHERA_PALETTE.cream, BAGHERA_PALETTE.cream])
+										: isSelected ? theme.primary : isGrillzTheme ? ["#2A2A2A", "#1F1F1F"] : ["#e9ecef", "#dee2e6"]
+								}
+								style={[styles.priceBadge, isBaghera && !isSelected && { borderWidth: 1, borderColor: BAGHERA_PALETTE.sand }]}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 0 }}
 							>
@@ -207,7 +292,8 @@ const PremiumPaymentItem = ({
 									style={[
 										styles.priceBadgeText,
 										!isSelected && styles.priceBadgeTextDark,
-										!isSelected && paymentTokens.itemPriceIdle && { color: paymentTokens.itemPriceIdle },
+										!isSelected && isGrillzTheme && { color: "#D4D4D8" },
+										isBaghera && { color: isSelected ? '#fff' : BAGHERA_PALETTE.ink, fontFamily: BAGHERA_FONTS.serifItalic, fontWeight: '400' },
 									]}
 								>
 									{itemTotal.toFixed(2)}€
@@ -250,6 +336,9 @@ export default function Payment({
 	// true  = affiche toutes les commandes de la table
 	const [payForWholeTable, setPayForWholeTable] = useState(false);
 
+	// 🛡️ Confirmation lorsqu'on sélectionne un item appartenant à un autre client
+	const [crossPayConfirm, setCrossPayConfirm] = useState(null); // { item } | null
+
 	// Commandes filtrées selon le mode actif
 	const visibleOrders = useMemo(
 		() => payForWholeTable
@@ -288,37 +377,20 @@ export default function Payment({
 	const isFastFood = restaurantCategory === "fast-food";
 	const isFoodtruck = restaurantCategory === "foodtruck";
 
-	// 🎨 Thème dynamique depuis la BDD, fallback DEFAULT_THEME
+		// 🎨 Thème dynamique depuis la BDD, fallback DEFAULT_THEME
 	const { config } = useRestaurantConfig(restaurantId);
+	const isGrillzTheme =
+		(config?.styleKey || "").toLowerCase() === "grillz" ||
+		restaurantId === GRILLZ_RESTAURANT_ID;
+	// 🔑 Single source of truth (seedé par App.jsx au boot pour la démo)
+	const { styleKey: themeStyleKey } = useThemeKey();
+	const isBaghera = themeStyleKey === "baghera" || (config?.styleKey || "").toLowerCase() === "baghera";
 	const theme = buildSafeTheme(
 		config?.style,
-		config?.styleKey,
+		isGrillzTheme ? "grillz" : config?.styleKey,
 	);
-
-	// 🔑 Phase 0.3.3-A — useThemeKey() coexiste avec useRestaurantConfig (strangler).
-	// styleKey est la single source of truth tenant identity (cf. useThemeKey JSDoc).
-	// Fallback sur config?.styleKey tant que la propagation tees Phase 0.3 n'est
-	// pas garantie sur tous les chemins de boot (deep links, refresh).
-	const themeKey = useThemeKey();
-	const paymentItemTokens = useMemo(
-		() => getPaymentItemTokens(themeKey?.styleKey || config?.styleKey),
-		[themeKey?.styleKey, config?.styleKey],
-	);
-	// Phase 0.3.3-B — tokens scoped Container + Header (cf. getPaymentContainerTokens)
-	const paymentContainerTokens = useMemo(
-		() => getPaymentContainerTokens(themeKey?.styleKey || config?.styleKey),
-		[themeKey?.styleKey, config?.styleKey],
-	);
-	// Phase 0.3.3-C — tokens scoped Boutons paiement (cf. getPaymentButtonsTokens)
-	const paymentButtonsTokens = useMemo(
-		() => getPaymentButtonsTokens(themeKey?.styleKey || config?.styleKey),
-		[themeKey?.styleKey, config?.styleKey],
-	);
-	// Phase 0.3.3-D1 — tokens scoped Modal Stripe web (cf. getPaymentModalTokens)
-	const paymentModalTokens = useMemo(
-		() => getPaymentModalTokens(themeKey?.styleKey || config?.styleKey),
-		[themeKey?.styleKey, config?.styleKey],
-	);
+	// 🔍 DEBUG — supprimer après vérification
+	console.log("[Payment] restaurantId:", restaurantId, "| isGrillzTheme:", isGrillzTheme, "| styleKey:", config?.styleKey);
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -430,6 +502,23 @@ export default function Payment({
 		checkApplePay();
 	}, [isApplePaySupported]);
 
+	// 🔁 IMPORTANT : sur l'écran de paiement, on a besoin de TOUTES les commandes
+	// de la table (cross-client) pour :
+	//   - décider correctement si la réservation est entièrement payée,
+	//   - permettre le paiement "Toute la table",
+	//   - afficher les badges "Commandé par un autre client".
+	// Les autres écrans (Menu/Order) appellent fetchOrdersByReservation avec
+	// clientId → on re-fetch ici SANS filtre clientId.
+	useEffect(() => {
+		if (!reservationId) return;
+		useOrderStore
+			.getState()
+			.fetchOrdersByReservation(reservationId, null)
+			.catch((err) => {
+				console.error("[Payment] Erreur re-fetch all-orders:", err);
+			});
+	}, [reservationId]);
+
 	// ✅ Initialiser la sélection avec les articles non payés (du client courant uniquement)
 	useEffect(() => {
 		if (visibleOrders && visibleOrders.length > 0) {
@@ -445,6 +534,33 @@ export default function Payment({
 			}
 		}
 	}, [visibleOrders, paidItems, payForWholeTable]);
+
+	// 🛡️ C2 — Marquer comme "payé" tout item dont l'order est paid côté serveur.
+	// Source de vérité = backend (orderPaid / paymentStatus). On fusionne avec le set local
+	// (qui sert encore d'optimistic UI au moment du paiement).
+	useEffect(() => {
+		if (!Array.isArray(allOrders) || allOrders.length === 0) return;
+		const paidIdsFromServer = allOrders
+			.filter(
+				(it) =>
+					it?.orderPaid === true ||
+					it?.paymentStatus === "paid" ||
+					it?.paid === true,
+			)
+			.map((it, idx) => getItemId(it, idx));
+		if (paidIdsFromServer.length === 0) return;
+		setPaidItems((prev) => {
+			let changed = false;
+			const next = new Set(prev);
+			for (const id of paidIdsFromServer) {
+				if (!next.has(id)) {
+					next.add(id);
+					changed = true;
+				}
+			}
+			return changed ? next : prev;
+		});
+	}, [allOrders]);
 
 	// 🔍 Vérifier si la réservation peut être fermée
 	const checkReservationClosure = async () => {
@@ -503,7 +619,7 @@ export default function Payment({
 	}, [allOrders, paidItems]);
 
 	// 🎯 Sélectionner/désélectionner un article
-	const toggleItem = (item) => {
+	const applyToggle = (item) => {
 		const itemId = getItemId(item);
 		const newSelected = new Set(selectedItems);
 		if (newSelected.has(itemId)) {
@@ -512,6 +628,87 @@ export default function Payment({
 			newSelected.add(itemId);
 		}
 		setSelectedItems(newSelected);
+	};
+
+	const toggleItem = (item) => {
+		const itemId = getItemId(item);
+		const alreadySelected = selectedItems.has(itemId);
+		const belongsToOther =
+			item?.clientId && clientId && item.clientId !== clientId;
+		// Demande de confirmation uniquement à la SÉLECTION (pas à la désélection)
+		if (!alreadySelected && belongsToOther) {
+			setCrossPayConfirm({ item });
+			return;
+		}
+		applyToggle(item);
+	};
+
+	// 🛡️ Acquérir/libérer le lock "payeur table" (anti double-paiement)
+	const acquirePaymentLock = async () => {
+		if (!reservationId) return { ok: true };
+		try {
+			const headers = await clientAuthService.getAuthHeaders({
+				"Content-Type": "application/json",
+			});
+			if (!headers) return { ok: false, error: true };
+			const resp = await fetch(
+				`${API_BASE_URL}/reservations/client/${reservationId}/payment-lock`,
+				{
+					method: "POST",
+					headers,
+					body: JSON.stringify({ clientName: userName || "Client" }),
+				},
+			);
+			if (resp.status === 409) {
+				const data = await resp.json().catch(() => ({}));
+				return { ok: false, lockedBy: data.lockedBy || "un autre client" };
+			}
+			if (!resp.ok) return { ok: false, error: true };
+			return { ok: true };
+		} catch (err) {
+			console.warn("[PAYMENT-LOCK] erreur acquisition:", err?.message);
+			return { ok: false, error: true };
+		}
+	};
+
+	const releasePaymentLock = async () => {
+		if (!reservationId) return;
+		try {
+			const headers = await clientAuthService.getAuthHeaders({
+				"Content-Type": "application/json",
+			});
+			if (!headers) return;
+			await fetch(
+				`${API_BASE_URL}/reservations/client/${reservationId}/payment-lock`,
+				{ method: "DELETE", headers },
+			);
+		} catch (err) {
+			console.warn("[PAYMENT-LOCK] erreur release:", err?.message);
+		}
+	};
+
+	const enableWholeTablePayment = async () => {
+		const result = await acquirePaymentLock();
+		if (result.ok) {
+			setPayForWholeTable(true);
+			return;
+		}
+		if (result.lockedBy) {
+			Alert.alert(
+				"Paiement déjà en cours",
+				`${result.lockedBy} est déjà en train de payer pour la table. Réessayez dans quelques minutes.`,
+			);
+		} else {
+			Alert.alert(
+				"Indisponible",
+				"Impossible d'activer le paiement pour la table. Réessayez.",
+			);
+		}
+	};
+
+	const disableWholeTablePayment = () => {
+		setPayForWholeTable(false);
+		releasePaymentLock();
 	};
 
 	// 🎯 Tout sélectionner/désélectionner
@@ -883,141 +1080,241 @@ export default function Payment({
 				selectedItems.has(getItemId(item)),
 			);
 
-			const uniqueOrderIds = [
-				...new Set(selectedOrders.map((item) => item.orderId).filter(Boolean)),
-			];
-			if (uniqueOrderIds.length !== 1) {
-				Alert.alert(
-					"Paiement non supporté",
-					"Sélectionnez des articles d'une seule commande à la fois.",
-				);
-				setLoading(false);
-				return;
+			// Grouper par orderId — Stripe = 1 PaymentIntent par order côté backend.
+			// Si plusieurs orders, on enchaîne les PaymentSheet séquentiellement.
+			const groups = new Map();
+			for (const it of selectedOrders) {
+				const oid = it.orderId || orderId || allOrders[0]?.orderId;
+				if (!oid) continue;
+				if (!groups.has(oid)) groups.set(oid, []);
+				groups.get(oid).push(it);
 			}
 
-			// 2. Calculer le montant payé
-			const amountPaid = selectedOrders.reduce(
-				(sum, item) =>
-					sum +
-					(parseFloat(item?.price) || 0) * (parseInt(item?.quantity) || 1),
-				0,
-			);
-			logger.debug("Calcul montant paiement", {
-				totalItems: paidItems.length,
-				amount: "[CENSORED]",
-			});
-
-			logger.info("Création PaymentIntent");
-			const amountCents = Math.round(amountPaid * 100);
-
-			const paymentMethodTypes =
-				paymentMethod === "apple_pay" ? ["card", "apple_pay"] : ["card"];
-
-			// 2.5. Récupérer orderId depuis le premier article sélectionné
-			const firstOrderId = uniqueOrderIds[0] || orderId || allOrders[0]?.orderId;
-			if (!firstOrderId) {
-				console.warn("[PaymentClient] firstOrderId introuvable, abandon du paiement", {
-					selectedOrdersCount: selectedOrders.length,
-					orderId,
-				});
+			if (groups.size === 0) {
 				Alert.alert("Erreur", "Impossible de trouver l'ID de commande");
 				setLoading(false);
 				return;
 			}
 
-			console.log("[PaymentClient] Création PaymentIntent", {
-				firstOrderId,
-				amountCents,
-				paymentMethod,
-			});
+			const paymentMethodTypes =
+				paymentMethod === "apple_pay" ? ["card", "apple_pay"] : ["card"];
 
-			const paymentIntentResult = await stripeService.createPaymentIntent({
-				orderId: firstOrderId,
-				amount: amountCents,
-				currency: "eur",
-				paymentMethodTypes,
-				tipAmount: 0,
-				paymentMode: "client",
-				reservationId: reservationId,
-			});
+			// ── WEB : on supporte 1 seul groupe à la fois ────────────────────
+			if (Platform.OS === "web" && groups.size > 1) {
+				Alert.alert(
+					"Paiement multiple non supporté sur web",
+					"Sélectionnez les articles d'une seule commande à la fois.",
+				);
+				setLoading(false);
+				return;
+			}
 
-			const newClientSecret = paymentIntentResult.clientSecret;
-			const newPaymentIntentId = paymentIntentResult.paymentIntentId;
-			console.log("[PaymentClient] PaymentIntent créé", {
-				paymentIntentId: newPaymentIntentId,
-			});
-			setClientSecret(newClientSecret);
-			setPaymentIntentId(newPaymentIntentId);
+			const groupEntries = Array.from(groups.entries());
 
-			if (Platform.OS === "web") {
-				setWebCheckoutSecret(newClientSecret);
-				setWebCheckoutContext({
-					selectedOrders,
-					amountPaid,
-					paymentIntentId: newPaymentIntentId,
+			// ── NATIVE MULTI-ORDERS : 1 PaymentIntent agrégé ─────────────────
+			// Avantages : 1 seul frais Stripe, 1 seul PaymentSheet, UX simplifiée.
+			if (Platform.OS !== "web" && groupEntries.length > 1) {
+				const orderSlices = groupEntries.map(([gOrderId, gItems]) => {
+					const gAmount = gItems.reduce(
+						(sum, it) =>
+							sum +
+							(parseFloat(it?.price) || 0) * (parseInt(it?.quantity) || 1),
+						0,
+					);
+					return {
+						orderId: gOrderId,
+						amount: Math.round(gAmount * 100),
+					};
 				});
-				setWebCheckoutVisible(true);
-				setLoading(false);
+				const totalCents = orderSlices.reduce((s, x) => s + x.amount, 0);
+				const totalEuros = totalCents / 100;
+				const allItems = groupEntries.flatMap(([, items]) => items);
+
+				console.log(
+					`[PaymentClient] AGGREGATED – ${orderSlices.length} orders, total=${totalEuros}€`,
+				);
+
+				const intentResult = await stripeService.createAggregatedPaymentIntent({
+					orderSlices,
+					currency: "eur",
+					paymentMethodTypes,
+					tipAmount: 0,
+					paymentMode: "client",
+				});
+
+				const aggClientSecret = intentResult.clientSecret;
+				const aggPaymentIntentId = intentResult.paymentIntentId;
+				setClientSecret(aggClientSecret);
+				setPaymentIntentId(aggPaymentIntentId);
+
+				const { error: initError } = await initPaymentSheet({
+					paymentIntentClientSecret: aggClientSecret,
+					merchantDisplayName: "SunnyGo Restaurant",
+					applePay: applePayAvailable
+						? {
+								merchantCountryCode: "FR",
+								merchantIdentifier: "merchant.com.sunnygo.app",
+								cartItems: [
+									{
+										label: `${orderSlices.length} commandes`,
+										amount: totalEuros.toFixed(2),
+									},
+								],
+							}
+						: undefined,
+					returnURL: "sunnygo://payment",
+				});
+
+				if (initError) {
+					console.error("❌ Erreur init Payment Sheet (agrégé):", initError);
+					Alert.alert("Erreur", initError.message);
+					setLoading(false);
+					paymentRequestInFlightRef.current = false;
+					return;
+				}
+
+				const { error: presentError } = await presentPaymentSheet();
+
+				if (presentError) {
+					if (presentError.code === "Canceled") {
+						console.log("[PaymentClient] PaymentSheet agrégé annulé");
+					} else {
+						console.error("❌ Erreur paiement agrégé:", presentError);
+						Alert.alert("Erreur", presentError.message);
+					}
+					setLoading(false);
+					paymentRequestInFlightRef.current = false;
+					return;
+				}
+
+				await finalizePaymentSuccess(
+					allItems,
+					totalEuros,
+					paymentMethod,
+					aggPaymentIntentId,
+				);
+				console.log("[PaymentClient] Paiement agrégé réussi", {
+					totalAmount: totalEuros,
+					paidCount: allItems.length,
+					ordersCount: orderSlices.length,
+				});
 				return;
 			}
 
-			// 2.6. Initialiser Payment Sheet
-			const { error: initError } = await initPaymentSheet({
-				paymentIntentClientSecret: newClientSecret,
-				merchantDisplayName: "SunnyGo Restaurant",
-				applePay: applePayAvailable
-					? {
-							merchantCountryCode: "FR",
-							merchantIdentifier: "merchant.com.sunnygo.app",
-							cartItems: [
-								{
-									label: "Commande",
-									amount: (amountCents / 100).toFixed(2),
-								},
-							],
-						}
-					: undefined,
-				returnURL: "sunnygo://payment",
-			});
+			// ── SINGLE ORDER (ou WEB) : flow classique groupe par groupe ─────
+			const paidOrdersAccumulator = [];
+			let lastPaymentIntentId = null;
+			let totalAmountPaid = 0;
 
-			if (initError) {
-				console.error("❌ Erreur init Payment Sheet:", initError);
-				Alert.alert("Erreur", initError.message);
-				setLoading(false);
-				return;
-			}
+			for (let i = 0; i < groupEntries.length; i++) {
+				const [groupOrderId, groupItems] = groupEntries[i];
+				const groupAmount = groupItems.reduce(
+					(sum, it) =>
+						sum + (parseFloat(it?.price) || 0) * (parseInt(it?.quantity) || 1),
+					0,
+				);
+				const groupAmountCents = Math.round(groupAmount * 100);
 
-			// 2.7. Présenter Payment Sheet
-			const { error: presentError } = await presentPaymentSheet();
+				console.log(
+					`[PaymentClient] Groupe ${i + 1}/${groupEntries.length} – order=${groupOrderId} amount=${groupAmount}€`,
+				);
 
-			if (presentError) {
-				if (presentError.code === "Canceled") {
-					console.log("[PaymentClient] PaymentSheet annulé par l'utilisateur");
+				const intentResult = await stripeService.createPaymentIntent({
+					orderId: groupOrderId,
+					amount: groupAmountCents,
+					currency: "eur",
+					paymentMethodTypes,
+					tipAmount: 0,
+					paymentMode: "client",
+					reservationId: reservationId,
+				});
+
+				const newClientSecret = intentResult.clientSecret;
+				const newPaymentIntentId = intentResult.paymentIntentId;
+				setClientSecret(newClientSecret);
+				setPaymentIntentId(newPaymentIntentId);
+
+				if (Platform.OS === "web") {
+					// Cas single-group sur web : on délègue au checkout web
+					setWebCheckoutSecret(newClientSecret);
+					setWebCheckoutContext({
+						selectedOrders: groupItems,
+						amountPaid: groupAmount,
+						paymentIntentId: newPaymentIntentId,
+					});
+					setWebCheckoutVisible(true);
 					setLoading(false);
 					return;
 				}
-				console.error("❌ Erreur paiement:", presentError);
-				Alert.alert("Erreur", presentError.message);
-				setLoading(false);
-				return;
+
+				// Native : init + present PaymentSheet pour ce groupe
+				const sheetLabel =
+					groupEntries.length > 1
+						? `Commande ${i + 1}/${groupEntries.length}`
+						: "Commande";
+
+				const { error: initError } = await initPaymentSheet({
+					paymentIntentClientSecret: newClientSecret,
+					merchantDisplayName: "SunnyGo Restaurant",
+					applePay: applePayAvailable
+						? {
+								merchantCountryCode: "FR",
+								merchantIdentifier: "merchant.com.sunnygo.app",
+								cartItems: [
+									{
+										label: sheetLabel,
+										amount: (groupAmountCents / 100).toFixed(2),
+									},
+								],
+							}
+						: undefined,
+					returnURL: "sunnygo://payment",
+				});
+
+				if (initError) {
+					console.error("❌ Erreur init Payment Sheet:", initError);
+					Alert.alert("Erreur", initError.message);
+					break;
+				}
+
+				const { error: presentError } = await presentPaymentSheet();
+
+				if (presentError) {
+					if (presentError.code === "Canceled") {
+						console.log(
+							`[PaymentClient] PaymentSheet annulé sur groupe ${i + 1}/${groupEntries.length}`,
+						);
+						if (paidOrdersAccumulator.length > 0) {
+							Alert.alert(
+								"Paiement partiel",
+								`${paidOrdersAccumulator.length} article(s) déjà payé(s) sur la table. Vous pourrez régler le reste plus tard.`,
+							);
+						}
+						break;
+					}
+					console.error("❌ Erreur paiement:", presentError);
+					Alert.alert("Erreur", presentError.message);
+					break;
+				}
+
+				// Succès pour ce groupe
+				paidOrdersAccumulator.push(...groupItems);
+				totalAmountPaid += groupAmount;
+				lastPaymentIntentId = newPaymentIntentId;
 			}
 
-			console.log("[PaymentClient] PaymentSheet confirmé, finalisation en cours", {
-				paymentIntentId: newPaymentIntentId,
-			});
-
-			await finalizePaymentSuccess(
-				selectedOrders,
-				amountPaid,
-				paymentMethod,
-				newPaymentIntentId,
-			);
-
-			console.log("[PaymentClient] finalizePaymentSuccess terminé", {
-				paymentIntentId: newPaymentIntentId,
-				selectedOrdersCount: selectedOrders.length,
-				amountPaid,
-			});
+			if (paidOrdersAccumulator.length > 0) {
+				await finalizePaymentSuccess(
+					paidOrdersAccumulator,
+					totalAmountPaid,
+					paymentMethod,
+					lastPaymentIntentId,
+				);
+				console.log("[PaymentClient] Tous les groupes traités", {
+					totalAmount: totalAmountPaid,
+					paidCount: paidOrdersAccumulator.length,
+				});
+			}
 		} catch (error) {
 			console.error("❌ Erreur paiement:", error);
 			Alert.alert("Erreur", "Échec du paiement. Veuillez réessayer.");
@@ -1103,8 +1400,9 @@ export default function Payment({
 		return (
 			<LinearGradient
 				colors={
-					paymentContainerTokens.containerBackground ||
-					theme.background || [theme.dark, theme.card]
+					isGrillzTheme
+						? ["#0D0D0D", "#171717", "#0F0F0F"]
+						: theme.background || [theme.dark, theme.card]
 				}
 				style={styles.container}
 			>
@@ -1115,10 +1413,10 @@ export default function Payment({
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 1 }}
 					>
-						<MaterialIcons name="error-outline" size={48} color={paymentContainerTokens.iconOnPrimary} />
+						<MaterialIcons name="error-outline" size={48} color="#fff" />
 					</LinearGradient>
-					<Text style={[styles.errorTitle, paymentContainerTokens.headingColor && { color: paymentContainerTokens.headingColor }]}>Aucune commande</Text>
-					<Text style={[styles.errorText, paymentContainerTokens.bodyMutedColor && { color: paymentContainerTokens.bodyMutedColor }]}>
+					<Text style={[styles.errorTitle, isGrillzTheme && { color: "#F8FAFC" }]}>Aucune commande</Text>
+					<Text style={[styles.errorText, isGrillzTheme && { color: "#A1A1AA" }]}>
 						Aucune commande n'a été trouvée pour cette réservation.{"\n"}
 						Retournez au menu et commandez des articles d'abord.
 					</Text>
@@ -1129,7 +1427,7 @@ export default function Payment({
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 0 }}
 						>
-							<MaterialIcons name="arrow-back" size={20} color={paymentContainerTokens.iconOnPrimary} />
+							<MaterialIcons name="arrow-back" size={20} color="#fff" />
 							<Text style={styles.errorBackButtonText}>Retour au Menu</Text>
 						</LinearGradient>
 					</TouchableOpacity>
@@ -1173,14 +1471,18 @@ export default function Payment({
 	return (
 		<LinearGradient
 			colors={
-				paymentContainerTokens.containerBackground ||
-				theme.background || [theme.dark, theme.card]
+				isBaghera
+					? [BAGHERA_PALETTE.cream, BAGHERA_PALETTE.cream]
+					: isGrillzTheme
+						? ["#0D0D0D", "#171717", "#0F0F0F"]
+						: theme.background || [theme.dark, theme.card]
 			}
 			style={styles.container}
 			start={{ x: 0, y: 0 }}
 			end={{ x: 1, y: 1 }}
 		>
 			{/* Background decorations */}
+			{!isBaghera && (
 			<View style={styles.bgDecor}>
 				<LinearGradient
 					colors={[...theme.primary, "transparent"]}
@@ -1188,12 +1490,13 @@ export default function Payment({
 				/>
 				<LinearGradient
 					colors={[
-						...theme[paymentContainerTokens.bgDecorSecondaryKey],
+						...(isGrillzTheme ? theme.accent : theme.success),
 						"transparent",
 					]}
 					style={[styles.bgCircle, styles.bgCircle2]}
 				/>
 			</View>
+			)}
 
 			<ScrollView
 				style={styles.scrollView}
@@ -1211,24 +1514,41 @@ export default function Payment({
 					]}
 				>
 					<LinearGradient
-					colors={theme[paymentContainerTokens.headerIconGradientKey]}
-					style={styles.headerIcon}
-					start={{ x: 0, y: 0 }}
-					end={{ x: 1, y: 1 }}
-				>
-					<Ionicons name="card" size={36} color={paymentContainerTokens.iconOnPrimary} />
-				</LinearGradient>
-				<Text style={[styles.title, paymentContainerTokens.headingColor && { color: paymentContainerTokens.headingColor }]}>Paiement</Text>
-				<Text style={[styles.subtitle, paymentContainerTokens.bodyMutedColor && { color: paymentContainerTokens.bodyMutedColor }]}>Sélectionnez les articles à payer</Text>
+						colors={isBaghera ? [BAGHERA_PALETTE.ember, BAGHERA_PALETTE.ember] : isGrillzTheme ? theme.primary : theme.success}
+						style={styles.headerIcon}
+						start={{ x: 0, y: 0 }}
+						end={{ x: 1, y: 1 }}
+					>
+						<Ionicons name="card" size={36} color="#fff" />
+					</LinearGradient>
+					<Text style={[
+						styles.title,
+						isGrillzTheme && { color: "#F8FAFC" },
+						isBaghera && { fontFamily: BAGHERA_FONTS.serif, fontWeight: '400', color: BAGHERA_PALETTE.ink, fontSize: 36 },
+					]}>
+						{isBaghera ? <>Paiement<Text style={{ color: BAGHERA_PALETTE.ember }}>.</Text></> : 'Paiement'}
+					</Text>
+					<Text style={[
+						styles.subtitle,
+						isGrillzTheme && { color: "#A1A1AA" },
+						isBaghera && { fontFamily: BAGHERA_FONTS.serifItalic, color: BAGHERA_PALETTE.smoke },
+					]}>{isBaghera ? '— sélectionnez les articles à payer' : 'Sélectionnez les articles à payer'}</Text>
+
 					{/* 🍔 Bannière statut foodtruck / fast-food */}
-					{(isFoodtruck || isFastFood) && (
-						<View style={styles.statusBanner}>
+					{(isFoodtruck || isFastFood) && !isBaghera && (
+						<View style={[
+							styles.statusBanner,
+							isBaghera && { backgroundColor: BAGHERA_PALETTE.creamSoft, borderColor: BAGHERA_PALETTE.sand, borderWidth: 1 },
+						]}>
 							<MaterialIcons
 								name={isFoodtruck ? "delivery-dining" : "restaurant"}
 								size={20}
-								color={isFoodtruck ? "#FF6B00" : "#4CAF50"}
+								color={isBaghera ? BAGHERA_PALETTE.ember : (isFoodtruck ? "#FF6B00" : "#4CAF50")}
 							/>
-							<Text style={styles.statusBannerText}>
+							<Text style={[
+								styles.statusBannerText,
+								isBaghera && { color: BAGHERA_PALETTE.ink, fontFamily: BAGHERA_FONTS.sansItalic },
+							]}>
 								{isFoodtruck
 									? "Commande reçue — Payez pour lancer la préparation"
 									: "Préparation en cours — Choisissez votre mode de paiement"}
@@ -1237,7 +1557,7 @@ export default function Payment({
 					)}
 
 					{/* Boutons de sélection rapide */}
-					{availableItems.length > 0 && (
+					{availableItems.length > 0 && !isBaghera && (
 						<View style={styles.quickSelectButtons}>
 							<TouchableOpacity
 								onPress={selectOneThird}
@@ -1245,13 +1565,13 @@ export default function Payment({
 								style={styles.quickSelectButton}
 							>
 								<LinearGradient
-									colors={theme.secondary}
-									style={styles.quickSelectGradient}
+									colors={isBaghera ? [BAGHERA_PALETTE.creamSoft, BAGHERA_PALETTE.creamSoft] : theme.secondary}
+									style={[styles.quickSelectGradient, isBaghera && { borderWidth: 1, borderColor: BAGHERA_PALETTE.sand }]}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 0 }}
 								>
-									<MaterialIcons name="pie-chart" size={18} color={paymentContainerTokens.iconOnPrimary} />
-									<Text style={styles.quickSelectText}>1/3</Text>
+									<MaterialIcons name="pie-chart" size={18} color={isBaghera ? BAGHERA_PALETTE.ember : "#fff"} />
+									<Text style={[styles.quickSelectText, isBaghera && { color: BAGHERA_PALETTE.ink, fontFamily: BAGHERA_FONTS.sans }]}>1/3</Text>
 								</LinearGradient>
 							</TouchableOpacity>
 
@@ -1261,7 +1581,7 @@ export default function Payment({
 								style={styles.quickSelectButton}
 							>
 								<LinearGradient
-									colors={theme.accent}
+									colors={isBaghera ? [BAGHERA_PALETTE.ember, BAGHERA_PALETTE.ember] : theme.accent}
 									style={styles.quickSelectGradient}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 0 }}
@@ -1273,9 +1593,9 @@ export default function Payment({
 												: "select-all"
 										}
 										size={18}
-										color={paymentContainerTokens.iconOnPrimary}
+										color="#fff"
 									/>
-									<Text style={styles.quickSelectText}>
+									<Text style={[styles.quickSelectText, isBaghera && { fontFamily: BAGHERA_FONTS.sans }]}>
 										{selectedItems.size === availableItems.length
 											? "Tout désélectionner"
 											: "100%"}
@@ -1290,76 +1610,80 @@ export default function Payment({
 				<View style={styles.itemsSection}>
 					{/* 👥 Toggle : Mes articles / Toute la table */}
 					{otherClientsCount > 0 && (
-					<View style={[styles.clientToggleRow, paymentContainerTokens.toggleRowBackground]}>
-						<TouchableOpacity
-							style={[
-								styles.clientToggleBtn,
-								!payForWholeTable && styles.clientToggleBtnActive,
-								!payForWholeTable && paymentContainerTokens.toggleActiveOverride,
-							]}
-							onPress={() => setPayForWholeTable(false)}
-							activeOpacity={0.8}
-						>
-							<MaterialIcons name="person" size={15} color={!payForWholeTable ? paymentContainerTokens.iconOnPrimary : paymentContainerTokens.toggleIconInactive} />
-							<Text style={[styles.clientToggleText, !payForWholeTable && styles.clientToggleTextActive]}>
-								Mes articles
-							</Text>
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={[
-								styles.clientToggleBtn,
-								payForWholeTable && styles.clientToggleBtnActive,
-								payForWholeTable && paymentContainerTokens.toggleActiveOverride,
-							]}
-							onPress={() =>
-								Alert.alert(
-									"Payer pour toute la table",
-									"Vous allez régler les commandes de tous les clients de cette table. Confirmez-vous ?",
-									[
-										{ text: "Annuler", style: "cancel" },
-										{ text: "Confirmer", onPress: () => setPayForWholeTable(true) },
-									],
-								)
-							}
-							activeOpacity={0.8}
-						>
-							<MaterialIcons name="group" size={15} color={payForWholeTable ? paymentContainerTokens.iconOnPrimary : paymentContainerTokens.toggleIconInactive} />
-							<Text style={[styles.clientToggleText, payForWholeTable && styles.clientToggleTextActive]}>
-								Toute la table
-							</Text>
-						</TouchableOpacity>
-					</View>
+						<View style={[styles.clientToggleRow, isGrillzTheme && { backgroundColor: "rgba(255,255,255,0.08)" }]}>
+							<TouchableOpacity
+								style={[
+									styles.clientToggleBtn,
+									!payForWholeTable && styles.clientToggleBtnActive,
+									isGrillzTheme && !payForWholeTable && styles.clientToggleBtnActiveGrillz,
+								]}
+								onPress={() => disableWholeTablePayment()}
+								activeOpacity={0.8}
+							>
+								<MaterialIcons name="person" size={15} color={!payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#666"} />
+								<Text style={[styles.clientToggleText, !payForWholeTable && styles.clientToggleTextActive]}>
+									Mes articles
+								</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={[
+									styles.clientToggleBtn,
+									payForWholeTable && styles.clientToggleBtnActive,
+									isGrillzTheme && payForWholeTable && styles.clientToggleBtnActiveGrillz,
+								]}
+								onPress={() =>
+									Alert.alert(
+										"Payer pour toute la table",
+										"Vous allez régler les commandes de tous les clients de cette table. Confirmez-vous ?",
+										[
+											{ text: "Annuler", style: "cancel" },
+											{ text: "Confirmer", onPress: () => enableWholeTablePayment() },
+										],
+									)
+								}
+								activeOpacity={0.8}
+							>
+								<MaterialIcons name="group" size={15} color={payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#666"} />
+								<Text style={[styles.clientToggleText, payForWholeTable && styles.clientToggleTextActive]}>
+									Toute la table
+								</Text>
+							</TouchableOpacity>
+						</View>
 					)}
 
 					{/* Section Header */}
 					<View style={styles.sectionHeader}>
 						<View style={styles.sectionTitleRow}>
 							<LinearGradient
-								colors={theme.primary}
+								colors={isBaghera ? [BAGHERA_PALETTE.ember, BAGHERA_PALETTE.ember] : theme.primary}
 								style={styles.sectionIconBg}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
 							>
-								<MaterialIcons name="shopping-cart" size={18} color={paymentContainerTokens.iconOnPrimary} />
+								<MaterialIcons name="shopping-cart" size={18} color="#fff" />
 							</LinearGradient>
-							<Text style={[styles.sectionTitle, paymentContainerTokens.headingColor && { color: paymentContainerTokens.headingColor }]}>
+							<Text style={[
+								styles.sectionTitle,
+								isGrillzTheme && { color: "#F8FAFC" },
+								isBaghera && { color: BAGHERA_PALETTE.ink, fontFamily: BAGHERA_FONTS.serif, fontWeight: '400' },
+							]}>
 								Articles à payer ({availableItems.length})
 							</Text>
 						</View>
 						{availableItems.length > 0 && (
 							<TouchableOpacity onPress={toggleAll} style={styles.selectAllBtn}>
 								<LinearGradient
-									colors={allSelected ? theme.secondary : theme.primary}
-									style={styles.selectAllGradient}
+									colors={isBaghera ? [BAGHERA_PALETTE.creamSoft, BAGHERA_PALETTE.creamSoft] : (allSelected ? theme.secondary : theme.primary)}
+									style={[styles.selectAllGradient, isBaghera && { borderWidth: 1, borderColor: BAGHERA_PALETTE.sand }]}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 0 }}
 								>
 									<MaterialIcons
 										name={allSelected ? "remove-done" : "done-all"}
 										size={16}
-										color={paymentContainerTokens.iconOnPrimary}
+										color={isBaghera ? BAGHERA_PALETTE.ember : "#fff"}
 									/>
-									<Text style={styles.selectAllText}>
+									<Text style={[styles.selectAllText, isBaghera && { color: BAGHERA_PALETTE.ember, fontFamily: BAGHERA_FONTS.sans }]}>
 										{allSelected ? "Désélectionner" : "Tout sélectionner"}
 									</Text>
 								</LinearGradient>
@@ -1371,15 +1695,23 @@ export default function Payment({
 					{availableItems.length === 0 ? (
 						<View style={styles.emptyState}>
 							<LinearGradient
-								colors={theme.success}
-								style={styles.emptyStateIcon}
+								colors={isBaghera ? [BAGHERA_PALETTE.creamSoft, BAGHERA_PALETTE.creamSoft] : theme.success}
+								style={[styles.emptyStateIcon, isBaghera && { borderWidth: 1, borderColor: BAGHERA_PALETTE.sand }]}
 								start={{ x: 0, y: 0 }}
 								end={{ x: 1, y: 1 }}
 							>
-								<MaterialIcons name="celebration" size={48} color={paymentContainerTokens.iconOnPrimary} />
+								<MaterialIcons name="celebration" size={48} color={isBaghera ? BAGHERA_PALETTE.ember : "#fff"} />
 							</LinearGradient>
-							<Text style={[styles.emptyStateTitle, paymentContainerTokens.headingColor && { color: paymentContainerTokens.headingColor }]}>Tout est payé !</Text>
-							<Text style={[styles.emptyStateSubtext, paymentContainerTokens.bodyMutedColor && { color: paymentContainerTokens.bodyMutedColor }]}>
+							<Text style={[
+								styles.emptyStateTitle,
+								isGrillzTheme && { color: "#F8FAFC" },
+								isBaghera && { color: BAGHERA_PALETTE.ink, fontFamily: BAGHERA_FONTS.serif, fontWeight: '400' },
+							]}>Tout est payé !</Text>
+							<Text style={[
+								styles.emptyStateSubtext,
+								isGrillzTheme && { color: "#A1A1AA" },
+								isBaghera && { color: BAGHERA_PALETTE.smoke, fontFamily: BAGHERA_FONTS.sansItalic },
+							]}>
 								Vous pouvez retourner au menu.
 							</Text>
 							<TouchableOpacity
@@ -1393,17 +1725,17 @@ export default function Payment({
 								activeOpacity={0.8}
 							>
 								<LinearGradient
-									colors={theme.accent}
-									style={styles.emptyStateButton}
+									colors={isBaghera ? [BAGHERA_PALETTE.ember, BAGHERA_PALETTE.ember] : theme.accent}
+									style={[styles.emptyStateButton, isBaghera && { borderRadius: 28 }]}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 0 }}
 								>
 									<MaterialIcons
 										name="restaurant-menu"
 										size={20}
-										color={paymentContainerTokens.iconOnPrimary}
+										color="#fff"
 									/>
-									<Text style={styles.emptyStateButtonText}>
+									<Text style={[styles.emptyStateButtonText, isBaghera && { fontFamily: BAGHERA_FONTS.sans }]}>
 										Retour au menu
 									</Text>
 								</LinearGradient>
@@ -1423,7 +1755,10 @@ export default function Payment({
 										isPaid={false}
 										onToggle={() => toggleItem(item)}
 										theme={theme}
-										paymentTokens={paymentItemTokens}
+										isGrillzTheme={isGrillzTheme}
+										isBaghera={isBaghera}
+										currentClientId={clientId}
+										currentUserName={userName}
 									/>
 								);
 							})}
@@ -1440,9 +1775,9 @@ export default function Payment({
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 1 }}
 								>
-									<MaterialIcons name="check-circle" size={18} color={paymentButtonsTokens.iconOnPrimary} />
+									<MaterialIcons name="check-circle" size={18} color="#fff" />
 								</LinearGradient>
-								<Text style={[styles.paidSectionTitle, paymentButtonsTokens.paidSectionTitleColor && { color: paymentButtonsTokens.paidSectionTitleColor }]}>
+								<Text style={[styles.paidSectionTitle, isGrillzTheme && { color: "#A1A1AA" }]}>
 									Déjà payés ({paidItemsList.length})
 								</Text>
 							</View>
@@ -1455,7 +1790,10 @@ export default function Payment({
 										isSelected={false}
 										isPaid={true}
 										theme={theme}
-										paymentTokens={paymentItemTokens}
+										isGrillzTheme={isGrillzTheme}
+										isBaghera={isBaghera}
+										currentClientId={clientId}
+										currentUserName={userName}
 									/>
 								))}
 							</View>
@@ -1467,23 +1805,23 @@ export default function Payment({
 				{availableItems.length > 0 && (
 					<View style={styles.totalSection}>
 						<LinearGradient
-							colors={theme.primary}
+							colors={isBaghera ? [BAGHERA_PALETTE.ember, BAGHERA_PALETTE.ember] : theme.primary}
 							style={styles.totalGradient}
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 0 }}
 						>
 							<View style={styles.totalContent}>
 								<View style={styles.totalLeft}>
-									<MaterialIcons name="payments" size={24} color={paymentButtonsTokens.iconOnPrimary} />
+									<MaterialIcons name="payments" size={24} color="#fff" />
 									<View style={styles.totalTextContainer}>
-										<Text style={styles.totalLabel}>Total sélectionné</Text>
-										<Text style={styles.totalCount}>
+										<Text style={[styles.totalLabel, isBaghera && { fontFamily: BAGHERA_FONTS.sans }]}>Total sélectionné</Text>
+										<Text style={[styles.totalCount, isBaghera && { fontFamily: BAGHERA_FONTS.sansItalic }]}>
 											{selectedOrders.length} article
 											{selectedOrders.length > 1 ? "s" : ""}
 										</Text>
 									</View>
 								</View>
-								<Text style={styles.totalValue}>
+								<Text style={[styles.totalValue, isBaghera && { fontFamily: BAGHERA_FONTS.serifItalic, fontWeight: '400' }]}>
 									{(total || 0).toFixed(2)}€
 								</Text>
 							</View>
@@ -1494,13 +1832,17 @@ export default function Payment({
 				{/* Info Note */}
 				{reservationId && (
 					<View style={styles.infoNote}>
-						<BlurView intensity={15} tint="light" style={[styles.infoNoteBlur, paymentButtonsTokens.infoNoteBorderOverride]}>
-							<MaterialIcons name="info-outline" size={20} color={paymentButtonsTokens.infoIconColor} />
+						<BlurView intensity={isBaghera ? 0 : 15} tint="light" style={[
+							styles.infoNoteBlur,
+							isGrillzTheme && { borderColor: "#2A2A2A" },
+							isBaghera && { backgroundColor: BAGHERA_PALETTE.creamSoft, borderColor: BAGHERA_PALETTE.sand },
+						]}>
+							<MaterialIcons name="info-outline" size={20} color={isBaghera ? BAGHERA_PALETTE.ember : "#4facfe"} />
 							<View style={styles.infoNoteText}>
-								<Text style={styles.infoNoteTitle}>
+								<Text style={[styles.infoNoteTitle, isBaghera && { color: BAGHERA_PALETTE.ink, fontFamily: BAGHERA_FONTS.sans }]}>
 									Les articles payés sont sauvegardés
 								</Text>
-								<Text style={styles.infoNoteSubtext}>
+								<Text style={[styles.infoNoteSubtext, isBaghera && { color: BAGHERA_PALETTE.smoke, fontFamily: BAGHERA_FONTS.sansItalic }]}>
 									{paidItems.size > 0
 										? `${paidItems.size} article(s) déjà payé(s)`
 										: "Vous pouvez quitter et revenir"}
@@ -1541,19 +1883,23 @@ export default function Payment({
 								<LinearGradient
 									colors={
 										isProcessing || selectedItems.size === 0
-											? paymentButtonsTokens.cardDisabledGradient
-											: theme[paymentButtonsTokens.cardActiveGradientKey]
+											? (isBaghera ? [BAGHERA_PALETTE.sand, BAGHERA_PALETTE.sand] : ["#ccc", "#ccc"])
+											: isBaghera
+												? [BAGHERA_PALETTE.ember, BAGHERA_PALETTE.ember]
+												: isGrillzTheme
+													? [theme.primary, theme.primary]
+													: [theme.success, theme.success]
 									}
-									style={[styles.payButton, paymentButtonsTokens.cardShadowOverride]}
+									style={[styles.payButton, isGrillzTheme && { shadowColor: "#EA580C" }, isBaghera && { shadowColor: BAGHERA_PALETTE.ember, borderRadius: 28 }]}
 									start={{ x: 0, y: 0 }}
 									end={{ x: 1, y: 0 }}
 								>
 									{isProcessing ? (
-										<ActivityIndicator color={paymentButtonsTokens.iconOnPrimary} />
+										<ActivityIndicator color="#fff" />
 									) : (
 										<>
-											<MaterialIcons name="payment" size={24} color={paymentButtonsTokens.iconOnPrimary} />
-											<Text style={styles.payButtonText}>
+											<MaterialIcons name="payment" size={24} color="#fff" />
+											<Text style={[styles.payButtonText, isBaghera && { fontFamily: BAGHERA_FONTS.sans }]}>
 												Payer {selectedOrders.length} article
 												{selectedOrders.length > 1 ? "s" : ""}
 												{reservationStatus.canClose ? " et fermer" : ""}
@@ -1575,18 +1921,18 @@ export default function Payment({
 									<LinearGradient
 										colors={
 											isProcessing || selectedItems.size === 0
-												? paymentButtonsTokens.applePayDisabledGradient
-												: paymentButtonsTokens.applePayActiveGradient
+												? ["#ccc", "#999"]
+												: ["#000", "#333"]
 										}
 										style={styles.applePayButton}
 										start={{ x: 0, y: 0 }}
 										end={{ x: 1, y: 0 }}
 									>
 										{isProcessing ? (
-											<ActivityIndicator color={paymentButtonsTokens.iconOnApple} />
+											<ActivityIndicator color="#fff" />
 										) : (
 											<>
-												<Ionicons name="logo-apple" size={24} color={paymentButtonsTokens.iconOnApple} />
+												<Ionicons name="logo-apple" size={24} color="#fff" />
 												<Text style={styles.payButtonText}>Apple Pay</Text>
 											</>
 										)}
@@ -1604,19 +1950,21 @@ export default function Payment({
 									<LinearGradient
 										colors={
 											isProcessing || selectedItems.size === 0
-												? paymentButtonsTokens.counterDisabledGradient
-												: paymentButtonsTokens.counterActiveGradient
+												? (isBaghera ? [BAGHERA_PALETTE.sand, BAGHERA_PALETTE.sand] : ["#ccc", "#999"])
+												: isBaghera
+													? [BAGHERA_PALETTE.creamSoft, BAGHERA_PALETTE.creamSoft]
+													: ["#FF8C00", "#FF6B00"]
 										}
-										style={[styles.payButton, paymentButtonsTokens.counterShadowOverride]}
+										style={[styles.payButton, isGrillzTheme && { shadowColor: "#EA580C" }, isBaghera && { borderWidth: 1, borderColor: BAGHERA_PALETTE.ember, borderRadius: 28 }]}
 										start={{ x: 0, y: 0 }}
 										end={{ x: 1, y: 0 }}
 									>
 										{isProcessing ? (
-											<ActivityIndicator color={paymentButtonsTokens.iconOnPrimary} />
+											<ActivityIndicator color="#fff" />
 										) : (
 											<>
-												<MaterialIcons name="store" size={24} color={paymentButtonsTokens.iconOnPrimary} />
-												<Text style={styles.payButtonText}>
+												<MaterialIcons name="store" size={24} color={isBaghera ? BAGHERA_PALETTE.ember : "#fff"} />
+												<Text style={[styles.payButtonText, isBaghera && { color: BAGHERA_PALETTE.ember, fontFamily: BAGHERA_FONTS.sans }]}>
 													Payer au comptoir
 												</Text>
 											</>
@@ -1635,13 +1983,13 @@ export default function Payment({
 						activeOpacity={0.9}
 					>
 						<LinearGradient
-							colors={theme.accent}
-							style={styles.backButton}
+							colors={isBaghera ? ["transparent", "transparent"] : theme.accent}
+							style={[styles.backButton, isBaghera && { borderWidth: 1, borderColor: BAGHERA_PALETTE.sand, borderRadius: 28, shadowOpacity: 0 }]}
 							start={{ x: 0, y: 0 }}
 							end={{ x: 1, y: 0 }}
 						>
-							<MaterialIcons name="arrow-back" size={22} color={paymentButtonsTokens.iconOnPrimary} />
-							<Text style={styles.backButtonText}>Retour</Text>
+							<MaterialIcons name="arrow-back" size={22} color={isBaghera ? BAGHERA_PALETTE.smoke : "#fff"} />
+							<Text style={[styles.backButtonText, isBaghera && { color: BAGHERA_PALETTE.smoke, fontFamily: BAGHERA_FONTS.sansItalic }]}>Retour</Text>
 						</LinearGradient>
 					</TouchableOpacity>
 				</Animated.View>
@@ -1683,9 +2031,9 @@ export default function Payment({
 					}}
 				>
 					<View style={styles.webModalBackdrop}>
-						<View style={[styles.webModalCard, paymentModalTokens.cardOverride]}>
-							<Text style={[styles.webModalTitle, paymentModalTokens.titleOverride]}>Paiement sécurisé Stripe</Text>
-							<Text style={[styles.webModalSubtitle, paymentModalTokens.subtitleOverride]}>
+						<View style={[styles.webModalCard, isGrillzTheme && styles.webModalCardGrillz]}>
+							<Text style={[styles.webModalTitle, isGrillzTheme && styles.webModalTitleGrillz]}>Paiement sécurisé Stripe</Text>
+							<Text style={[styles.webModalSubtitle, isGrillzTheme && styles.webModalSubtitleGrillz]}>
 								Entrez vos informations de carte pour finaliser le paiement.
 							</Text>
 							<WebStripeCheckout
@@ -1706,6 +2054,146 @@ export default function Payment({
 					</View>
 				</Modal>
 			)}
+
+			{/* 🛡️ Modal de confirmation : payer pour un autre client */}
+			<Modal
+				visible={!!crossPayConfirm}
+				transparent
+				animationType="fade"
+				onRequestClose={() => setCrossPayConfirm(null)}
+			>
+				<View style={styles.crossPayBackdrop}>
+					<View
+						style={[
+							styles.crossPayCard,
+							isGrillzTheme && styles.crossPayCardGrillz,
+							isBaghera && styles.crossPayCardBaghera,
+						]}
+					>
+						<View
+							style={[
+								styles.crossPayIconWrap,
+								isGrillzTheme && { backgroundColor: "rgba(234, 88, 12, 0.18)" },
+								isBaghera && { backgroundColor: BAGHERA_PALETTE.cream },
+							]}
+						>
+							<MaterialIcons
+								name="group"
+								size={28}
+								color={
+									isBaghera
+										? BAGHERA_PALETTE.ember
+										: isGrillzTheme
+											? "#FB923C"
+											: theme?.primary?.[0] || "#667eea"
+								}
+							/>
+						</View>
+						<Text
+							style={[
+								styles.crossPayTitle,
+								isGrillzTheme && { color: "#fff" },
+								isBaghera && {
+									color: BAGHERA_PALETTE.ink,
+									fontFamily: BAGHERA_FONTS.serif,
+								},
+							]}
+						>
+							Paiement pour un autre client
+						</Text>
+						<Text
+							style={[
+								styles.crossPaySubtitle,
+								isGrillzTheme && { color: "#D4D4D8" },
+								isBaghera && {
+									color: BAGHERA_PALETTE.smoke,
+									fontFamily: BAGHERA_FONTS.sansItalic,
+								},
+							]}
+						>
+							Vous vous apprêtez à payer la commande de
+							{"\n"}
+							<Text
+								style={[
+									styles.crossPayName,
+									isBaghera && {
+										color: BAGHERA_PALETTE.ember,
+										fontFamily: BAGHERA_FONTS.serif,
+									},
+									isGrillzTheme && { color: "#FB923C" },
+								]}
+							>
+								{crossPayConfirm?.item?.clientName || "ce client"}
+							</Text>
+							{"."}
+							{"\n\n"}
+							Voulez-vous continuer ?
+						</Text>
+						<View style={styles.crossPayActions}>
+							<TouchableOpacity
+								style={[
+									styles.crossPayBtn,
+									styles.crossPayBtnCancel,
+									isGrillzTheme && { borderColor: "#3F3F46", backgroundColor: "#1F1F1F" },
+									isBaghera && {
+										borderColor: BAGHERA_PALETTE.sand,
+										backgroundColor: BAGHERA_PALETTE.cream,
+									},
+								]}
+								onPress={() => setCrossPayConfirm(null)}
+								activeOpacity={0.85}
+							>
+								<Text
+									style={[
+										styles.crossPayBtnText,
+										styles.crossPayBtnCancelText,
+										isGrillzTheme && { color: "#D4D4D8" },
+										isBaghera && {
+											color: BAGHERA_PALETTE.ink,
+											fontFamily: BAGHERA_FONTS.sans,
+										},
+									]}
+								>
+									Annuler
+								</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={[styles.crossPayBtn, styles.crossPayBtnConfirm]}
+								onPress={() => {
+									const it = crossPayConfirm?.item;
+									setCrossPayConfirm(null);
+									if (it) applyToggle(it);
+								}}
+								activeOpacity={0.85}
+							>
+								<LinearGradient
+									colors={
+										isBaghera
+											? [BAGHERA_PALETTE.ember, BAGHERA_PALETTE.ember]
+											: isGrillzTheme
+												? ["#EA580C", "#F97316"]
+												: theme?.primary || ["#667eea", "#764ba2"]
+									}
+									style={styles.crossPayBtnConfirmGradient}
+									start={{ x: 0, y: 0 }}
+									end={{ x: 1, y: 0 }}
+								>
+									<MaterialIcons name="check" size={18} color="#fff" />
+									<Text
+										style={[
+											styles.crossPayBtnText,
+											styles.crossPayBtnConfirmText,
+											isBaghera && { fontFamily: BAGHERA_FONTS.sans },
+										]}
+									>
+										Continuer
+									</Text>
+								</LinearGradient>
+							</TouchableOpacity>
+						</View>
+					</View>
+				</View>
+			</Modal>
 		</LinearGradient>
 	);
 }
@@ -1738,6 +2226,16 @@ const styles = StyleSheet.create({
 		color: "#475569",
 		marginBottom: 12,
 	},
+	webModalCardGrillz: {
+		backgroundColor: "#141414",
+		borderColor: "#3F3F46",
+	},
+	webModalTitleGrillz: {
+		color: "#F8FAFC",
+	},
+	webModalSubtitleGrillz: {
+		color: "#D4D4D8",
+	},
 
 	// 👥 CLIENT TOGGLE (Mes articles / Toute la table)
 	clientToggleRow: {
@@ -1759,6 +2257,9 @@ const styles = StyleSheet.create({
 	},
 	clientToggleBtnActive: {
 		backgroundColor: "#667eea",
+	},
+	clientToggleBtnActiveGrillz: {
+		backgroundColor: "#EA580C",
 	},
 	clientToggleText: {
 		fontSize: 13,
@@ -2294,5 +2795,124 @@ const styles = StyleSheet.create({
 		color: "#fff",
 		fontSize: 16,
 		fontWeight: "bold",
+	},
+
+	// 👤 Badge "Commandé par X" sous le prix d'un item
+	orderedByBadge: {
+		flexDirection: "row",
+		alignItems: "center",
+		gap: 4,
+		alignSelf: "flex-start",
+		marginTop: 6,
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 10,
+		backgroundColor: "rgba(108, 117, 125, 0.10)",
+		borderWidth: 1,
+		borderColor: "rgba(108, 117, 125, 0.20)",
+	},
+	orderedByText: {
+		fontSize: 11,
+		fontWeight: "600",
+		color: "#6c757d",
+		letterSpacing: 0.2,
+	},
+
+	// 🛡️ Modal de confirmation : payer pour un autre client
+	crossPayBackdrop: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.55)",
+		justifyContent: "center",
+		alignItems: "center",
+		paddingHorizontal: 24,
+	},
+	crossPayCard: {
+		width: "100%",
+		maxWidth: 380,
+		backgroundColor: "#fff",
+		borderRadius: 22,
+		paddingTop: 26,
+		paddingBottom: 20,
+		paddingHorizontal: 22,
+		alignItems: "center",
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 12 },
+		shadowOpacity: 0.25,
+		shadowRadius: 24,
+		elevation: 14,
+	},
+	crossPayCardGrillz: {
+		backgroundColor: "#1A1A1A",
+		borderWidth: 1,
+		borderColor: "#3F3F46",
+	},
+	crossPayCardBaghera: {
+		backgroundColor: "#FFFCF7",
+		borderWidth: 1,
+	},
+	crossPayIconWrap: {
+		width: 56,
+		height: 56,
+		borderRadius: 28,
+		backgroundColor: "rgba(102, 126, 234, 0.12)",
+		justifyContent: "center",
+		alignItems: "center",
+		marginBottom: 14,
+	},
+	crossPayTitle: {
+		fontSize: 18,
+		fontWeight: "700",
+		color: "#212529",
+		textAlign: "center",
+		marginBottom: 10,
+	},
+	crossPaySubtitle: {
+		fontSize: 14,
+		color: "#6c757d",
+		textAlign: "center",
+		lineHeight: 20,
+		marginBottom: 22,
+	},
+	crossPayName: {
+		fontWeight: "700",
+		color: "#212529",
+	},
+	crossPayActions: {
+		flexDirection: "row",
+		width: "100%",
+		gap: 10,
+	},
+	crossPayBtn: {
+		flex: 1,
+		borderRadius: 14,
+		overflow: "hidden",
+	},
+	crossPayBtnCancel: {
+		paddingVertical: 14,
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "#F1F3F5",
+		borderWidth: 1,
+		borderColor: "#DEE2E6",
+	},
+	crossPayBtnConfirm: {
+		// gradient handled by inner LinearGradient
+	},
+	crossPayBtnConfirmGradient: {
+		flexDirection: "row",
+		alignItems: "center",
+		justifyContent: "center",
+		paddingVertical: 14,
+		gap: 6,
+	},
+	crossPayBtnText: {
+		fontSize: 14,
+		fontWeight: "700",
+	},
+	crossPayBtnCancelText: {
+		color: "#495057",
+	},
+	crossPayBtnConfirmText: {
+		color: "#fff",
 	},
 });

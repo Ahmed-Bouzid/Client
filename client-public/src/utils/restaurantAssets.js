@@ -61,6 +61,46 @@ const RESTAURANT_CONFIG_BY_STYLEKEY = {
       menuPreview: require("../../assets/images/restaurants/grillz-695e4300adde654b80f6911a/welcome/screenMenu.png"),
     },
   },
+  // ───────────────────────────────────────────────────────────────────────────
+  // 🆕 Phase 3.1 — Baghera (brunch premium Marseille, démo client 13 mai 2026)
+  // ───────────────────────────────────────────────────────────────────────────
+  // Pas de restaurantId BDD encore (créé post-démo). null intentionnel.
+  // PAS de logo image — wordmark typographique "Baghera." (Instrument Serif).
+  // Fonts Google Fonts (Instrument Serif + Inter) chargées via Font.loadAsync
+  // dans Phase 3.2 (WelcomeScreenBaghera) depuis assets/baghera/fonts/.
+  baghera: {
+    restaurantId: null,
+    name: "Baghera",
+    hasCustomAssets: true,
+    font: {
+      family: "InstrumentSerif",
+      file: require("../../assets/baghera/fonts/InstrumentSerif-Regular.ttf"),
+    },
+    fontItalic: {
+      family: "InstrumentSerif-Italic",
+      file: require("../../assets/baghera/fonts/InstrumentSerif-Italic.ttf"),
+    },
+    fontSans: {
+      family: "Inter",
+      file: require("../../assets/baghera/fonts/Inter-Regular.ttf"),
+    },
+    fontSansItalic: {
+      family: "Inter-Italic",
+      file: require("../../assets/baghera/fonts/Inter-Italic.ttf"),
+    },
+    logo: require("../../assets/baghera/logo.png"),
+    welcomeImages: {
+      // Plats signatures (Shere Kan / Bagheera / Mowgli) + ambiance.
+      image1: require("../../assets/baghera/signature-shere-kan.jpg"),
+      image2: require("../../assets/baghera/signature-bagheera.jpg"),
+      image3: require("../../assets/baghera/signature-mowgli.jpg"),
+      image4: require("../../assets/baghera/ambiance-atelier.jpg"),
+    },
+    decorativeAssets: {
+      hero: require("../../assets/baghera/hero-brunch.jpg"),
+      ambiance: require("../../assets/baghera/ambiance-atelier.jpg"),
+    },
+  },
 };
 
 /**
