@@ -1,3 +1,4 @@
+import "react-native-gesture-handler"; // must be first — required by @react-navigation/stack
 import { registerRootComponent } from "expo";
 import React from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
