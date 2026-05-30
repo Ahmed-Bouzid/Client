@@ -40,7 +40,7 @@ export const useReservationStatus = (
 			// Si la réservation est terminée → rediriger
 			if (
 				type === "statusUpdated" &&
-				data.status === "completed" &&
+				data.status === "terminée" &&
 				!hasRedirectedRef.current
 			) {
 				hasRedirectedRef.current = true;
