@@ -56,7 +56,6 @@ import { BAGHERA_PALETTE, BAGHERA_FONTS, getMenuBagheraTokens } from "../theme/b
 
 // Image placeholder
 const PANINI_IMAGE = require("../../assets/images/menu/image-fond/panini.png");
-const BAGHERA_PRODUCT_IMAGE = require("../../assets/baghera/hero-brunch.jpg");
 
 // =============================================================================
 // 🎨 BAGHERA — Mapping image cohérente par produit (Unsplash + fallback local)
@@ -274,13 +273,6 @@ const BagheraProductImage = React.memo(function BagheraProductImage({ item, styl
   );
 });
 
-// Compat ancien call site (renvoie un source RN-ready)
-const getBagheraProductImage = (item) => {
-  const s = getBagheraProductSource(item);
-  if (s.local) return s.local;
-  return { uri: s.uri };
-};
-
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎨 COULEURS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -431,26 +423,13 @@ export default function MenuScreen({
     colors: themeColors, 
     gradients: themeGradients, 
     getGradient,
-    getColor,
-    hasSandwichPattern,
-    bannerType,
-    loading: themeLoading,
-    error: themeError,
-    isReady: themeReady
   } = useTheme(restaurantId);
   
   // États pour userName
   const [userName, setUserName] = useState(null);
 
   // ⭐ WebSocket - Écouter les changements de style en temps réel
-  const { style: liveStyle, isConnected: socketConnected } = useStyleUpdates(restaurantId);
-
-  // Mettre à jour quand un nouveau style est appliqué en temps réel
-  useEffect(() => {
-    if (liveStyle && liveStyle.config) {
-      console.log("🎨 [MenuScreen] Nouveau style reçu via WebSocket");
-    }
-  }, [liveStyle]);
+  const { style: liveStyle } = useStyleUpdates(restaurantId);
 
   // 🎨 Charger la police DXNacky (Cucina uniquement)
   useEffect(() => {
