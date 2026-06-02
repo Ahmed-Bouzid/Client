@@ -163,35 +163,13 @@ export default function WelcomeScreen({
 
   
   const handleLookupOrder = async () => {
-    console.log("[WelcomeScreen][CTA] handleLookupOrder", {
-      restaurantId,
-      phone,
-      isOrderLookupMode,
-      isValid: orderLookup.isValid,
-      loading: orderLookup.loading,
-    });
     const result = await orderLookup.lookup({ restaurantId });
     if (result) {
       onLookupOrder(result);
     }
   };
 
-  const logPrimaryCtaPress = (source, action) => {
-    console.log("[WelcomeScreen][CTA] press", {
-      source,
-      action,
-      name,
-      phone,
-      tableId,
-      restaurantId,
-      loading,
-      lookupLoading: orderLookup.loading,
-      isOrderLookupMode,
-      isNameLookupMode,
-      isNameLookupValid,
-      isOrderLookupValid: orderLookup.isValid,
-    });
-  };
+  const logPrimaryCtaPress = (_source, _action) => {};
   
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -445,35 +423,17 @@ export default function WelcomeScreen({
   // 1. Valide prénom + tableId
   // 2. Génère/récupère clientId (UUID stable)
   // 3. Obtient un token client (JWT)
-  // 4. Crée/reprend une réservation via API
-  // 5. Stocke credentials dans AsyncStorage
-  // 6. Appelle onJoin() → App.jsx navigue vers MenuScreen
-  // ── PARCOURS PRINCIPAL : connexion utilisateur ──
-  // 1. Valide prénom + tableId
-  // 2. Génère/récupère clientId (UUID stable)
-  // 3. Obtient un token client (JWT)
   // 4. Crée/reprend une réservation (POST /reservations/client/reservations)
   // 5. Stocke credentials dans AsyncStorage
   // 6. Appelle onJoin() → App.jsx navigue vers MenuScreen
   const handleContinueWithEmail = async () => {
-    console.log("[WelcomeScreen][CTA] handleContinueWithEmail:start", {
-      name,
-      phone,
-      tableId,
-      restaurantId,
-      loading,
-      isNameLookupMode,
-      isNameLookupValid,
-    });
     if (!name?.trim()) {
-      console.log("[WelcomeScreen][CTA] blocked: empty name");
       setError("Veuillez entrer votre nom");
       return;
     }
 
     // Si un code CMD est saisi dans le champ nom, déclencher la recherche commande
     if (isCmdCode(name)) {
-      console.log("[WelcomeScreen][CTA] branch: name CMD lookup");
       const cmdCode = normalizeCmdCode(name);
       setPhone(cmdCode);
       orderLookup.setOrderNumber(cmdCode);
@@ -486,7 +446,6 @@ export default function WelcomeScreen({
     }
 
     if (!tableId || tableId === "DEFAULT") {
-      console.log("[WelcomeScreen][CTA] blocked: missing tableId", { tableId });
       setError("Table non identifiée. Re-scanner le QR code.");
       return;
     }
@@ -540,8 +499,6 @@ export default function WelcomeScreen({
         reservationTime: `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`,
       };
       
-      console.log("📤 [JOIN] Envoi réservation:", JSON.stringify(body, null, 2));
-      
       const requestHeaders = await deviceIdentity.getAuthHeaders({
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
@@ -556,10 +513,7 @@ export default function WelcomeScreen({
         },
       );
       
-      console.log("📥 [JOIN] Réponse reçue - Status:", response.status);
-      
       const text = await response.text();
-      console.log("📥 [JOIN] Réponse texte:", text);
       
       let data;
       try {
@@ -570,8 +524,6 @@ export default function WelcomeScreen({
         setLoading(false);
         return;
       }
-      
-      console.log("📥 [JOIN] Réponse JSON parsée:", data);
       
       if (!response.ok) {
         console.error("❌ [JOIN] Réponse non-OK:", response.status, data.message);
@@ -585,12 +537,8 @@ export default function WelcomeScreen({
         return;
       }
       
-      console.log("✅ [JOIN] Réponse OK reçue");
-      
       const reservationObj = data.reservation || data;
       const reservationId = reservationObj._id;
-      
-      console.log("✅ [JOIN] Reservation ID:", reservationId);
       
       if (!reservationId) {
         Alert.alert("Erreur", "Aucun ID de réservation retourné.");
@@ -607,14 +555,12 @@ export default function WelcomeScreen({
           secureSessionStore.keys.CLIENT_ID,
           String(effectiveClientId),
         );
-        console.log("🔐 [JOIN] clientId stable adopté:", effectiveClientId);
       }
       if (data.token) {
         await secureSessionStore.setString(
           secureSessionStore.keys.CLIENT_TOKEN,
           data.token,
         );
-        console.log("🔐 [JOIN] token réémis et stocké");
       }
       
       // ⭐ Stocker les infos importantes dans AsyncStorage
@@ -633,7 +579,6 @@ export default function WelcomeScreen({
 		);
       
       // ⭐ Appeler onJoin avec un objet (format attendu par App.jsx)
-      console.log("🎉 [JOIN] Succès! Appel onJoin callback");
       onJoin?.({
         reservationId: reservationId,
         clientId: effectiveClientId,
@@ -650,24 +595,19 @@ export default function WelcomeScreen({
   
   // 🎬 Animation de sortie complexe (Grillz uniquement)
   const handleExitAnimation = async () => {
-    console.log("🎬 [WelcomeScreen] Démarrage animation de sortie");
-    
     // Vérification avant animation
     if (!name.trim()) {
-      console.log("[WelcomeScreen][CTA] blocked(exit): empty name");
       setError("Veuillez entrer votre nom");
       return;
     }
 
     if (!tableId || tableId === "DEFAULT") {
-      console.log("[WelcomeScreen][CTA] blocked(exit): missing tableId", { tableId });
       setError("Table non identifiée. Re-scanner le QR code.");
       return;
     }
 
     // Si le client tape un code CMD dans le champ nom, ne pas l'utiliser comme pseudo
     if (isCmdCode(name)) {
-      console.log("[WelcomeScreen][CTA] branch(exit): name CMD lookup");
       const cmdCode = normalizeCmdCode(name);
       setPhone(cmdCode);
       orderLookup.setOrderNumber(cmdCode);
@@ -748,7 +688,6 @@ export default function WelcomeScreen({
       ]),
     ]).start(async () => {
       // Callback : Navigation à la fin de l'animation
-      console.log("✅ [Animation] Terminée, navigation vers MenuScreen");
       await handleContinueWithEmail();
     });
   };
@@ -1092,10 +1031,7 @@ export default function WelcomeScreen({
             
             {/* Bouton Rejoindre */}
             <TouchableOpacity
-              onPress={() => {
-                logPrimaryCtaPress("cucina", isNameLookupMode ? "lookup" : "start");
-                handleContinueWithEmail();
-              }}
+              onPress={handleContinueWithEmail}
               disabled={isNameLookupMode ? (!isNameLookupValid || orderLookup.loading) : (loading || !name.trim())}
               activeOpacity={0.8}
               style={{
@@ -1235,38 +1171,8 @@ export default function WelcomeScreen({
             />
           </Animated.View>
           
-          {/* Logo + Restaurant Name - Layout différent selon restaurant */}
-          {/* Phase 0.4-C.4 — Hash literal Grillz remplacé par isGrillz (dérivé styleKey).
-              NOTE: dead code path — Grillz return early L770, ce sous-arbre n'est
-              jamais atteint pour styleKey='grillz'. Cleanup décision Phase 0.6. */}
-          {isGrillz ? (
-            // 🔥 LE GRILLZ: Bienvenue en haut, Logo en bas, tout descendu
-            <View style={[styles.logoContainer, { marginTop: 180 }]}>
-              <Text style={[styles.welcomeText, { 
-                color: '#FF8A50',  // Orange feu BBQ
-                marginBottom: -30, 
-                fontSize: 28, 
-                letterSpacing: 6, 
-                textTransform: 'uppercase',
-                fontFamily: fontLoaded ? 'BogotaBold' : undefined,
-                // Ombre portée effet braise
-                textShadowColor: 'rgba(211, 84, 0, 0.8)',
-                textShadowOffset: { width: 0, height: 2 },
-                textShadowRadius: 8,
-                top: -95,  // Descendu de 15px (était -110)
-              }]}>
-                Bienvenue chez
-              </Text>
-              
-              <Image
-                source={RESTAURANT_CONFIG.logo}
-                style={[styles.logoImage, { width: 400, height: 400 }]}
-                resizeMode="contain"
-              />
-            </View>
-          ) : (
-            // 🏪 AUTRES RESTOS: Logo en haut, texte en bas
-            <View style={styles.logoContainer}>
+          {/* Logo + Restaurant Name */}
+          <View style={styles.logoContainer}>
               <Image
                 source={RESTAURANT_CONFIG.logo}
                 style={styles.logoImage}
@@ -1281,7 +1187,6 @@ export default function WelcomeScreen({
                 {restaurantName ? restaurantName.split(' ').join('\n') : "Restaurant"}
               </Text>
             </View>
-          )}
           
           {/* Slogan */}
           <Text style={[styles.slogan, { ...theme.typography.styles.body, color: theme.colors.text.secondary }]}>
@@ -1309,8 +1214,8 @@ export default function WelcomeScreen({
           {/* Google button carré */}
           <TouchableOpacity
             style={[styles.googleButtonSquare, { 
-              backgroundColor: isGrillz ? '#1E1E1E' : '#FFFFFF', 
-              borderColor: isGrillz ? '#D35400' : '#E0E0E0', 
+              backgroundColor: '#FFFFFF', 
+              borderColor: '#E0E0E0', 
               ...theme.shadows.soft 
             }]}
             activeOpacity={0.7}
@@ -1322,16 +1227,16 @@ export default function WelcomeScreen({
           <View style={[
             styles.inputContainerInline, 
             { 
-              backgroundColor: isGrillz ? '#1E1E1E' : '#FFFFFF', 
-              borderColor: isGrillz ? '#D35400' : '#E0E0E0',
+              backgroundColor: '#FFFFFF', 
+              borderColor: '#E0E0E0',
               marginRight: 62, // 50px (bouton) + 12px (gap)
             }
           ]}>
-            <Ionicons name="person-outline" size={20} color={isGrillz ? '#FF8A50' : '#888'} style={styles.inputIconMain} />
+            <Ionicons name="person-outline" size={20} color="#888" style={styles.inputIconMain} />
             <TextInput
-              style={[styles.textInputMain, isGrillz && { color: '#FFFFFF' }]}
+              style={styles.textInputMain}
               placeholder={isNameLookupMode ? "Code commande ex: #FA24" : "Votre nom"}
-              placeholderTextColor={isGrillz ? '#777' : '#AAA'}
+              placeholderTextColor="#AAA"
               value={name}
               onChangeText={handleNameChange}
               autoCapitalize={isNameLookupMode ? "characters" : "words"}
@@ -1348,88 +1253,19 @@ export default function WelcomeScreen({
           <Text style={[styles.errorText, { color: '#FF6B6B' }]}>{error}</Text>
         ) : null}
         
-        {/* 🔥 Input Téléphone - GRILLZ ONLY */}
-        {isGrillz && (
-          <View style={styles.inputRow}>
-            {/* Spacer pour aligner avec le bouton Google */}
-            <View style={[styles.googleButtonSquare, { opacity: 0 }]} />
-            
-            {/* Input Téléphone - réduit de 50px à droite */}
-            <View style={[
-              styles.inputContainerInline, 
-              { 
-                backgroundColor: '#1E1E1E', 
-                borderColor: '#D35400',
-                marginRight: 62, // 50px (bouton) + 12px (gap)
-              }
-            ]}>
-              <Ionicons name="call-outline" size={20} color="#FF8A50" style={styles.inputIconMain} />
-              <TextInput
-                style={[styles.textInputMain, { color: '#FFFFFF' }]}
-                placeholder="Votre téléphone"
-                placeholderTextColor="#777"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                autoCorrect={false}
-              />
-            </View>
-          </View>
-        )}
-        
         {/* Main CTA */}
-        {isGrillz ? (
-          <TouchableOpacity
-            onPress={() => {
-              logPrimaryCtaPress("default-grillz", "start");
-              handleContinueWithEmail();
-            }}
-            activeOpacity={0.8}
-            disabled={!name.trim()}
-            style={{ marginTop: 16 }}
-          >
-            <LinearGradient
-              colors={['#D35400', '#E67E22']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{
-                paddingVertical: 16,
-                borderRadius: 14,
-                alignItems: 'center',
-                opacity: name.trim() ? 1 : 0.5,
-                shadowColor: '#FF5722',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.4,
-                shadowRadius: 8,
-              }}
-            >
-              <Text style={{
-                color: '#FFFFFF',
-                fontSize: 17,
-                fontWeight: '700',
-                letterSpacing: 0.5,
-              }}>
-                Commençons ! 🔥
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.mainButton, { backgroundColor: theme.colors.secondary.main, ...theme.shadows.medium }]}
-            onPress={() => {
-              logPrimaryCtaPress("default", isNameLookupMode ? "lookup" : "start");
-              handleContinueWithEmail();
-            }}
-            activeOpacity={0.8}
-            disabled={isNameLookupMode ? (!isNameLookupValid || orderLookup.loading) : (!name.trim() || loading)}
-          >
-            <Text style={styles.mainButtonText}>
-              {isNameLookupMode
-                ? (orderLookup.loading ? "Recherche..." : "Récupérer une commande")
-                : "Commençons !"}
-            </Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={[styles.mainButton, { backgroundColor: theme.colors.secondary.main, ...theme.shadows.medium }]}
+          onPress={handleContinueWithEmail}
+          activeOpacity={0.8}
+          disabled={isNameLookupMode ? (!isNameLookupValid || orderLookup.loading) : (!name.trim() || loading)}
+        >
+          <Text style={styles.mainButtonText}>
+            {isNameLookupMode
+              ? (orderLookup.loading ? "Recherche..." : "Récupérer une commande")
+              : "Commençons !"}
+          </Text>
+        </TouchableOpacity>
       </Animated.View>
     </ContainerComponent>
   );
