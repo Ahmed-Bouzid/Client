@@ -135,20 +135,17 @@ function AppContent() {
 		userName,
 		init: initTable,
 		setUserName,
-		joinTable,
 	} = useClientTableStore();
 
 	const {
 		currentOrder,
 		allOrders,
 		activeOrderId,
-		hasActiveOrder,
 		init: initOrder,
 		resetOrder,
 		addToOrder,
 		updateOrderQuantity,
 		submitOrder: submitOrderToServer,
-		markAsPaid,
 		initCart,
 		clearCart,
 	} = useOrderStore();
@@ -439,11 +436,6 @@ function AppContent() {
 		addToOrder(item, userName);
 	};
 
-	// Handler pour mettre à jour la quantité (useOrderStore persiste automatiquement)
-	const handleUpdateQuantity = (item, quantity) => {
-		updateOrderQuantity(item, quantity);
-	};
-
 	// ── PARCOURS : soumet la commande au serveur (crée l'order en BDD) ──
 	// Appelé après validation du panier (MenuScreen) ou auto-submit fast-food (10s)
 	const submitOrder = async ({ redirectToTracking = true, showSuccessAlert = true } = {}) => {
@@ -491,7 +483,6 @@ function AppContent() {
 				status: "in_progress",
 				origin: "client",
 			};
-
 
 			// ⭐ ENVOYER TOUTES LES DONNÉES (submitOrder nettoie le panier persisté)
 			const createdOrder = await submitOrderToServer(orderData);
