@@ -389,8 +389,6 @@ export default function Payment({
 		config?.style,
 		isGrillzTheme ? "grillz" : config?.styleKey,
 	);
-	// 🔍 DEBUG — supprimer après vérification
-	console.log("[Payment] restaurantId:", restaurantId, "| isGrillzTheme:", isGrillzTheme, "| styleKey:", config?.styleKey);
 
 	// 🎨 Animation refs
 	const fadeAnim = useRef(new Animated.Value(0)).current;
