@@ -46,6 +46,7 @@ import { useOrderStore } from "../stores/useOrderStore";
 import { useRestaurantStore } from "../stores/useRestaurantStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { clientAuthService } from "shared-api/services/clientAuthService.js";
+import { API_CONFIG } from "shared-api/config/apiConfig.js";
 import OrderSummary from "./OrderSummary";
 import DietaryPreferences from "./DietaryPreferences";
 import AddOnFlow from "../components/menu/AddOnFlow";
@@ -320,6 +321,8 @@ export default function MenuScreen({
   const [showProductDetail, setShowProductDetail] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [detailQty, setDetailQty] = useState(1);
+  const [productOptions, setProductOptions] = useState([]);
+  const [selectedOptions, setSelectedOptions] = useState([]);
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -645,9 +648,10 @@ export default function MenuScreen({
   };
 
   // 🔥 GRILLZ: Fonction pour ouvrir la modale détail produit
-  const openProductDetail = (product) => {
+  const openProductDetail = async (product) => {
     setSelectedProduct(product);
     setDetailQty(currentOrder.find(o => o._id === product._id)?.quantity || 1);
+    setSelectedOptions([]);
     setShowProductDetail(true);
     
     // Reset animations
@@ -668,6 +672,24 @@ export default function MenuScreen({
         useNativeDriver: true,
       }),
     ]).start();
+
+    // Charger les options du produit depuis l'API
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/products/${product._id}/options`, {
+        headers: {
+          'Authorization': `Bearer ${await AsyncStorage.getItem('token')}`,
+        },
+      });
+      if (response.ok) {
+        const options = await response.json();
+        setProductOptions(Array.isArray(options) ? options : []);
+      } else {
+        setProductOptions([]);
+      }
+    } catch (error) {
+      console.error('Erreur chargement options:', error);
+      setProductOptions([]);
+    }
   };
   
   const closeProductDetail = () => {
@@ -685,19 +707,45 @@ export default function MenuScreen({
     ]).start(() => {
       setShowProductDetail(false);
       setSelectedProduct(null);
+      setProductOptions([]);
+      setSelectedOptions([]);
     });
+  };
+
+  const toggleOption = (optionId) => {
+    setSelectedOptions(prev => 
+      prev.includes(optionId) 
+        ? prev.filter(id => id !== optionId)
+        : [...prev, optionId]
+    );
   };
   
   const handleDetailAddToCart = () => {
     if (selectedProduct) {
+      // Calculer le prix total avec options
+      const optionsPrice = selectedOptions.reduce((sum, optId) => {
+        const opt = productOptions.find(o => o._id === optId);
+        return sum + (opt?.price || 0);
+      }, 0);
+
+      const productWithOptions = {
+        ...selectedProduct,
+        selectedOptions: selectedOptions.map(optId => {
+          const opt = productOptions.find(o => o._id === optId);
+          return { _id: opt._id, name: opt.name, price: opt.price };
+        }),
+        basePrice: selectedProduct.price,
+        totalPrice: selectedProduct.price + optionsPrice,
+      };
+
       const existing = currentOrder.find(o => o._id === selectedProduct._id);
       const targetQty = (existing?.quantity || 0) + detailQty;
       if (existing) {
-        updateOrderQuantity(selectedProduct, targetQty);
+        updateOrderQuantity(productWithOptions, targetQty);
       } else {
-        addToOrder(selectedProduct, userName);
+        addToOrder(productWithOptions, userName);
         if (detailQty > 1) {
-          updateOrderQuantity(selectedProduct, detailQty);
+          updateOrderQuantity(productWithOptions, detailQty);
         }
       }
       closeProductDetail();
@@ -2026,11 +2074,80 @@ export default function MenuScreen({
                 color: '#FF8A50',
                 fontSize: 28,
                 fontWeight: '800',
-                marginBottom: 30,
+                marginBottom: productOptions.length > 0 ? 20 : 30,
                 textAlign: 'center',
               }}>
                 {selectedProduct?.price?.toFixed(2) || '0.00'}€
               </Text>
+
+              {/* Options/Suppléments */}
+              {productOptions.length > 0 && (
+                <View style={{
+                  marginBottom: 24,
+                  paddingHorizontal: 16,
+                }}>
+                  <Text style={{
+                    color: '#FFFFFF',
+                    fontSize: 16,
+                    fontWeight: '600',
+                    marginBottom: 12,
+                  }}>
+                    Suppléments
+                  </Text>
+                  {productOptions.map(opt => {
+                    const isSelected = selectedOptions.includes(opt._id);
+                    return (
+                      <TouchableOpacity
+                        key={opt._id}
+                        onPress={() => toggleOption(opt._id)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingVertical: 10,
+                          paddingHorizontal: 12,
+                          backgroundColor: isSelected ? 'rgba(211, 84, 0, 0.2)' : 'rgba(255,255,255,0.05)',
+                          borderRadius: 10,
+                          marginBottom: 8,
+                          borderWidth: 1,
+                          borderColor: isSelected ? '#D35400' : 'rgba(255,255,255,0.1)',
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 6,
+                          borderWidth: 2,
+                          borderColor: isSelected ? '#D35400' : '#555',
+                          backgroundColor: isSelected ? '#D35400' : 'transparent',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: 12,
+                        }}>
+                          {isSelected && (
+                            <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                          )}
+                        </View>
+                        <Text style={{
+                          flex: 1,
+                          color: isSelected ? '#FFFFFF' : '#CCC',
+                          fontSize: 15,
+                          fontWeight: isSelected ? '600' : '400',
+                        }}>
+                          {opt.name}
+                        </Text>
+                        <Text style={{
+                          color: '#FF8A50',
+                          fontSize: 14,
+                          fontWeight: '600',
+                        }}>
+                          +{opt.price?.toFixed(2)}€
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
               
               {/* Quantity selector + Add to cart */}
               <View style={{
