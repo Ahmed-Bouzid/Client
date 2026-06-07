@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- * OrderScreen.jsx — ÉTAPE 3 : RÉCAPITULATIF COMMANDE & VALIDATION
+ * OrderS  creen.jsx — ÉTAPE 3 : RÉCAPITULATIF COMMANDE & VALIDATION
  * ═══════════════════════════════════════════════════════════════
  *
  * Parcours client :
@@ -34,7 +34,7 @@ import {
   Animated,
   PanResponder,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useRestaurantStore } from "../stores/useRestaurantStore";
 import { useReservationStatus } from "../hooks/useReservationStatus";
 import useThemeKey from "../hooks/useThemeKey";
@@ -47,6 +47,7 @@ import {
   getOrderFooterTokens,
 } from "../theme/defaultTheme";
 import { BAGHERA_PALETTE, BAGHERA_FONTS } from "../theme/bagheraTheme";
+import { useTranslation } from "../hooks/useTranslation";
 
 const { width } = Dimensions.get("window");
 const PANINI_IMAGE = require("../../assets/images/menu/image-fond/panini.png");
@@ -177,7 +178,7 @@ const SendNowSlider = ({ countdown, onConfirm, isBaghera = false }) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const confirmedRef = useRef(false);
   const palette = isBaghera
-    ? { track: BAGHERA_PALETTE.creamSoft, border: BAGHERA_PALETTE.sand, thumb: BAGHERA_PALETTE.ember, label: BAGHERA_PALETTE.smoke, hint: BAGHERA_PALETTE.ember }
+    ? { track: BAGHERA_PALETTE.white, border: BAGHERA_PALETTE.linen, thumb: BAGHERA_PALETTE.terracotta, label: BAGHERA_PALETTE.sage, hint: BAGHERA_PALETTE.terracotta }
     : { track: "#FFF7ED", border: "#FDBA74", thumb: "#F97316", label: "#9A6938", hint: "#C2410C" };
 
   const panResponder = useRef(
@@ -268,6 +269,7 @@ export default function OrderScreen({
   onAutoSubmit = () => {},  // 🍔 Fast-food: callback envoi BDD après 10s
   onReservationClosed = () => {},
 }) {
+  const { t } = useTranslation();
   // Stores
   const storeRestaurantId = useRestaurantStore((state) => state.id);
   const restaurantCategory = useRestaurantStore((state) => state.category);
@@ -294,47 +296,47 @@ export default function OrderScreen({
   const isBaghera = resolvedStyleKey === 'baghera';
   const orderContainerTokens = useMemo(
     () => isBaghera ? {
-      background: BAGHERA_PALETTE.cream,
-      emptyTextColor: BAGHERA_PALETTE.smoke,
+      background: BAGHERA_PALETTE.linen,
+      emptyTextColor: BAGHERA_PALETTE.sage,
     } : getOrderContainerTokens(resolvedStyleKey),
     [resolvedStyleKey, isBaghera],
   );
   const orderHeaderTokens = useMemo(
     () => isBaghera ? {
-      titleColor: BAGHERA_PALETTE.ink,
-      backIconColor: BAGHERA_PALETTE.ink,
+      titleColor: BAGHERA_PALETTE.espresso,
+      backIconColor: BAGHERA_PALETTE.espresso,
     } : getOrderHeaderTokens(resolvedStyleKey),
     [resolvedStyleKey, isBaghera],
   );
   const orderSummaryTokens = useMemo(
     () => isBaghera ? {
-      textColor: BAGHERA_PALETTE.ink,
-      dateColor: BAGHERA_PALETTE.smoke,
-      priceColor: BAGHERA_PALETTE.ember,
+      textColor: BAGHERA_PALETTE.espresso,
+      dateColor: BAGHERA_PALETTE.sage,
+      priceColor: BAGHERA_PALETTE.terracotta,
     } : getOrderSummaryTokens(resolvedStyleKey),
     [resolvedStyleKey, isBaghera],
   );
   const orderCardTokens = useMemo(
     () => isBaghera ? {
-      cardBackground: BAGHERA_PALETTE.creamSoft,
-      cardBorderOverride: { borderWidth: 1, borderColor: BAGHERA_PALETTE.sand },
-      productNameColor: BAGHERA_PALETTE.ink,
-      productPriceColor: BAGHERA_PALETTE.ember,
+      cardBackground: BAGHERA_PALETTE.white,
+      cardBorderOverride: { borderWidth: 1, borderColor: BAGHERA_PALETTE.linen },
+      productNameColor: BAGHERA_PALETTE.espresso,
+      productPriceColor: BAGHERA_PALETTE.terracotta,
     } : getOrderCardTokens(resolvedStyleKey),
     [resolvedStyleKey, isBaghera],
   );
   const orderFooterTokens = useMemo(
     () => isBaghera ? {
-      footerBackground: BAGHERA_PALETTE.cream,
-      payBtnBackground: BAGHERA_PALETTE.ember,
-      cancelBtnBorderColor: BAGHERA_PALETTE.sand,
-      cancelBtnTextColor: BAGHERA_PALETTE.smoke,
+      footerBackground: BAGHERA_PALETTE.linen,
+      payBtnBackground: BAGHERA_PALETTE.terracotta,
+      cancelBtnBorderColor: BAGHERA_PALETTE.linen,
+      cancelBtnTextColor: BAGHERA_PALETTE.sage,
     } : getOrderFooterTokens(resolvedStyleKey),
     [resolvedStyleKey, isBaghera],
   );
 
   // �🚪 Écouter fermeture réservation WebSocket
-  useReservationStatus(effectiveRestaurantId, reservationId, onReservationClosed);
+  useReservationStatus(effectiveRestaurantId, reservationId, onReservationClosed, tableId);
 
   // ═══════════════════════════════════════════════════════════════════════
   // 🍔 FAST-FOOD: Countdown 10s avant envoi BDD
@@ -426,43 +428,49 @@ export default function OrderScreen({
       {/* HEADER */}
       {isBaghera ? (
         <View style={{
-          paddingTop: Platform.OS === "ios" ? 60 : (StatusBar.currentHeight || 0) + 16,
-          paddingHorizontal: 16,
-          paddingBottom: 12,
+          backgroundColor: BAGHERA_PALETTE.linen,
+          paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 20,
+          paddingHorizontal: 22,
+          paddingBottom: 22,
+          flexDirection: 'row',
           alignItems: 'center',
-          position: 'relative',
+          justifyContent: 'space-between',
         }}>
-          <TouchableOpacity onPress={onBack} style={{ position: 'absolute', left: 12, top: Platform.OS === "ios" ? 56 : (StatusBar.currentHeight || 0) + 12, padding: 6 }}>
-            <MaterialIcons name="chevron-left" size={28} color={BAGHERA_PALETTE.ink} />
+          <TouchableOpacity
+            onPress={onBack}
+            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="chevron-back" size={24} color={BAGHERA_PALETTE.espresso} />
           </TouchableOpacity>
-          <View style={{ alignItems: 'center', position: 'relative' }}>
+          <View style={{ alignItems: 'center', flex: 1 }}>
             <Image
-              source={BAGHERA_LOGO}
-              style={{ position: 'absolute', width: 180, height: 90, opacity: 0.08, top: -8 }}
+              source={require("../../assets/baghera/baghera-logo.png")}
+              style={{ width: 120, height: 120 }}
               resizeMode="contain"
             />
-            <Text style={{
-              fontFamily: BAGHERA_FONTS.serif,
-              fontSize: 38,
-              color: BAGHERA_PALETTE.ink,
-              letterSpacing: -0.5,
-            }}>
-              Bag<Text style={{ color: BAGHERA_PALETTE.ember }}>h</Text>era<Text style={{ color: BAGHERA_PALETTE.ember }}>.</Text>
-            </Text>
-            <Text style={{
-              fontFamily: BAGHERA_FONTS.serifItalic,
-              fontSize: 14,
-              color: BAGHERA_PALETTE.smoke,
-              marginTop: 2,
-            }}>— votre commande</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+              <Text style={{
+                fontFamily: BAGHERA_FONTS.day,
+                fontSize: 36,
+                color: BAGHERA_PALETTE.sage,
+                letterSpacing: 0.5,
+              }}>{t("votre commande")}</Text>
+              <View style={{
+                width: 3, height: 3, borderRadius: 1.5,
+                backgroundColor: BAGHERA_PALETTE.terracotta,
+                marginLeft: 6, opacity: 0.8,
+              }} />
+            </View>
           </View>
+          <View style={{ width: 44 }} />
         </View>
       ) : (
         <View style={styles.header}>
           <TouchableOpacity onPress={onBack} style={styles.backBtn}>
             <MaterialIcons name="chevron-left" size={28} color={orderHeaderTokens.backIconColor} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: orderHeaderTokens.titleColor }]}>Ma commande en cours</Text>
+          <Text style={[styles.headerTitle, { color: orderHeaderTokens.titleColor }]}>{t("Ma commande en cours")}</Text>
         </View>
       )}
 
@@ -472,20 +480,20 @@ export default function OrderScreen({
           <Text style={[
             styles.summaryText,
             { color: orderSummaryTokens.textColor },
-            isBaghera && { fontFamily: BAGHERA_FONTS.sansItalic, fontSize: 14 },
+            isBaghera && { fontFamily: BAGHERA_FONTS.sans, fontSize: 14 },
           ]} numberOfLines={2}>
-            {summaryText || "Aucun article"}
+            {summaryText || t("Aucun article")}
           </Text>
           <Text style={[
             styles.summaryDate,
             { color: orderSummaryTokens.dateColor },
-            isBaghera && { fontFamily: BAGHERA_FONTS.sansItalic },
+            isBaghera && { fontFamily: BAGHERA_FONTS.sans },
           ]}>{dateText}</Text>
         </View>
         <Text style={[
           styles.summaryPrice,
           { color: orderSummaryTokens.priceColor },
-          isBaghera && { fontFamily: BAGHERA_FONTS.serifItalic, fontWeight: '400', fontSize: 24 },
+          isBaghera && { fontFamily: BAGHERA_FONTS.mono, fontWeight: '400', fontSize: 24 },
         ]}>{total.toFixed(2)}€</Text>
       </View>
 
@@ -510,7 +518,7 @@ export default function OrderScreen({
         {items.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialIcons name="check-circle" size={80} color="#4ECDC4" />
-            <Text style={[styles.emptyText, { color: orderContainerTokens.emptyTextColor }]}>Aucune commande</Text>
+            <Text style={[styles.emptyText, { color: orderContainerTokens.emptyTextColor }]}>{t("Aucune commande")}</Text>
           </View>
         ) : (
           items.map((item, index) => {
@@ -538,17 +546,17 @@ export default function OrderScreen({
                     <Text style={[
                       styles.productName,
                       { color: orderCardTokens.productNameColor },
-                      isBaghera && { fontFamily: BAGHERA_FONTS.serif, fontSize: 18, fontWeight: '400' },
+                      isBaghera && { fontFamily: BAGHERA_FONTS.black, fontSize: 18, fontWeight: '400' },
                     ]}>{item.name}</Text>
                     <Text style={[
                       styles.productPrice,
                       { color: orderCardTokens.productPriceColor },
-                      isBaghera && { fontFamily: BAGHERA_FONTS.serifItalic, fontSize: 18, fontWeight: '400' },
+                      isBaghera && { fontFamily: BAGHERA_FONTS.mono, fontSize: 18, fontWeight: '400' },
                     ]}>{itemPrice.toFixed(2)}€</Text>
                   </View>
                   <View style={[
                     styles.quantityBadge,
-                    isBaghera && { backgroundColor: BAGHERA_PALETTE.ember },
+                    isBaghera && { backgroundColor: BAGHERA_PALETTE.terracotta },
                   ]}>
                     <Text style={[
                       styles.quantityBadgeText,
@@ -594,7 +602,7 @@ export default function OrderScreen({
 
           <View style={styles.btnRow}>
             <TouchableOpacity style={styles.backButton} onPress={onBack} activeOpacity={0.9}>
-              <Text style={styles.backButtonText}>Retour au menu</Text>
+              <Text style={styles.backButtonText}>{t("Retour au menu")}</Text>
             </TouchableOpacity>
 
             {/* 🍔 Fast-food: cancel cliquable pendant 10s uniquement */}

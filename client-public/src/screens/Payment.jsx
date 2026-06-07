@@ -376,7 +376,7 @@ export default function Payment({
 	const storeRestaurantId = useRestaurantStore((state) => state.id);
 	const restaurantId = restaurantIdProp || storeRestaurantId;
 	const restaurantCategory = useRestaurantStore((state) => state.category);
-	useReservationStatus(restaurantId, reservationId, onReservationClosed);
+useReservationStatus(restaurantId, reservationId, onReservationClosed, tableId);
 
 	// 🍔 Fast-food / foodtruck : déterminer si paiement au comptoir est disponible
 	const isFastFood = restaurantCategory === "fast-food";
