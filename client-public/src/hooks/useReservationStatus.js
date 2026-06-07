@@ -98,5 +98,3 @@ export const useReservationStatus = (
 };
 
 export default useReservationStatus;
-
-export default useReservationStatus;
