@@ -393,6 +393,21 @@ export const connectSocket = (
 		notifyListeners("notification", payload);
 	});
 
+	// 🏪 Session table (fermeture via comptoir)
+	socket.on("table-session", (payload) => {
+		notifyListeners("table-session", payload);
+	});
+
+	// 💳 Paiement complété
+	socket.on("payment-completed", (payload) => {
+		notifyListeners("payment-completed", payload);
+	});
+
+	// 📋 Réservation mise à jour
+	socket.on("reservation", (payload) => {
+		notifyListeners("reservation", payload);
+	});
+
 	// Connecter immédiatement
 	socket.connect();
 
