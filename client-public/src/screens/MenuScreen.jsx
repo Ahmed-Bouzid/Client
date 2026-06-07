@@ -492,7 +492,7 @@ export default function MenuScreen({
       const orderResaId = data?.reservationId?._id?.toString() || data?.reservationId?.toString();
       const orderTableId = data?.tableId?._id?.toString() || data?.tableId?.toString();
       const matchesResa = reservationId && orderResaId === reservationId.toString();
-      const matchesTable = tableId && orderTableId === tableId.toString();
+      const matchesTable = tableId && orderTableId === orderTableId.toString();
       if (matchesResa || matchesTable) {
         useOrderStore.getState().fetchOrdersByReservation(reservationId, clientId);
       }
@@ -507,14 +507,40 @@ export default function MenuScreen({
       }
     };
 
+    // ✅ GAP #5 FIX : Écouter les changements de réservation (annulation, modification)
+    const handleReservationEvent = (payload) => {
+      const { type, data } = payload || {};
+      const resaId = data?._id?.toString() || data?.id?.toString();
+      
+      // Filtrer : uniquement notre réservation
+      if (!reservationId || resaId !== reservationId.toString()) return;
+      
+      // Si réservation annulée → notifier client et retour à l'écran précédent
+      if (type === "statusUpdated" && data.status === "cancelled") {
+        Alert.alert(
+          "Réservation annulée",
+          "Votre réservation a été annulée par le restaurant. Merci de contacter le restaurant pour plus d'informations.",
+          [{ text: "OK", onPress: () => onBack?.() }],
+          { cancelable: false }
+        );
+      }
+      
+      // Si réservation modifiée (table, heure, etc.) → refresh orders pour sync
+      if (type === "updated") {
+        useOrderStore.getState().fetchOrdersByReservation(reservationId, clientId);
+      }
+    };
+
     socketService.on("order", handleOrderEvent);
     socketService.on("table-session", handleTableSession);
+    socketService.on("reservation", handleReservationEvent); // ✅ AJOUTÉ
 
     return () => {
       socketService.off("order", handleOrderEvent);
       socketService.off("table-session", handleTableSession);
+      socketService.off("reservation", handleReservationEvent); // ✅ AJOUTÉ
     };
-  }, [reservationId, clientId, tableId]);
+  }, [reservationId, clientId, tableId, onBack]); // ✅ Ajout onBack dans les deps
   
   // Charger les produits - EXACTEMENT comme Menu.jsx
   // ── PARCOURS : charge le menu complet depuis l'API ──
