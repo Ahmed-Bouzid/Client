@@ -264,11 +264,11 @@ const PremiumPaymentItem = ({
 								>
 									{isOwnItem
 										? orderedBy
-											? `Vous · ${orderedBy}`
-											: "Vous"
+											? `${t("Vous")} · ${orderedBy}`
+											: t("Vous")
 										: orderedBy
-											? `Commandé par ${orderedBy}`
-											: "Commandé par un autre client"}
+											? `${t("Commandé par")} ${orderedBy}`
+											: t("Commandé par un autre client")}
 								</Text>
 							</View>
 						) : null}
@@ -376,7 +376,7 @@ export default function Payment({
 	const storeRestaurantId = useRestaurantStore((state) => state.id);
 	const restaurantId = restaurantIdProp || storeRestaurantId;
 	const restaurantCategory = useRestaurantStore((state) => state.category);
-useReservationStatus(restaurantId, reservationId, onReservationClosed, tableId);
+	useReservationStatus(restaurantId, reservationId, onReservationClosed);
 
 	// 🍔 Fast-food / foodtruck : déterminer si paiement au comptoir est disponible
 	const isFastFood = restaurantCategory === "fast-food";
@@ -952,17 +952,14 @@ useReservationStatus(restaurantId, reservationId, onReservationClosed, tableId);
 		);
 		const isFullPayment = remainingItems.length === 0;
 
-		// 5. Si paiement complet → Fermer la réservation ou la session comptoir
+		// 5. Si paiement complet → Fermer la réservation
 		let reservationClosed = false;
 		if (isFullPayment) {
-			console.log("[Payment] isFullPayment=true | reservationId:", reservationId, "| tableId:", tableId, "| restaurantId:", restaurantId);
 			if (reservationId) {
-				console.log("[Payment] → closeReservationOnServer (reservationId:", reservationId, ")");
 				const closureResult = await closeReservationOnServer().catch((error) => {
 					console.error("❌ Erreur fermeture réservation:", error);
 					return { success: false, message: error.message };
 				});
-				console.log("[Payment] closeReservationOnServer result:", JSON.stringify(closureResult));
 
 				if (closureResult && closureResult.success) {
 					reservationClosed = true;
@@ -972,33 +969,6 @@ useReservationStatus(restaurantId, reservationId, onReservationClosed, tableId);
 						t("Le paiement est effectué mais la fermeture de réservation a échoué. Veuillez contacter le serveur."),
 						[{ text: "OK" }],
 					);
-				}
-			} else if (tableId && restaurantId) {
-				// Pas de reservationId → fermer la session comptoir directement par tableId
-				console.log("[Payment] → close-by-table (tableId:", tableId, "restaurantId:", restaurantId, ")");
-				try {
-					const token = await clientAuthService.getClientToken();
-					console.log("[Payment] token disponible:", !!token);
-					const res = await fetch(
-						`${API_BASE_URL}/counter/sessions/close-by-table`,
-						{
-							method: "POST",
-							headers: {
-								"Content-Type": "application/json",
-								...(token ? { Authorization: `Bearer ${token}` } : {}),
-							},
-							body: JSON.stringify({ tableId, restaurantId }),
-						},
-					);
-					const resBody = await res.text();
-					console.log("[Payment] close-by-table HTTP", res.status, ":", resBody);
-					if (res.ok) {
-						reservationClosed = true;
-					} else {
-						console.warn("⚠️ close-by-table failed:", await res.text());
-					}
-				} catch (err) {
-					console.error("❌ Erreur fermeture session comptoir:", err);
 				}
 			}
 
@@ -1677,7 +1647,7 @@ useReservationStatus(restaurantId, reservationId, onReservationClosed, tableId);
 									/>
 									<Text style={[styles.quickSelectText, isBaghera && { fontFamily: BAGHERA_FONTS.sans }]}>
 										{selectedItems.size === availableItems.length
-											? "Tout désélectionner"
+											? t("Tout désélectionner")
 											: "100%"}
 									</Text>
 								</LinearGradient>
@@ -1702,7 +1672,7 @@ useReservationStatus(restaurantId, reservationId, onReservationClosed, tableId);
 							>
 								<MaterialIcons name="person" size={15} color={!payForWholeTable ? "#fff" : isGrillzTheme ? "#A1A1AA" : "#666"} />
 								<Text style={[styles.clientToggleText, !payForWholeTable && styles.clientToggleTextActive]}>
-									Mes articles
+									{t("Mes articles")}
 								</Text>
 							</TouchableOpacity>
 							<TouchableOpacity
@@ -1747,7 +1717,7 @@ useReservationStatus(restaurantId, reservationId, onReservationClosed, tableId);
 								isGrillzTheme && { color: "#F8FAFC" },
 								isBaghera && { color: BAGHERA_PALETTE.espresso, fontFamily: BAGHERA_FONTS.black, fontWeight: '400' },
 							]}>
-								Articles à payer ({availableItems.length})
+								{t("Articles à payer")} ({availableItems.length})
 							</Text>
 						</View>
 						{availableItems.length > 0 && (
@@ -1764,7 +1734,7 @@ useReservationStatus(restaurantId, reservationId, onReservationClosed, tableId);
 										color={isBaghera ? BAGHERA_PALETTE.terracotta : "#fff"}
 									/>
 									<Text style={[styles.selectAllText, isBaghera && { color: BAGHERA_PALETTE.terracotta, fontFamily: BAGHERA_FONTS.sans }]}>
-										{allSelected ? "Désélectionner" : "Tout sélectionner"}
+										{allSelected ? t("Désélectionner") : t("Tout sélectionner")}
 									</Text>
 								</LinearGradient>
 							</TouchableOpacity>
@@ -1896,8 +1866,7 @@ useReservationStatus(restaurantId, reservationId, onReservationClosed, tableId);
 									<View style={styles.totalTextContainer}>
 										<Text style={[styles.totalLabel, isBaghera && { fontFamily: BAGHERA_FONTS.sans }]}>{t("Total sélectionné")}</Text>
 										<Text style={[styles.totalCount, isBaghera && { fontFamily: BAGHERA_FONTS.sans }]}>
-											{selectedOrders.length} article
-											{selectedOrders.length > 1 ? "s" : ""}
+											{selectedOrders.length} {selectedOrders.length > 1 ? t("articles") : t("article")}
 										</Text>
 									</View>
 								</View>
@@ -1920,7 +1889,7 @@ useReservationStatus(restaurantId, reservationId, onReservationClosed, tableId);
 							<MaterialIcons name="info-outline" size={20} color={isBaghera ? BAGHERA_PALETTE.terracotta : "#4facfe"} />
 							<View style={styles.infoNoteText}>
 								<Text style={[styles.infoNoteTitle, isBaghera && { color: BAGHERA_PALETTE.espresso, fontFamily: BAGHERA_FONTS.sans }]}>
-									Les articles payés sont sauvegardés
+									{t("Les articles payés sont sauvegardés")}
 								</Text>
 								<Text style={[styles.infoNoteSubtext, isBaghera && { color: BAGHERA_PALETTE.sage, fontFamily: BAGHERA_FONTS.sans }]}>
 									{paidItems.size > 0
@@ -1980,9 +1949,8 @@ useReservationStatus(restaurantId, reservationId, onReservationClosed, tableId);
 										<>
 											<MaterialIcons name="payment" size={24} color="#fff" />
 											<Text style={[styles.payButtonText, isBaghera && { fontFamily: BAGHERA_FONTS.sans }]}>
-												Payer {selectedOrders.length} article
-												{selectedOrders.length > 1 ? "s" : ""}
-												{reservationStatus.canClose ? " et fermer" : ""}
+												{t("Payer")} {selectedOrders.length} {selectedOrders.length > 1 ? t("articles") : t("article")}
+												{reservationStatus.canClose ? ` ${t("et fermer")}` : ""}
 											</Text>
 										</>
 									)}

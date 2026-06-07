@@ -22,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import GRILLZ_COLORS, { GRILLZ_PREMIUM } from "../theme/grillzColors"; // 🔥 Design Grillz personnalisé
 import clientFeedbackService from "../services/clientFeedbackService"; // 🌟 API Service
+import { useTranslation } from "../hooks/useTranslation";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -50,9 +51,9 @@ export default function FeedbackScreen({
 }) {
 	// 📱 États du questionnaire
 	const [answers, setAnswers] = useState({
-		serviceRating: null, // "Le service à table vous a-t-il satisfait ?"
-		foodQuality: null, // "Vos plats étaient-ils à votre goût ?"
-		venueExperience: null, // "Le lieu vous a-t-il plu ?"
+		serviceRating: null, // t("Le service à table vous a-t-il satisfait ?")
+		foodQuality: null, // t("Vos plats étaient-ils à votre goût ?")
+		venueExperience: null, // t("Le lieu vous a-t-il plu ?")
 	});
 
 	// 💭 Commentaire libre
@@ -62,6 +63,7 @@ export default function FeedbackScreen({
 	const [currentStep, setCurrentStep] = useState("questions"); // questions | feedback | success
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [showCopiedAlert, setShowCopiedAlert] = useState(false);
+	const { t } = useTranslation();
 
 	// 🎨 Animations
 	const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -123,8 +125,8 @@ export default function FeedbackScreen({
 		);
 		if (!allAnswered) {
 			Alert.alert(
-				"Questions incomplètes",
-				"Veuillez répondre à toutes les questions pour continuer.",
+				t("Questions incomplètes"),
+				t("Veuillez répondre à toutes les questions pour continuer."),
 			);
 			return;
 		}
@@ -205,8 +207,8 @@ export default function FeedbackScreen({
 				);
 				setCurrentStep("success");
 				Alert.alert(
-					"Information",
-					"Certaines données sont incomplètes, mais vous pouvez continuer vers Google.",
+					t("Information"),
+					t("Certaines données sont incomplètes, mais vous pouvez continuer vers Google."),
 				);
 				setIsSubmitting(false);
 				return;
@@ -223,8 +225,8 @@ export default function FeedbackScreen({
 			// Même en cas d'erreur complète, on continue vers Google
 			setCurrentStep("success");
 			Alert.alert(
-				"Information",
-				"Une erreur technique s'est produite, mais vous pouvez toujours laisser votre avis sur Google.",
+				t("Information"),
+				t("Une erreur technique s'est produite, mais vous pouvez toujours laisser votre avis sur Google."),
 			);
 		} finally {
 			setIsSubmitting(false);
@@ -250,7 +252,7 @@ export default function FeedbackScreen({
 			// ✅ SÉCURITÉ: Vérifier que nous avons des données valides
 			if (!placeId && !googleUrl) {
 				console.error("❌ Données Google manquantes");
-				Alert.alert("Erreur", "Informations Google manquantes");
+				Alert.alert(t("Erreur"), t("Informations Google manquantes"));
 				return;
 			}
 
@@ -264,7 +266,7 @@ export default function FeedbackScreen({
 					!googleUrl.startsWith("https://search.google.com")
 				) {
 					console.error("❌ URL Google invalide:", googleUrl);
-					Alert.alert("Erreur", "URL de redirection invalide");
+					Alert.alert(t("Erreur"), t("URL de redirection invalide"));
 					return;
 				}
 				finalUrl = googleUrl;
@@ -272,7 +274,7 @@ export default function FeedbackScreen({
 				// ✅ SÉCURITÉ: Valider le format du place_id
 				if (placeId === "YOUR_PLACE_ID" || placeId.length < 10) {
 					console.error("❌ Place ID invalide:", placeId);
-					Alert.alert("Erreur", "ID Google Places invalide");
+					Alert.alert(t("Erreur"), t("ID Google Places invalide"));
 					return;
 				}
 				// ✅ SÉCURITÉ: Encoder l'ID pour éviter l'injection
@@ -293,7 +295,7 @@ export default function FeedbackScreen({
 			// ✅ SÉCURITÉ: Vérifier que l'URL peut être ouverte
 			const canOpen = await Linking.canOpenURL(finalUrl);
 			if (!canOpen) {
-				Alert.alert("Erreur", "Impossible d'ouvrir le lien Google");
+				Alert.alert("Erreur", t("Impossible d'ouvrir le lien Google"));
 				return;
 			}
 
@@ -310,7 +312,7 @@ export default function FeedbackScreen({
 			console.error("❌ Erreur redirection Google:", error);
 			Alert.alert(
 				"Erreur",
-				"Impossible d'ouvrir le lien Google. Veuillez rechercher notre restaurant manuellement.",
+				t("Impossible d'ouvrir le lien Google. Veuillez rechercher notre restaurant manuellement."),
 			);
 		}
 	};
@@ -385,17 +387,17 @@ export default function FeedbackScreen({
 
 		return (
 			<View style={styles.questionsContainer}>
-				<Text style={styles.title}>Votre avis nous intéresse ! 🌟</Text>
+				<Text style={styles.title}>{t("Votre avis nous intéresse ! 🌟")}</Text>
 				<Text style={styles.subtitle}>
-					Aidez-nous à améliorer votre expérience
+					{t("Aidez-nous à améliorer votre expérience")}
 				</Text>
 
 				{questions.map((question, index) => (
 					<View key={question.key} style={styles.questionBlock}>
-						<Text style={styles.questionText}>{question.text}</Text>
+						<Text style={styles.questionText}>{t(question.text)}</Text>
 						<View style={styles.answersRow}>
-							{renderYesNoButton(question.key, true, "Oui")}
-							{renderYesNoButton(question.key, false, "Non")}
+							{renderYesNoButton(question.key, true, t("Oui"))}
+							{renderYesNoButton(question.key, false, t("Non"))}
 						</View>
 					</View>
 				))}
@@ -417,7 +419,7 @@ export default function FeedbackScreen({
 						}
 						style={styles.nextButtonGradient}
 					>
-						<Text style={styles.nextButtonText}>Suivant</Text>
+						<Text style={styles.nextButtonText}>{t("Suivant")}</Text>
 						<Ionicons
 							name="arrow-forward"
 							size={20}
@@ -443,19 +445,19 @@ export default function FeedbackScreen({
 			>
 				<View style={styles.feedbackContainer}>
 					<Text style={styles.title}>
-						{fulllySatisfied ? "Fantastique ! 🎉" : "Merci pour vos réponses !"}
+						{fulllySatisfied ? t("Fantastique ! 🎉") : t("Merci pour vos réponses !")}
 					</Text>
 
 					<Text style={styles.feedbackMessage}>
 						{fulllySatisfied
-							? "Votre retour positif nous fait très plaisir ! Votre commentaire peut être directement utilisé pour partager votre expérience sur Google."
-							: "Votre feedback nous aide à nous améliorer. Vous pouvez partager vos suggestions ici, et laisser un avis public sur Google si vous le souhaitez."}
+							? t("Votre retour positif nous fait très plaisir ! Votre commentaire peut être directement utilisé pour partager votre expérience sur Google.")
+							: t("Votre feedback nous aide à nous améliorer. Vous pouvez partager vos suggestions ici, et laisser un avis public sur Google si vous le souhaitez.")}
 					</Text>
 
 					<Text style={styles.inputLabel}>
 						{fulllySatisfied
-							? "Partagez votre expérience (optionnel) :"
-							: "Suggestions ou remarques (optionnel) :"}
+							? t("Partagez votre expérience (optionnel) :")
+							: t("Suggestions ou remarques (optionnel) :")}
 					</Text>
 
 					<TextInput
@@ -464,8 +466,8 @@ export default function FeedbackScreen({
 						numberOfLines={4}
 						placeholder={
 							fulllySatisfied
-								? "Décrivez ce qui vous a plu..."
-								: "Qu'est-ce qui pourrait être amélioré ?"
+								? t("Décrivez ce qui vous a plu...")
+								: t("Qu'est-ce qui pourrait être amélioré ?")
 						}
 						placeholderTextColor="#999"
 						value={comment}
@@ -474,7 +476,7 @@ export default function FeedbackScreen({
 					/>
 
 					<Text style={styles.characterCount}>
-						{comment.length}/500 caractères
+						{comment.length}{t("/500 caractères")}
 					</Text>
 
 					<View style={styles.finalButtons}>
@@ -493,8 +495,8 @@ export default function FeedbackScreen({
 									<>
 										<Text style={styles.submitButtonText}>
 											{fulllySatisfied
-												? "Continuer vers Google"
-												: "Envoyer & Google"}
+												? t("Continuer vers Google")
+												: t("Envoyer & Google")}
 										</Text>
 										<Ionicons name="arrow-forward" size={20} color="#fff" />
 									</>
@@ -506,7 +508,7 @@ export default function FeedbackScreen({
 							style={styles.skipButton}
 							onPress={handleClose}
 						>
-							<Text style={styles.skipButtonText}>Annuler</Text>
+							<Text style={styles.skipButtonText}>{t("Annuler")}</Text>
 						</TouchableOpacity>
 					</View>
 				</View>
@@ -535,19 +537,19 @@ export default function FeedbackScreen({
 
 				<Text style={styles.successTitle}>
 					{fulllySatisfied
-						? "Merci infiniment ! 💖"
-						: "Merci pour vos retours ! 🙏"}
+						? t("Merci infiniment ! 💖")
+						: t("Merci pour vos retours ! 🙏")}
 				</Text>
 
 				<Text style={styles.successMessage}>
 					{fulllySatisfied
-						? "Votre satisfaction est notre plus belle récompense. Partagez votre expérience sur Google !"
-						: "Vos suggestions nous aideront à nous améliorer. N'hésitez pas à laisser un avis sur Google."}
+						? t("Votre satisfaction est notre plus belle récompense. Partagez votre expérience sur Google !")
+						: t("Vos suggestions nous aideront à nous améliorer. N'hésitez pas à laisser un avis sur Google.")}
 				</Text>
 
 				{fulllySatisfied && comment.trim() && (
 					<View style={styles.copySection}>
-						<Text style={styles.copyLabel}>Votre commentaire :</Text>
+						<Text style={styles.copyLabel}>{t("Votre commentaire :")}</Text>
 						<View style={styles.commentPreview}>
 							<Text style={styles.commentPreviewText}>"{comment.trim()}"</Text>
 						</View>
@@ -557,12 +559,12 @@ export default function FeedbackScreen({
 							onPress={handleCopyComment}
 						>
 							<Ionicons name="copy-outline" size={20} color="#667eea" />
-							<Text style={styles.copyButtonText}>Copier le texte</Text>
+							<Text style={styles.copyButtonText}>{t("Copier le texte")}</Text>
 						</TouchableOpacity>
 
 						{showCopiedAlert && (
 							<Animated.View style={styles.copiedAlert}>
-								<Text style={styles.copiedAlertText}>✅ Copié !</Text>
+								<Text style={styles.copiedAlertText}>{t("✅ Copié !")}</Text>
 							</Animated.View>
 						)}
 					</View>
@@ -578,12 +580,12 @@ export default function FeedbackScreen({
 							style={styles.googleButtonGradient}
 						>
 							<Ionicons name="logo-google" size={20} color="#fff" />
-							<Text style={styles.googleButtonText}>Avis Google</Text>
+							<Text style={styles.googleButtonText}>{t("Avis Google")}</Text>
 						</LinearGradient>
 					</TouchableOpacity>
 
 					<TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-						<Text style={styles.closeButtonText}>Fermer</Text>
+						<Text style={styles.closeButtonText}>{t("Fermer")}</Text>
 					</TouchableOpacity>
 				</View>
 			</View>

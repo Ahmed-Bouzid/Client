@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useStripe } from "@stripe/stripe-react-native";
 import stripeService from "../services/stripeService";
 import ReceiptTicket from "../components/ReceiptTicket";
+import { useTranslation } from "../hooks/useTranslation";
 
 /**
  * PaymentScreen - Écran de paiement client avec Stripe
@@ -33,7 +34,9 @@ import ReceiptTicket from "../components/ReceiptTicket";
 
 // 🎨 Thème BBQ
 
-export default function PaymentScreen({ orderId, onSuccess, onBack }) {
+export default function PaymentScreen({
+ orderId, onSuccess, onBack }) {
+	const { t } = useTranslation();
 	const [loading, setLoading] = useState(false);
 	const [order, setOrder] = useState(null);
 	const [tipPercentage, setTipPercentage] = useState(0);
@@ -322,16 +325,16 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 				<TouchableOpacity onPress={onBack}>
 					<Ionicons name="close" size={28} color="#333" />
 				</TouchableOpacity>
-				<Text style={styles.headerTitle}>Paiement</Text>
+				<Text style={styles.headerTitle}>{t("Paiement")}</Text>
 				<View style={{ width: 28 }} />
 			</View>
 
 			<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 				{/* Résumé de la commande */}
 				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Résumé</Text>
+					<Text style={styles.sectionTitle}>{t("Résumé")}</Text>
 					<View style={styles.summaryRow}>
-						<Text style={styles.summaryLabel}>Commande</Text>
+						<Text style={styles.summaryLabel}>{t("Commande")}</Text>
 						<Text style={styles.summaryValue}>
 							{stripeService.formatAmount(orderCents)}
 						</Text>
@@ -339,7 +342,7 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 
 					{/* Sélection du pourboire */}
 					<View style={styles.tipSection}>
-						<Text style={styles.tipLabel}>Pourboire</Text>
+						<Text style={styles.tipLabel}>{t("Pourboire")}</Text>
 						<View style={styles.tipButtons}>
 							{[0, 5, 10, 15, 20].map((percent) => (
 								<TouchableOpacity
@@ -370,7 +373,7 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 
 					{/* Total */}
 					<View style={[styles.summaryRow, styles.totalRow]}>
-						<Text style={styles.totalLabel}>Total</Text>
+						<Text style={styles.totalLabel}>{t("Total")}</Text>
 						<Text style={styles.totalValue}>
 							{stripeService.formatAmount(totalCents)}
 						</Text>
@@ -379,7 +382,7 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 
 				{/* Méthodes de paiement */}
 				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Méthode de paiement</Text>
+					<Text style={styles.sectionTitle}>{t("Méthode de paiement")}</Text>
 
 					{/* Apple Pay (prioritaire si disponible) */}
 					{applePayAvailable && (
@@ -390,7 +393,7 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 						>
 							<View style={styles.paymentButtonContent}>
 								<Ionicons name="logo-apple" size={24} color="#000" />
-								<Text style={styles.paymentButtonText}>Apple Pay</Text>
+								<Text style={styles.paymentButtonText}>{t("Apple Pay")}</Text>
 							</View>
 							<Ionicons name="chevron-forward" size={20} color="#999" />
 						</TouchableOpacity>
@@ -404,7 +407,7 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 					>
 						<View style={styles.paymentButtonContent}>
 							<Ionicons name="card" size={24} color="#4A90E2" />
-							<Text style={styles.paymentButtonText}>Carte bancaire</Text>
+							<Text style={styles.paymentButtonText}>{t("Carte bancaire")}</Text>
 						</View>
 						<Ionicons name="chevron-forward" size={20} color="#999" />
 					</TouchableOpacity>
@@ -430,7 +433,7 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 				{/* Infos de sécurité */}
 				<View style={styles.securityInfo}>
 					<Ionicons name="lock-closed" size={16} color="#999" />
-					<Text style={styles.securityText}>Paiement sécurisé par Stripe</Text>
+					<Text style={styles.securityText}>{t("Paiement sécurisé par Stripe")}</Text>
 				</View>
 			</ScrollView>
 
@@ -438,7 +441,7 @@ export default function PaymentScreen({ orderId, onSuccess, onBack }) {
 			{loading && (
 				<View style={styles.loadingOverlay}>
 					<ActivityIndicator size="large" color="#4A90E2" />
-					<Text style={styles.loadingText}>Traitement en cours...</Text>
+					<Text style={styles.loadingText}>{t("Traitement en cours...")}</Text>
 				</View>
 			)}
 

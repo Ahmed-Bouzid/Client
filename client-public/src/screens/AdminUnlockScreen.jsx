@@ -14,10 +14,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
 import { API_BASE_URL } from "../config/api";
+import { useTranslation } from "../hooks/useTranslation";
 
 const ADMIN_UNLOCK_TOKEN_KEY = "admin_unlock_token";
 
-export default function AdminUnlockScreen({ onUnlock }) {
+export default function AdminUnlockScreen({
+ onUnlock }) {
+	const { t } = useTranslation();
 	const [password, setPassword] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [showPassword, setShowPassword] = useState(false);
@@ -200,14 +203,14 @@ export default function AdminUnlockScreen({ onUnlock }) {
 			<View style={styles.content}>
 				<Ionicons name="lock-closed" size={64} color="#333" style={styles.icon} />
 
-				<Text style={styles.title}>Accès Admin</Text>
-				<Text style={styles.subtitle}>Entrez le mot de passe pour continuer</Text>
+				<Text style={styles.title}>{t("Accès Admin")}</Text>
+				<Text style={styles.subtitle}>{t("Entrez le mot de passe pour continuer")}</Text>
 				{!!biometricReason && <Text style={styles.biometricHint}>{biometricReason}</Text>}
 
 				<View style={styles.inputWrapper}>
 					<TextInput
 						style={styles.input}
-						placeholder="Mot de passe"
+						placeholder={t("Mot de passe")}
 						secureTextEntry={!showPassword}
 						value={password}
 						onChangeText={setPassword}

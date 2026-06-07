@@ -595,7 +595,7 @@ export default function OrderScreen({
                 styles.payBtnText,
                 isBaghera && { fontFamily: BAGHERA_FONTS.sans, fontWeight: '600', letterSpacing: 0.3 },
               ]}>
-                {`Payer maintenant • ${total.toFixed(2)}€`}
+                {`${t("Payer maintenant")} • ${total.toFixed(2)}€`}
               </Text>
             </TouchableOpacity>
           )}
@@ -624,10 +624,10 @@ export default function OrderScreen({
                 (pendingOrder && !canCancel) && styles.cancelBtnTextDisabled,
               ]}>
                 {canCancel
-                  ? `Annuler`
+                  ? t("Annuler")
                   : pendingOrder
-                    ? "Commande envoyée ✓"
-                    : "Annuler la commande"}
+                    ? t("Commande envoyée ✓")
+                    : t("Annuler la commande")}
               </Text>
             </TouchableOpacity>
           </View>

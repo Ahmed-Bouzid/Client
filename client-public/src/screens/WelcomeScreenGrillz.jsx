@@ -24,6 +24,7 @@
  */
 
 import React from "react";
+import { useTranslation } from "../hooks/useTranslation";
 import {
   View,
   Text,
@@ -97,6 +98,7 @@ export default function WelcomeScreenGrillz({
   // === STYLES ===
   styles,
 }) {
+  const { t } = useTranslation();
   // Phase 0.4-C.2 — Assets Grillz via NEW API restaurantAssets (getRestaurantAssetsByStyleKey).
   // Source unique de vérité, indexée par styleKey. Suppression de la prop
   // restaurantConfig héritée de la copie 1-pour-1 0.4-C.1.
@@ -225,7 +227,7 @@ export default function WelcomeScreenGrillz({
             <View style={styles.resumeSessionContent}>
               <Ionicons name="refresh" size={28} color="#F87171" />
               <View style={styles.resumeSessionText}>
-                <Text style={styles.resumeSessionTitle}>Session en cours</Text>
+                <Text style={styles.resumeSessionTitle}>{t("Session en cours")}</Text>
                 <Text style={styles.resumeSessionSubtitle}>
                   Reprendre la commande de{" "}
                   <Text style={{ fontWeight: "700" }}>{existingSession.clientName}</Text> ?
@@ -238,14 +240,14 @@ export default function WelcomeScreenGrillz({
                 onPress={handleResumeSession}
                 activeOpacity={0.8}
               >
-                <Text style={styles.resumeBtnText}>Reprendre</Text>
+                <Text style={styles.resumeBtnText}>{t("Reprendre")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.resumeBtnSecondary}
                 onPress={handleNewSession}
                 activeOpacity={0.8}
               >
-                <Text style={styles.resumeBtnSecondaryText}>Nouvelle session</Text>
+                <Text style={styles.resumeBtnSecondaryText}>{t("Nouvelle session")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -528,7 +530,7 @@ export default function WelcomeScreenGrillz({
             <Ionicons name="person-outline" size={20} color="#FF8A50" style={styles.inputIconMain} />
             <TextInput
               style={[styles.textInputMain, { color: '#FFFFFF', backgroundColor: 'transparent' }]}
-              placeholder="Votre nom"
+              placeholder={t("Votre nom")}
               placeholderTextColor="#777"
               value={name}
               onChangeText={setName}

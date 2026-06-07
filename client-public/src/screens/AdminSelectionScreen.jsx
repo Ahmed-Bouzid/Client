@@ -15,8 +15,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config/api";
+import { useTranslation } from "../hooks/useTranslation";
 
-export default function AdminSelectionScreen({ onConnect, onTableSelected, adminToken }) {
+export default function AdminSelectionScreen({
+ onConnect, onTableSelected, adminToken }) {
+	const { t } = useTranslation();
 	const [restaurants, setRestaurants] = useState([]);
 	const [selectedRestaurant, setSelectedRestaurant] = useState(null);
 	const [tables, setTables] = useState([]);
@@ -213,7 +216,7 @@ export default function AdminSelectionScreen({ onConnect, onTableSelected, admin
 		return (
 			<View style={styles.centerContainer}>
 				<ActivityIndicator size="large" color="#333" />
-				<Text style={styles.loadingText}>Chargement...</Text>
+				<Text style={styles.loadingText}>{t("Chargement...")}</Text>
 			</View>
 		);
 	}
@@ -223,16 +226,16 @@ export default function AdminSelectionScreen({ onConnect, onTableSelected, admin
 			<ScrollView style={styles.container} contentContainerStyle={styles.content}>
 			<View style={styles.header}>
 				<Ionicons name="restaurant" size={48} color="#333" />
-				<Text style={styles.title}>Sélectionner le Restaurant</Text>
-				<Text style={styles.subtitle}>et la Table</Text>
+				<Text style={styles.title}>{t("Sélectionner le Restaurant")}</Text>
+				<Text style={styles.subtitle}>{t("et la Table")}</Text>
 			</View>
 
 			{/* Section Restaurants */}
 			<View style={styles.section}>
-				<Text style={styles.sectionTitle}>Restaurants</Text>
+				<Text style={styles.sectionTitle}>{t("Restaurants")}</Text>
 				<View style={styles.itemsContainer}>
 					{restaurants.length === 0 ? (
-						<Text style={styles.noDataText}>Aucun restaurant disponible</Text>
+						<Text style={styles.noDataText}>{t("Aucun restaurant disponible")}</Text>
 					) : (
 						restaurants.map((restaurant) => (
 							<TouchableOpacity
@@ -269,16 +272,16 @@ export default function AdminSelectionScreen({ onConnect, onTableSelected, admin
 			{/* Section Tables (visible si restaurant sélectionné) */}
 			{selectedRestaurant && (
 				<View style={styles.section}>
-					<Text style={styles.sectionTitle}>Tables</Text>
+					<Text style={styles.sectionTitle}>{t("Tables")}</Text>
 					{loadingTables ? (
 						<View style={styles.centerContainer}>
 							<ActivityIndicator size="small" color="#333" />
-							<Text style={styles.loadingText}>Chargement des tables...</Text>
+							<Text style={styles.loadingText}>{t("Chargement des tables...")}</Text>
 						</View>
 					) : (
 						<View style={styles.itemsContainer}>
 							{tables.length === 0 ? (
-								<Text style={styles.noDataText}>Aucune table disponible</Text>
+								<Text style={styles.noDataText}>{t("Aucune table disponible")}</Text>
 							) : (
 								tables.map((table) => (
 									<View key={table._id} style={styles.tableItem}>
@@ -334,16 +337,16 @@ export default function AdminSelectionScreen({ onConnect, onTableSelected, admin
 						{Platform.OS === "web" && (
 							<TouchableOpacity style={styles.button} onPress={handleDownloadQR}>
 								<Ionicons name="download" size={18} color="#fff" style={styles.buttonIcon} />
-								<Text style={styles.buttonText}>Télécharger</Text>
+								<Text style={styles.buttonText}>{t("Télécharger")}</Text>
 							</TouchableOpacity>
 						)}
 						<TouchableOpacity style={styles.button} onPress={handleShareQR}>
 							<Ionicons name="share-social" size={18} color="#fff" style={styles.buttonIcon} />
-							<Text style={styles.buttonText}>Partager</Text>
+							<Text style={styles.buttonText}>{t("Partager")}</Text>
 						</TouchableOpacity>
 						<TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={handleCopyLink}>
 							<Ionicons name="copy" size={18} color="#333" style={styles.buttonIcon} />
-							<Text style={[styles.buttonText, styles.secondaryButtonText]}>Copier lien</Text>
+							<Text style={[styles.buttonText, styles.secondaryButtonText]}>{t("Copier lien")}</Text>
 						</TouchableOpacity>
 					</View>
 				</View>
@@ -360,7 +363,7 @@ export default function AdminSelectionScreen({ onConnect, onTableSelected, admin
 			<View style={styles.modalContainer}>
 				<View style={styles.modalContent}>
 					<View style={styles.modalHeader}>
-						<Text style={styles.modalTitle}>Accès à la Table</Text>
+						<Text style={styles.modalTitle}>{t("Accès à la Table")}</Text>
 						<TouchableOpacity onPress={() => setShowTableModal(false)}>
 							<Ionicons name="close-circle" size={28} color="#333" />
 						</TouchableOpacity>
@@ -408,7 +411,7 @@ export default function AdminSelectionScreen({ onConnect, onTableSelected, admin
 							}}
 						>
 							<Ionicons name="open-outline" size={18} color="#fff" style={styles.buttonIcon} />
-							<Text style={styles.buttonText}>Ouvrir</Text>
+							<Text style={styles.buttonText}>{t("Ouvrir")}</Text>
 						</TouchableOpacity>
 					</View>
 				</View>

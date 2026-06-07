@@ -30,6 +30,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import useThemeStore from "../stores/useThemeStore";
+import { useTranslation } from "../hooks/useTranslation";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎨 THEME PRESETS
@@ -83,7 +84,9 @@ const COLORS = {
 // 📦 COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
-export default function ThemeEditorScreen({ restaurantId, onBack, onSave }) {
+export default function ThemeEditorScreen({
+ restaurantId, onBack, onSave }) {
+	const { t } = useTranslation();
   // ─────────────────────────────────────────────────────────────────────────
   // STATE
   // ─────────────────────────────────────────────────────────────────────────
@@ -223,7 +226,7 @@ export default function ThemeEditorScreen({ restaurantId, onBack, onSave }) {
 
   const renderLivePreview = () => (
     <View style={styles.previewSection}>
-      <Text style={styles.sectionTitle}>Aperçu en direct</Text>
+      <Text style={styles.sectionTitle}>{t("Aperçu en direct")}</Text>
 
       {/* Banner Preview */}
       <LinearGradient
@@ -274,7 +277,7 @@ export default function ThemeEditorScreen({ restaurantId, onBack, onSave }) {
         activeOpacity={0.7}
       >
         <Ionicons name="color-palette-outline" size={20} color={COLORS.text} />
-        <Text style={styles.customizeButtonText}>Personnaliser les couleurs</Text>
+        <Text style={styles.customizeButtonText}>{t("Personnaliser les couleurs")}</Text>
       </TouchableOpacity>
 
       {/* Save Button */}
@@ -295,7 +298,7 @@ export default function ThemeEditorScreen({ restaurantId, onBack, onSave }) {
           ) : (
             <>
               <Ionicons name="checkmark" size={22} color="#FFFFFF" />
-              <Text style={styles.saveButtonText}>Enregistrer</Text>
+              <Text style={styles.saveButtonText}>{t("Enregistrer")}</Text>
             </>
           )}
         </LinearGradient>
@@ -320,7 +323,7 @@ export default function ThemeEditorScreen({ restaurantId, onBack, onSave }) {
       >
         {/* Theme Selection Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Choisir un thème</Text>
+          <Text style={styles.sectionTitle}>{t("Choisir un thème")}</Text>
           <View style={styles.themesRow}>
             {THEME_PRESETS.map(renderThemeCard)}
           </View>

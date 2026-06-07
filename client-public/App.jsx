@@ -49,6 +49,7 @@ import { Platform, View, StyleSheet, AppState } from "react-native";
 import { ThemeProvider } from "./src/theme";
 import { clientAuthService } from "shared-api/services/clientAuthService";
 import { secureSessionStore } from "shared-api/utils/secureSessionStore";
+import { useLanguageStore } from "./src/stores/useLanguageStore";
 
 export default function App() {
 	return (
@@ -116,6 +117,9 @@ function AppContent() {
 	//   d'entrée garanti (ex: ThemeProvider).
 	// ════════════════════════════════════════════════════════════════════
 	useEffect(() => {
+		// 🌍 Initialiser la langue sauvegardée
+		useLanguageStore.getState().init();
+
 		const themeStore = useThemeStore.getState();
 		if (themeStore.themeKey?.styleKey !== "baghera") {
 			themeStore.setSession({
@@ -681,7 +685,7 @@ function AppContent() {
 			{/* Sur web tablette/desktop, centrer le contenu et limiter la largeur */}
 			<View style={Platform.OS === "web" ? styles.webWrapper : { flex: 1 }}>
 			<SafeAreaView
-				style={{ flex: 1, backgroundColor: isBagheraTenant ? BAGHERA_PALETTE.cream : "whitesmoke" }}
+				style={{ flex: 1, backgroundColor: isBagheraTenant ? BAGHERA_PALETTE.terracotta : "whitesmoke" }}
 				edges={Platform.OS === "web" ? [] : ["top", "left", "right"]}
 			>
 				{/* 🔐 Mode Admin: écran de déverrouillage */}

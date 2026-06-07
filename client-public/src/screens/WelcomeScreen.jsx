@@ -17,6 +17,7 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslation } from "../hooks/useTranslation";
 import {
   View,
   Text,
@@ -63,6 +64,7 @@ export default function WelcomeScreen({
   onLookupOrder = () => {},
 }) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   
   // ═══════════════════════════════════════════════════════════════════════════
   // 🔒 RESTAURANT CONFIG - Seules ces valeurs changent selon le restaurant
@@ -240,6 +242,7 @@ export default function WelcomeScreen({
           secureSessionStore.keys.CLIENT_ID,
         );
         const savedTableNumber = await AsyncStorage.getItem("currentTableNumber");
+        const savedCreatedAt = await AsyncStorage.getItem("currentSessionCreatedAt");
 
         if (savedTableId === tableId && savedReservationId && savedClientName) {
           setExistingSession({
@@ -247,6 +250,7 @@ export default function WelcomeScreen({
             clientName: savedClientName,
             clientId: savedClientId,
             tableNumber: savedTableNumber,
+            createdAt: savedCreatedAt ? Number(savedCreatedAt) : 0,
           });
         } else {
           setExistingSession(null);
@@ -263,47 +267,23 @@ export default function WelcomeScreen({
     if (!existingSession) return;
     setLoading(true);
     try {
-      // 1. Régénère un token frais (utile si l'ancien a expiré)
-      const freshToken = await clientAuthService.getClientToken(
-        existingSession.clientName,
-        tableId,
-        restaurantId,
-        existingSession.clientId,
-      );
-
-      // 2. Valider la session côté serveur avant de naviguer
-      if (freshToken) {
-        const { deviceIdentity } = await import("shared-api/utils/deviceIdentity.js");
-        const headers = await deviceIdentity.getAuthHeaders({
-          Authorization: `Bearer ${freshToken}`,
-          "Content-Type": "application/json",
-        });
-        const response = await fetch(
-          `${API_CONFIG.BASE_URL}/reservations/client/reservations/resume`,
-          {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ reservationId: existingSession.reservationId }),
-          },
-        );
-        const data = await response.json();
-        if (!data.valid) {
-          // Session terminée ou invalide → nettoyer et rester sur WelcomeScreen
-          await AsyncStorage.multiRemove([
-            "currentTableId",
-            "currentReservationId",
-            "currentClientName",
-            "currentTableNumber",
-          ]);
-          setExistingSession(null);
-          Alert.alert(
-            "Session expirée",
-            "Votre session précédente est terminée. Veuillez créer une nouvelle session.",
+      // Rafraîchir le token si possible (silencieux, sans bloquer la reprise)
+      try {
+        if (existingSession.clientName && restaurantId && restaurantId !== "DEFAULT") {
+          await clientAuthService.getClientToken(
+            existingSession.clientName,
+            tableId !== "DEFAULT" ? tableId : null,
+            restaurantId,
+            existingSession.clientId,
           );
-          return;
         }
+      } catch {
+        // Échec silencieux — on continue avec le token stocké
       }
 
+      // Reprendre directement sans validation backend.
+      // Si la session est expirée côté serveur, le MenuScreen le détectera
+      // via ses propres appels API et appellera onReservationClosed.
       onJoin({
         reservationId: existingSession.reservationId,
         clientId: existingSession.clientId,
@@ -312,6 +292,7 @@ export default function WelcomeScreen({
         isResumed: true,
       });
     } catch (err) {
+      console.error("❌ [ResumeSession] Erreur:", err);
       Alert.alert("Erreur", "Impossible de reprendre la session");
     } finally {
       setLoading(false);
@@ -568,6 +549,7 @@ export default function WelcomeScreen({
         ["currentReservationId", reservationId],
         ["currentTableId", tableId],
         ["currentClientName", name.trim()],
+        ["currentSessionCreatedAt", String(Date.now())],
       ];
       if (tableNumber) {
         storePairs.push(["currentTableNumber", tableNumber.toString()]);
@@ -851,7 +833,7 @@ export default function WelcomeScreen({
               <View style={styles.resumeSessionContent}>
                 <Ionicons name="refresh" size={28} color="#F87171" />
                 <View style={styles.resumeSessionText}>
-                  <Text style={styles.resumeSessionTitle}>Session en cours</Text>
+                  <Text style={styles.resumeSessionTitle}>{t("Session en cours")}</Text>
                   <Text style={styles.resumeSessionSubtitle}>
                     Reprendre la commande de{" "}
                     <Text style={{ fontWeight: "700" }}>{existingSession.clientName}</Text> ?
@@ -864,14 +846,14 @@ export default function WelcomeScreen({
                   onPress={handleResumeSession}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.resumeBtnText}>Reprendre</Text>
+                  <Text style={styles.resumeBtnText}>{t("Reprendre")}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.resumeBtnSecondary}
                   onPress={handleNewSession}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.resumeBtnSecondaryText}>Nouvelle session</Text>
+                  <Text style={styles.resumeBtnSecondaryText}>{t("Nouvelle session")}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1099,7 +1081,7 @@ export default function WelcomeScreen({
           <View style={styles.resumeSessionContent}>
             <Ionicons name="refresh" size={28} color="#F87171" />
             <View style={styles.resumeSessionText}>
-              <Text style={styles.resumeSessionTitle}>Session en cours</Text>
+              <Text style={styles.resumeSessionTitle}>{t("Session en cours")}</Text>
               <Text style={styles.resumeSessionSubtitle}>
                 Reprendre la commande de{" "}
                 <Text style={{ fontWeight: "700" }}>{existingSession.clientName}</Text> ?
@@ -1112,14 +1094,14 @@ export default function WelcomeScreen({
               onPress={handleResumeSession}
               activeOpacity={0.8}
             >
-              <Text style={styles.resumeBtnText}>Reprendre</Text>
+              <Text style={styles.resumeBtnText}>{t("Reprendre")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.resumeBtnSecondary}
               onPress={handleNewSession}
               activeOpacity={0.8}
             >
-              <Text style={styles.resumeBtnSecondaryText}>Nouvelle session</Text>
+              <Text style={styles.resumeBtnSecondaryText}>{t("Nouvelle session")}</Text>
             </TouchableOpacity>
           </View>
         </View>

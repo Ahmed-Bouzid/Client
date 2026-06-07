@@ -64,33 +64,43 @@ const RESTAURANT_CONFIG_BY_STYLEKEY = {
   // ───────────────────────────────────────────────────────────────────────────
   // 🆕 Phase 3.1 — Baghera (brunch premium Marseille, démo client 13 mai 2026)
   // ───────────────────────────────────────────────────────────────────────────
-  // Pas de restaurantId BDD encore (créé post-démo). null intentionnel.
-  // PAS de logo image — wordmark typographique "Baghera." (Instrument Serif).
-  // Fonts Google Fonts (Instrument Serif + Inter) chargées via Font.loadAsync
-  // dans Phase 3.2 (WelcomeScreenBaghera) depuis assets/baghera/fonts/.
   baghera: {
-    restaurantId: null,
+    restaurantId: "6a0381c865b4fbf2f219e0f0",
     name: "Baghera",
     hasCustomAssets: true,
+    // ── Charte officielle MAISONVNK ──
+    // Polices : Sans Black (titres) · Roboto Mono (UI) · Great Day (accents) · Droid Sans (body)
     font: {
-      family: "InstrumentSerif",
-      file: require("../../assets/baghera/fonts/InstrumentSerif-Regular.ttf"),
+      family: "SansBlack",
+      file: require("../../assets/baghera/fonts/SansBlack.ttf"),
     },
-    fontItalic: {
-      family: "InstrumentSerif-Italic",
-      file: require("../../assets/baghera/fonts/InstrumentSerif-Italic.ttf"),
+    fontMono: {
+      family: "RobotoMono-Regular",
+      file: require("../../assets/baghera/fonts/RobotoMono-Regular.ttf"),
+    },
+    fontMonoBold: {
+      family: "RobotoMono-Bold",
+      file: require("../../assets/baghera/fonts/RobotoMono-Bold.ttf"),
+    },
+    fontDay: {
+      family: "GreatDay",
+      file: require("../../assets/baghera/fonts/GreatDay.ttf"),
+    },
+    fontDayBold: {
+      family: "GreatDay-Bold",
+      file: require("../../assets/baghera/fonts/GreatDay-Bold.ttf"),
     },
     fontSans: {
-      family: "Inter",
-      file: require("../../assets/baghera/fonts/Inter-Regular.ttf"),
+      family: "DroidSans",
+      file: require("../../assets/baghera/fonts/DroidSans.ttf"),
     },
-    fontSansItalic: {
-      family: "Inter-Italic",
-      file: require("../../assets/baghera/fonts/Inter-Italic.ttf"),
+    fontSansBold: {
+      family: "DroidSans-Bold",
+      file: require("../../assets/baghera/fonts/DroidSans-Bold.ttf"),
     },
-    logo: require("../../assets/baghera/logo.png"),
+    // Logo officiel : illustration cartoon (2 personnages + assiette pancakes)
+    logo: require("../../assets/baghera/logo-cartoon.png"),
     welcomeImages: {
-      // Plats signatures (Shere Kan / Bagheera / Mowgli) + ambiance.
       image1: require("../../assets/baghera/signature-shere-kan.jpg"),
       image2: require("../../assets/baghera/signature-bagheera.jpg"),
       image3: require("../../assets/baghera/signature-mowgli.jpg"),

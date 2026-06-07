@@ -14,7 +14,9 @@
  *   - useOrderTracking hook (polling + WebSocket combinés)
  *   - GET /orders/:orderId pour récupérer le statut
  */
+
 import React, { useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "../hooks/useTranslation";
 import {
 	ActivityIndicator,
 	Animated,
@@ -87,6 +89,7 @@ const LiveDot = ({ isOnline, isSocketConnected }) => {
 };
 
 export default function OrderTrackingScreen({ orderId, onBackToMenu }) {
+	const { t } = useTranslation();
 	const {
 		order,
 		trackingStatus,
@@ -146,7 +149,7 @@ export default function OrderTrackingScreen({ orderId, onBackToMenu }) {
 		return (
 			<View style={styles.loaderWrap}>
 				<ActivityIndicator size="large" color="#0F766E" />
-				<Text style={styles.loaderText}>Connexion au suivi de commande...</Text>
+				<Text style={styles.loaderText}>{t("Connexion au suivi de commande...")}</Text>
 			</View>
 		);
 	}
@@ -154,7 +157,7 @@ export default function OrderTrackingScreen({ orderId, onBackToMenu }) {
 	return (
 		<View style={[styles.container, trackingStatus === "ready" ? styles.readyContainer : null]}>
 			<View style={styles.header}>
-				<Text style={styles.title}>Suivi de commande</Text>
+				<Text style={styles.title}>{t("Suivi de commande")}</Text>
 				<Text style={styles.orderCode}>No {orderNumber}</Text>
 				<LiveDot isOnline={isOnline} isSocketConnected={isSocketConnected} />
 			</View>
@@ -189,8 +192,8 @@ export default function OrderTrackingScreen({ orderId, onBackToMenu }) {
 			</View>
 
 			<View style={styles.infoCard}>
-				<Text style={styles.infoTitle}>Conseil</Text>
-				<Text style={styles.infoText}>Gardez cette page ouverte pour recevoir instantanement les changements.</Text>
+				<Text style={styles.infoTitle}>{t("Conseil")}</Text>
+				<Text style={styles.infoText}>{t("Gardez cette page ouverte pour recevoir instantanement les changements.")}</Text>
 				<Text style={styles.syncText}>Derniere synchro: {formatLastSync()} via {syncSource}</Text>
 				{!!error && <Text style={styles.errorText}>Connexion instable: {error}</Text>}
 			</View>
@@ -198,16 +201,16 @@ export default function OrderTrackingScreen({ orderId, onBackToMenu }) {
 			{Platform.OS === "web" && !audioUnlocked && (
 				<Pressable style={styles.unlockButton} onPress={unlockAudio}>
 					<MaterialIcons name="volume-up" size={18} color="#FFFFFF" />
-					<Text style={styles.unlockButtonText}>Activer le son d'alerte</Text>
+					<Text style={styles.unlockButtonText}>{t("Activer le son d'alerte")}</Text>
 				</Pressable>
 			)}
 
 			<View style={styles.actionsRow}>
 				<Pressable style={styles.secondaryBtn} onPress={() => refreshNow("manual")}> 
-					<Text style={styles.secondaryBtnText}>Rafraichir</Text>
+					<Text style={styles.secondaryBtnText}>{t("Rafraichir")}</Text>
 				</Pressable>
 				<Pressable style={styles.primaryBtn} onPress={onBackToMenu}>
-					<Text style={styles.primaryBtnText}>Retour menu</Text>
+					<Text style={styles.primaryBtnText}>{t("Retour menu")}</Text>
 				</Pressable>
 			</View>
 		</View>

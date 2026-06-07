@@ -1,13 +1,33 @@
 // components/receipt/ReceiptTicket.jsx
 // THEMING: orphan palette by design — see audit 0.1
-// Ce composant utilise une palette purple/teal interne (style ticket de caisse virtuel)
-// indépendante du theming multi-tenant. NE PAS tokeniser sans décision produit.
+// Style: thermal paper receipt (white/cream, monospace, classic)
 import React, { useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Animated, Dimensions } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
+import { useTranslation } from "../../hooks/useTranslation";
 
 const { width } = Dimensions.get("window");
+const TICKET_WIDTH = Math.min(width - 48, 380);
+
+// Jagged edge — simulates torn thermal paper
+const JaggedEdge = ({ flipped = false }) => {
+	const count = Math.floor(TICKET_WIDTH / 10);
+	return (
+		<View style={[styles.jaggedRow, flipped && { transform: [{ scaleY: -1 }] }]}>
+			{Array.from({ length: count }).map((_, i) => (
+				<View key={i} style={styles.jaggedTooth} />
+			))}
+		</View>
+	);
+};
+
+// Dashed separator (thermal style)
+const DashedSeparator = () => (
+	<Text style={styles.dashedLine}>
+		{"- - - - - - - - - - - - - - - - - - - - - - - - - - -"}
+	</Text>
+);
+
+const SolidSeparator = () => <View style={styles.solidLine} />;
 
 export const ReceiptTicket = React.forwardRef(
 	(
@@ -24,417 +44,358 @@ export const ReceiptTicket = React.forwardRef(
 		},
 		ref,
 	) => {
-		const scaleAnim = useRef(new Animated.Value(0)).current;
+		const { t } = useTranslation();
 		const fadeAnim = useRef(new Animated.Value(0)).current;
+		const slideAnim = useRef(new Animated.Value(20)).current;
 
 		useEffect(() => {
 			Animated.parallel([
-				Animated.spring(scaleAnim, {
-					toValue: 1,
-					tension: 50,
-					friction: 7,
-					useNativeDriver: false,
-				}),
-				Animated.timing(fadeAnim, {
-					toValue: 1,
-					duration: 400,
-					useNativeDriver: false,
-				}),
+				Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: false }),
+				Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: false }),
 			]).start();
-		}, [scaleAnim, fadeAnim]);
+		}, [fadeAnim, slideAnim]);
 
-		// Premium colors for client
-		const colors = {
-			primary: "#667eea",
-			accent: "#4CAF50",
-			textColor: "#ffffff",
-			cardColor: "#2a2a3e",
-			backgroundColor: "#1a1a2e",
-		};
-
-		const formattedAmount = `${(parseFloat(amount) || 0).toFixed(2)}€`;
+		const formattedAmount = `${(parseFloat(amount) || 0).toFixed(2)} €`;
 		const dateObj = date instanceof Date ? date : new Date(date);
 		const formattedDate = dateObj.toLocaleDateString("fr-FR", {
-			day: "numeric",
-			month: "long",
+			day: "2-digit",
+			month: "2-digit",
 			year: "numeric",
+		});
+		const formattedTime = dateObj.toLocaleTimeString("fr-FR", {
 			hour: "2-digit",
 			minute: "2-digit",
+		});
+
+		// Deterministic barcode bars (no re-render flicker)
+		const barsPattern = Array.from({ length: 48 }).map((_, i) => {
+			const seed = ticketId ? ticketId.charCodeAt(i % ticketId.length) : i;
+			return (seed + i) % 3 === 0 ? 1 : (seed + i) % 5 === 0 ? 4 : 2;
 		});
 
 		return (
 			<Animated.View
 				ref={ref}
 				style={[
-					styles.container,
-					{
-						transform: [{ scale: scaleAnim }],
-						opacity: fadeAnim,
-					},
+					styles.wrapper,
+					{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
 				]}
 			>
-				{/* Ticket cut-out circles */}
-				<View style={[styles.cutout, styles.cutoutLeft]} />
-				<View style={[styles.cutout, styles.cutoutRight]} />
+				{/* Top jagged edge */}
+				<JaggedEdge />
 
-				{/* Header with success icon */}
-				<LinearGradient colors={["#11998e", "#38ef7d"]} style={styles.header}>
-					<Text style={styles.headerTitle}>Merci !</Text>
-					<Text style={styles.headerSubtitle}>
-						Votre paiement a été effectué avec succès
+				{/* Paper body */}
+				<View style={styles.paper}>
+					{/* Store name */}
+					<Text style={styles.storeName}>{restaurantName.toUpperCase()}</Text>
+					{tableNumber && (
+						<Text style={styles.storeAddress}>{t("Table")} {tableNumber}</Text>
+					)}
+
+					<DashedSeparator />
+
+					{/* Receipt title */}
+					<Text style={styles.receiptTitle}>{"*** " + t("Merci !").toUpperCase() + " ***"}</Text>
+					<Text style={styles.receiptSubtitle}>
+						{t("Votre paiement a été effectué avec succès").toUpperCase()}
 					</Text>
-				</LinearGradient>
 
-				{/* Ticket body */}
-				<View style={[styles.body, { backgroundColor: colors.cardColor }]}>
-					{/* Dashed line */}
-					<View style={styles.dashedLine} />
+					<DashedSeparator />
 
-					{/* Restaurant info */}
-					<View style={styles.section}>
-						<Text style={[styles.restaurantName, { color: colors.textColor }]}>
-							{restaurantName}
-						</Text>
-						{tableNumber && (
-							<Text style={[styles.tableInfo, { color: "#999" }]}>
-								Table {tableNumber}
-							</Text>
+					{/* Meta */}
+					<View style={styles.metaRow}>
+						<Text style={styles.metaText}>{formattedDate}</Text>
+						<Text style={styles.metaText}>{formattedTime}</Text>
+					</View>
+					<View style={styles.metaRow}>
+						<Text style={styles.metaLabel}>{t("N° TICKET")}</Text>
+						<Text style={styles.metaValue}>{ticketId}</Text>
+					</View>
+
+					<DashedSeparator />
+
+					{/* Items */}
+					{items.length > 0 && (
+						<>
+							{items.map((item, index) => {
+								const qty = parseInt(item.quantity) || 1;
+								const unitPrice = parseFloat(item.price) || 0;
+								const lineTotal = (qty * unitPrice).toFixed(2);
+								return (
+									<View key={index} style={styles.itemBlock}>
+										<View style={styles.itemMainRow}>
+											<Text style={styles.itemName} numberOfLines={1}>
+												{item.name || t("Article")}
+											</Text>
+											<Text style={styles.itemTotal}>{lineTotal} €</Text>
+										</View>
+										{qty > 1 && (
+											<Text style={styles.itemSub}>
+												{"  x" + qty + " @ " + unitPrice.toFixed(2) + " €"}
+											</Text>
+										)}
+									</View>
+								);
+							})}
+							<DashedSeparator />
+							<View style={styles.totalRow}>
+								<Text style={styles.subtotalLabel}>SOUS-TOTAL</Text>
+								<Text style={styles.subtotalValue}>{formattedAmount}</Text>
+							</View>
+						</>
+					)}
+
+					{/* Total */}
+					<SolidSeparator />
+					<View style={styles.totalRow}>
+						<Text style={styles.totalLabel}>{t("MONTANT")}</Text>
+						<Text style={styles.totalValue}>{formattedAmount}</Text>
+					</View>
+					<SolidSeparator />
+
+					{/* Payment */}
+					<View style={[styles.metaRow, { marginTop: 8 }]}>
+						<Text style={styles.metaLabel}>{paymentMethod.toUpperCase()}</Text>
+						{last4Digits && (
+							<Text style={styles.metaValue}>{"•••• " + last4Digits}</Text>
 						)}
 					</View>
 
-					{/* Ticket ID and Amount */}
-					<View style={styles.row}>
-						<View style={styles.column}>
-							<Text style={[styles.label, { color: "#999" }]}>N° TICKET</Text>
-							<Text style={[styles.value, { color: colors.textColor }]}>
-								{ticketId}
-							</Text>
-						</View>
-						<View style={[styles.column, styles.columnRight]}>
-							<Text style={[styles.label, { color: "#999" }]}>MONTANT</Text>
-							<Text style={[styles.amount, { color: colors.accent }]}>
-								{formattedAmount}
-							</Text>
-						</View>
-					</View>
+					<DashedSeparator />
 
-					{/* CMD code helper */}
+					{/* Order code */}
 					{orderCode && (
-						<View style={styles.lookupBox}>
-							<Text style={styles.lookupTitle}>Code commande: {orderCode}</Text>
-							<Text style={styles.lookupText}>
-								Tapez ce code sur la page d'accueil pour retrouver votre commande,
-								votre paiement et votre ticket.
-							</Text>
-						</View>
-					)}
-
-					{/* Date */}
-					<View style={styles.section}>
-						<Text style={[styles.label, { color: "#999" }]}>DATE & HEURE</Text>
-						<Text style={[styles.value, { color: colors.textColor }]}>
-							{formattedDate}
-						</Text>
-					</View>
-
-					{/* Items list */}
-					{items.length > 0 && (
-						<View style={styles.section}>
-							<Text style={[styles.sectionTitle, { color: colors.textColor }]}>
-								Articles
-							</Text>
-							<View style={styles.itemsList}>
-								{items.map((item, index) => (
-									<View key={index} style={styles.itemRow}>
-										<View style={styles.itemInfo}>
-											<Text
-												style={[styles.itemName, { color: colors.textColor }]}
-												numberOfLines={1}
-											>
-												{item.name || "Article"}
-											</Text>
-											<Text style={[styles.itemQuantity, { color: "#999" }]}>
-												x{item.quantity || 1}
-											</Text>
-										</View>
-										<Text
-											style={[styles.itemPrice, { color: colors.textColor }]}
-										>
-											{(
-												(parseFloat(item.price) || 0) *
-												(parseInt(item.quantity) || 1)
-											).toFixed(2)}
-											€
-										</Text>
-									</View>
-								))}
+						<>
+							<View style={styles.metaRow}>
+								<Text style={styles.metaLabel}>{t("Code commande")}</Text>
+								<Text style={styles.metaValueBold}>{orderCode}</Text>
 							</View>
-						</View>
+							<Text style={styles.lookupText}>
+								{t("Tapez ce code sur la page d'accueil pour retrouver votre commande, votre paiement et votre ticket.")}
+							</Text>
+							<DashedSeparator />
+						</>
 					)}
 
-					{/* Payment method */}
-					<View
-						style={[
-							styles.paymentSection,
-							{ backgroundColor: colors.backgroundColor },
-						]}
-					>
-						<View style={styles.paymentIcon}>
-							<MaterialIcons name="credit-card" size={24} color="#ffffff" />
-						</View>
-						<View style={styles.paymentInfo}>
-							<Text style={[styles.paymentMethod, { color: colors.textColor }]}>
-								{paymentMethod}
-							</Text>
-							{last4Digits && (
-								<Text style={[styles.cardNumber, { color: "#999" }]}>
-									•••• {last4Digits}
-								</Text>
-							)}
-						</View>
-					</View>
-
-					{/* Dashed line */}
-					<View style={styles.dashedLine} />
-
-					{/* Barcode simulation */}
+					{/* Barcode */}
 					<View style={styles.barcodeContainer}>
 						<View style={styles.barcode}>
-							{Array.from({ length: 40 }).map((_, i) => (
-								<View
-									key={i}
-									style={[
-										styles.bar,
-										{
-											width: Math.random() > 0.5 ? 2 : 3,
-											backgroundColor: colors.textColor,
-										},
-									]}
-								/>
+							{barsPattern.map((w, i) => (
+								<View key={i} style={[styles.bar, { width: w }]} />
 							))}
 						</View>
-						<Text style={[styles.barcodeText, { color: "#999" }]}>
-							{ticketId}
-						</Text>
+						<Text style={styles.barcodeLabel}>{ticketId}</Text>
 					</View>
 
 					{/* Footer */}
-					<View style={styles.footer}>
-						<Text style={[styles.footerText, { color: "#999" }]}>
-							Merci de votre visite !
-						</Text>
-						<Text style={[styles.footerText, { color: "#999" }]}>
-							www.sunnygo.fr
-						</Text>
-					</View>
+					<Text style={styles.thankYou}>
+						{t("Merci de votre visite !").toUpperCase()}
+					</Text>
+					<Text style={styles.footerUrl}>www.sunnygo.fr</Text>
 				</View>
+
+				{/* Bottom jagged edge */}
+				<JaggedEdge flipped />
 			</Animated.View>
 		);
 	},
 );
 
 const styles = StyleSheet.create({
-	container: {
-		width: width - 60,
-		maxWidth: 400,
-		backgroundColor: "#2a2a3e",
-		borderRadius: 20,
+	wrapper: {
+		width: TICKET_WIDTH,
+		alignSelf: "center",
+	},
+	jaggedRow: {
+		flexDirection: "row",
+		height: 10,
 		overflow: "hidden",
+	},
+	jaggedTooth: {
+		width: 10,
+		height: 10,
+		backgroundColor: "#f2efe8",
+		borderBottomLeftRadius: 5,
+		borderBottomRightRadius: 5,
+	},
+	paper: {
+		backgroundColor: "#f2efe8",
+		paddingHorizontal: 24,
+		paddingVertical: 20,
 		shadowColor: "#000",
-		shadowOffset: { width: 0, height: 10 },
-		shadowOpacity: 0.3,
-		shadowRadius: 20,
-		elevation: 10,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.12,
+		shadowRadius: 12,
+		elevation: 6,
 	},
-	cutout: {
-		position: "absolute",
-		width: 30,
-		height: 30,
-		borderRadius: 15,
-		backgroundColor: "#0f0c29",
-		top: "35%",
-		zIndex: 10,
-	},
-	cutoutLeft: {
-		left: -15,
-	},
-	cutoutRight: {
-		right: -15,
-	},
-	header: {
-		paddingVertical: 40,
-		paddingHorizontal: 30,
-		alignItems: "center",
-	},
-	iconContainer: {
-		marginBottom: 15,
-	},
-	headerTitle: {
-		fontSize: 32,
+	storeName: {
+		fontFamily: "monospace",
+		fontSize: 18,
 		fontWeight: "700",
-		color: "#ffffff",
-		marginBottom: 8,
-	},
-	headerSubtitle: {
-		fontSize: 16,
-		color: "#ffffff",
-		opacity: 0.9,
+		color: "#1a1a1a",
 		textAlign: "center",
+		letterSpacing: 1,
+		marginBottom: 4,
 	},
-	body: {
-		paddingHorizontal: 30,
-		paddingVertical: 25,
+	storeAddress: {
+		fontFamily: "monospace",
+		fontSize: 12,
+		color: "#555",
+		textAlign: "center",
+		marginBottom: 4,
 	},
 	dashedLine: {
-		height: 1,
-		borderStyle: "dashed",
-		borderWidth: 1,
-		borderColor: "#444",
-		marginVertical: 10,
-	},
-	section: {
-		marginBottom: 20,
-	},
-	restaurantName: {
-		fontSize: 20,
-		fontWeight: "600",
-		textAlign: "center",
-		marginBottom: 5,
-	},
-	tableInfo: {
-		fontSize: 14,
-		textAlign: "center",
-	},
-	row: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		marginBottom: 20,
-	},
-	column: {
-		flex: 1,
-	},
-	columnRight: {
-		alignItems: "flex-end",
-	},
-	label: {
+		fontFamily: "monospace",
 		fontSize: 10,
-		fontWeight: "600",
-		letterSpacing: 1,
-		marginBottom: 5,
+		color: "#aaa",
+		textAlign: "center",
+		marginVertical: 8,
 	},
-	value: {
+	solidLine: {
+		height: 1.5,
+		backgroundColor: "#1a1a1a",
+		marginVertical: 6,
+	},
+	receiptTitle: {
+		fontFamily: "monospace",
 		fontSize: 16,
-		fontWeight: "500",
-	},
-	amount: {
-		fontSize: 22,
 		fontWeight: "700",
+		color: "#1a1a1a",
+		textAlign: "center",
+		letterSpacing: 1,
+		marginBottom: 4,
 	},
-	sectionTitle: {
-		fontSize: 14,
-		fontWeight: "600",
-		marginBottom: 12,
+	receiptSubtitle: {
+		fontFamily: "monospace",
+		fontSize: 9,
+		color: "#444",
+		textAlign: "center",
+		letterSpacing: 0.5,
 	},
-	itemsList: {
-		gap: 10,
-	},
-	itemRow: {
+	metaRow: {
 		flexDirection: "row",
 		justifyContent: "space-between",
-		alignItems: "center",
+		marginBottom: 4,
 	},
-	itemInfo: {
-		flex: 1,
+	metaLabel: {
+		fontFamily: "monospace",
+		fontSize: 11,
+		color: "#555",
+	},
+	metaValue: {
+		fontFamily: "monospace",
+		fontSize: 11,
+		color: "#1a1a1a",
+	},
+	metaValueBold: {
+		fontFamily: "monospace",
+		fontSize: 11,
+		fontWeight: "700",
+		color: "#1a1a1a",
+	},
+	metaText: {
+		fontFamily: "monospace",
+		fontSize: 11,
+		color: "#555",
+	},
+	itemBlock: {
+		marginBottom: 6,
+	},
+	itemMainRow: {
 		flexDirection: "row",
-		alignItems: "center",
-		gap: 8,
+		justifyContent: "space-between",
 	},
 	itemName: {
-		fontSize: 14,
-		flex: 1,
-	},
-	itemQuantity: {
-		fontSize: 12,
-	},
-	itemPrice: {
-		fontSize: 14,
-		fontWeight: "600",
-	},
-	paymentSection: {
-		flexDirection: "row",
-		alignItems: "center",
-		padding: 15,
-		borderRadius: 12,
-		marginVertical: 15,
-		gap: 15,
-	},
-	paymentIcon: {
-		width: 40,
-		height: 40,
-		borderRadius: 25,
-		backgroundColor: "#11998e",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	paymentInfo: {
-		flex: 1,
-	},
-	paymentMethod: {
-		fontSize: 16,
-		fontWeight: "600",
-		marginBottom: 3,
-	},
-	cardNumber: {
+		fontFamily: "monospace",
 		fontSize: 13,
-		letterSpacing: 2,
+		color: "#1a1a1a",
+		flex: 1,
+		marginRight: 8,
+	},
+	itemTotal: {
+		fontFamily: "monospace",
+		fontSize: 13,
+		color: "#1a1a1a",
+		fontWeight: "600",
+	},
+	itemSub: {
+		fontFamily: "monospace",
+		fontSize: 11,
+		color: "#777",
+	},
+	totalRow: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+		marginVertical: 4,
+	},
+	subtotalLabel: {
+		fontFamily: "monospace",
+		fontSize: 12,
+		color: "#555",
+	},
+	subtotalValue: {
+		fontFamily: "monospace",
+		fontSize: 12,
+		color: "#555",
+	},
+	totalLabel: {
+		fontFamily: "monospace",
+		fontSize: 16,
+		fontWeight: "700",
+		color: "#1a1a1a",
+		letterSpacing: 1,
+	},
+	totalValue: {
+		fontFamily: "monospace",
+		fontSize: 16,
+		fontWeight: "700",
+		color: "#1a1a1a",
+	},
+	lookupText: {
+		fontFamily: "monospace",
+		fontSize: 9,
+		color: "#666",
+		textAlign: "center",
+		lineHeight: 14,
+		marginTop: 4,
+		marginBottom: 4,
 	},
 	barcodeContainer: {
 		alignItems: "center",
-		marginVertical: 20,
+		marginVertical: 16,
 	},
 	barcode: {
 		flexDirection: "row",
-		height: 60,
-		alignItems: "flex-end",
-		gap: 2,
-		marginBottom: 10,
+		height: 56,
+		alignItems: "stretch",
+		gap: 1,
+		marginBottom: 6,
 	},
 	bar: {
-		height: "100%",
+		backgroundColor: "#1a1a1a",
 	},
-	barcodeText: {
-		fontSize: 12,
-		letterSpacing: 3,
+	barcodeLabel: {
 		fontFamily: "monospace",
+		fontSize: 10,
+		color: "#555",
+		letterSpacing: 2,
 	},
-	footer: {
-		alignItems: "center",
-		marginTop: 10,
-		gap: 5,
-	lookupBox: {
-		marginTop: 12,
-		marginBottom: 4,
-		backgroundColor: "rgba(255,255,255,0.06)",
-		borderRadius: 10,
-		paddingHorizontal: 12,
-		paddingVertical: 10,
-		borderWidth: 1,
-		borderColor: "rgba(255,255,255,0.1)",
-	},
-	lookupTitle: {
-		fontSize: 13,
+	thankYou: {
+		fontFamily: "monospace",
+		fontSize: 12,
 		fontWeight: "700",
-		color: "#FFFFFF",
+		color: "#1a1a1a",
+		textAlign: "center",
+		letterSpacing: 1,
+		marginTop: 4,
+		marginBottom: 2,
+	},
+	footerUrl: {
+		fontFamily: "monospace",
+		fontSize: 10,
+		color: "#888",
+		textAlign: "center",
 		marginBottom: 4,
-	},
-	lookupText: {
-		fontSize: 12,
-		lineHeight: 16,
-		color: "#B8B8B8",
-	},
-	},
-	footerText: {
-		fontSize: 12,
 	},
 });
 

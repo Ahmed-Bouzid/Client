@@ -15,6 +15,7 @@ import { BlurView } from "expo-blur";
 import { MaterialIcons } from "@expo/vector-icons";
 import { ReceiptTicket } from "./ReceiptTicket";
 import { useReceiptExport } from "../../hooks/useReceiptExport";
+import { useTranslation } from "../../hooks/useTranslation";
 
 const { height } = Dimensions.get("window");
 
@@ -70,6 +71,7 @@ export const ReceiptModal = ({
 	paymentMethod,
 	last4Digits,
 }) => {
+	const { t } = useTranslation();
 	const slideAnim = useRef(new Animated.Value(height)).current;
 	const overlayAnim = useRef(new Animated.Value(0)).current;
 	const receiptRef = useRef(null);
@@ -204,7 +206,7 @@ export const ReceiptModal = ({
 								<>
 									<MaterialIcons name="ios-share" size={22} color="#ffffff" />
 									<Text style={styles.exportButtonText}>
-										Enregistrer le reçu
+										{t("Enregistrer le reçu")}
 									</Text>
 								</>
 							)}

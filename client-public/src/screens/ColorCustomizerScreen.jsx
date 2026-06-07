@@ -33,6 +33,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import useThemeStore from "../stores/useThemeStore";
+import { useTranslation } from "../hooks/useTranslation";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎨 COLOR PRESETS
@@ -72,6 +73,7 @@ export default function ColorCustomizerScreen({
   onBack,
   onSave,
 }) {
+  const { t } = useTranslation();
   // ─────────────────────────────────────────────────────────────────────────
   // STATE
   // ─────────────────────────────────────────────────────────────────────────
@@ -197,7 +199,7 @@ export default function ColorCustomizerScreen({
       >
         <Ionicons name="chevron-back" size={24} color={COLORS.text} />
       </TouchableOpacity>
-      <Text style={styles.headerTitle}>Personnaliser les couleurs</Text>
+      <Text style={styles.headerTitle}>{t("Personnaliser les couleurs")}</Text>
       <View style={styles.headerSpacer} />
     </View>
   );
@@ -239,7 +241,7 @@ export default function ColorCustomizerScreen({
 
   const renderLogoInput = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>URL du logo (optionnel)</Text>
+      <Text style={styles.sectionTitle}>{t("URL du logo (optionnel)")}</Text>
       <TextInput
         style={[styles.textInput, !isValidUrl && styles.textInputError]}
         value={logoUrl}
@@ -251,7 +253,7 @@ export default function ColorCustomizerScreen({
         keyboardType="url"
       />
       {!isValidUrl && (
-        <Text style={styles.errorText}>URL invalide</Text>
+        <Text style={styles.errorText}>{t("URL invalide")}</Text>
       )}
     </View>
   );
@@ -260,7 +262,7 @@ export default function ColorCustomizerScreen({
     <View style={styles.previewSection}>
       <View style={styles.previewHeader}>
         <View style={styles.previewDivider} />
-        <Text style={styles.previewLabel}>APERÇU</Text>
+        <Text style={styles.previewLabel}>{t("APERÇU")}</Text>
         <View style={styles.previewDivider} />
       </View>
 
@@ -283,8 +285,8 @@ export default function ColorCustomizerScreen({
           </View>
         )}
         <View style={styles.bannerTextContainer}>
-          <Text style={styles.bannerTitle}>Mon Restaurant</Text>
-          <Text style={styles.bannerSubtitle}>Bienvenue</Text>
+          <Text style={styles.bannerTitle}>{t("Mon Restaurant")}</Text>
+          <Text style={styles.bannerSubtitle}>{t("Bienvenue")}</Text>
         </View>
       </LinearGradient>
 
@@ -294,13 +296,13 @@ export default function ColorCustomizerScreen({
           <View
             style={[styles.indicatorDot, { backgroundColor: primaryColor }]}
           />
-          <Text style={styles.indicatorLabel}>Principale</Text>
+          <Text style={styles.indicatorLabel}>{t("Principale")}</Text>
         </View>
         <View style={styles.colorIndicator}>
           <View
             style={[styles.indicatorDot, { backgroundColor: accentColor }]}
           />
-          <Text style={styles.indicatorLabel}>Accent</Text>
+          <Text style={styles.indicatorLabel}>{t("Accent")}</Text>
         </View>
       </View>
     </View>
@@ -315,7 +317,7 @@ export default function ColorCustomizerScreen({
         activeOpacity={0.7}
       >
         <Ionicons name="arrow-back" size={18} color={COLORS.text} />
-        <Text style={styles.backButtonText}>Retour</Text>
+        <Text style={styles.backButtonText}>{t("Retour")}</Text>
       </TouchableOpacity>
 
       {/* Save Button */}
@@ -336,7 +338,7 @@ export default function ColorCustomizerScreen({
           ) : (
             <>
               <Ionicons name="checkmark" size={20} color={COLORS.white} />
-              <Text style={styles.saveButtonText}>Enregistrer</Text>
+              <Text style={styles.saveButtonText}>{t("Enregistrer")}</Text>
             </>
           )}
         </LinearGradient>

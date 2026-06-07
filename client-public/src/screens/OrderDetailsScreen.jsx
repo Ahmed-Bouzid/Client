@@ -26,6 +26,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTranslation } from "../hooks/useTranslation";
 
 // ── Helpers ──
 
@@ -86,20 +87,22 @@ function formatPrice(price) {
 
 // ── Component ──
 
-export default function OrderDetailsScreen({ orderData, onBack, onPayByCard }) {
+export default function OrderDetailsScreen({
+ orderData, onBack, onPayByCard }) {
+	const { t } = useTranslation();
   if (!orderData) {
     return (
       <View style={styles.container}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         <View style={styles.emptyContainer}>
           <Ionicons name="receipt-outline" size={64} color="#444" />
-          <Text style={styles.emptyTitle}>Aucune commande</Text>
+          <Text style={styles.emptyTitle}>{t("Aucune commande")}</Text>
           <Text style={styles.emptySubtitle}>
             Aucune commande trouvée avec ce numéro.
           </Text>
           <TouchableOpacity onPress={onBack} style={styles.backButtonEmpty}>
             <Ionicons name="arrow-back" size={18} color="#FF8A50" style={{ marginRight: 6 }} />
-            <Text style={styles.backButtonEmptyText}>Retour à l'accueil</Text>
+            <Text style={styles.backButtonEmptyText}>{t("Retour à l'accueil")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -138,7 +141,7 @@ export default function OrderDetailsScreen({ orderData, onBack, onPayByCard }) {
         <TouchableOpacity onPress={onBack} style={styles.headerBackBtn} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Détail commande</Text>
+        <Text style={styles.headerTitle}>{t("Détail commande")}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -172,7 +175,7 @@ export default function OrderDetailsScreen({ orderData, onBack, onPayByCard }) {
 
         {/* Items Card */}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Articles commandés</Text>
+          <Text style={styles.sectionTitle}>{t("Articles commandés")}</Text>
           {orderData.items.map((item, index) => (
             <View key={index} style={styles.itemRow}>
               <View style={styles.itemLeft}>
@@ -190,7 +193,7 @@ export default function OrderDetailsScreen({ orderData, onBack, onPayByCard }) {
 
           {/* Total */}
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total payé</Text>
+            <Text style={styles.totalLabel}>{t("Total payé")}</Text>
             <Text style={styles.totalPrice}>{formatPrice(orderData.total)}</Text>
           </View>
         </View>
@@ -200,7 +203,7 @@ export default function OrderDetailsScreen({ orderData, onBack, onPayByCard }) {
           <View style={styles.card}>
             <View style={styles.paymentRow}>
               <Ionicons name="card-outline" size={20} color="#FF8A50" />
-                <Text style={styles.paymentLabel}>Paiement</Text>
+                <Text style={styles.paymentLabel}>{t("Paiement")}</Text>
             </View>
               <Text style={styles.paymentValue}>{orderData.paymentMethod || "-"}</Text>
 
@@ -232,7 +235,7 @@ export default function OrderDetailsScreen({ orderData, onBack, onPayByCard }) {
           {/* Timeline */}
           {Array.isArray(orderData.timeline) && orderData.timeline.length > 0 && (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Historique</Text>
+              <Text style={styles.sectionTitle}>{t("Historique")}</Text>
               {orderData.timeline.map((event, index) => (
                 <View key={`${event.type}-${index}`} style={styles.timelineRow}>
                   <View style={styles.timelineDot} />
@@ -247,22 +250,22 @@ export default function OrderDetailsScreen({ orderData, onBack, onPayByCard }) {
 
           {/* Info utile */}
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Informations utiles</Text>
+            <Text style={styles.sectionTitle}>{t("Informations utiles")}</Text>
             <View style={styles.infoGrid}>
               <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Table</Text>
+                <Text style={styles.infoLabel}>{t("Table")}</Text>
                 <Text style={styles.infoValue}>{orderData.tableNumber || "-"}</Text>
               </View>
               <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Client</Text>
+                <Text style={styles.infoLabel}>{t("Client")}</Text>
                 <Text style={styles.infoValue}>{orderData.clientName || "-"}</Text>
               </View>
               <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Payé</Text>
+                <Text style={styles.infoLabel}>{t("Payé")}</Text>
                 <Text style={styles.infoValue}>{orderData.paid ? "Oui" : "Non"}</Text>
               </View>
               <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Montant réglé</Text>
+                <Text style={styles.infoLabel}>{t("Montant réglé")}</Text>
                 <Text style={styles.infoValue}>{formatPrice(orderData.paidAmount || 0)}</Text>
               </View>
             </View>
@@ -291,7 +294,7 @@ export default function OrderDetailsScreen({ orderData, onBack, onPayByCard }) {
             style={styles.homeButton}
           >
             <Ionicons name="home-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.homeButtonText}>Retour à l'accueil</Text>
+            <Text style={styles.homeButtonText}>{t("Retour à l'accueil")}</Text>
           </LinearGradient>
         </TouchableOpacity>
 

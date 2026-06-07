@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "../hooks/useTranslation";
 import {
 	View,
 	Text,
@@ -25,6 +26,7 @@ export default function AllergyManagement({ onClose }) {
 	const { userAllergenIds, toggleAllergen, allergensCache, setAllergensCache } =
 		useAllergyStore();
 
+	const { t } = useTranslation();
 	const [allergens, setAllergens] = useState([]);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [loading, setLoading] = useState(true);
@@ -55,7 +57,7 @@ export default function AllergyManagement({ onClose }) {
 			}
 		} catch (error) {
 			console.error("❌ Erreur chargement allergènes:", error);
-			Alert.alert("Erreur", "Impossible de charger les allergènes");
+			Alert.alert(t("Erreur"), t("Impossible de charger les allergènes"));
 		} finally {
 			setLoading(false);
 		}
@@ -261,7 +263,7 @@ export default function AllergyManagement({ onClose }) {
 							fontSize: 16,
 							color: "#333",
 						}}
-						placeholder="Rechercher un allergène..."
+						placeholder={t("Rechercher un allergène...")}
 						placeholderTextColor="#999"
 						value={searchQuery}
 						onChangeText={setSearchQuery}
@@ -327,8 +329,8 @@ export default function AllergyManagement({ onClose }) {
 					<TouchableOpacity
 						onPress={() => {
 							Alert.alert(
-								"Sauvegardé",
-								"Vos allergies sont automatiquement sauvegardées",
+								t("Sauvegardé"),
+								t("Vos allergies sont automatiquement sauvegardées"),
 								[{ text: "OK" }],
 							);
 						}}

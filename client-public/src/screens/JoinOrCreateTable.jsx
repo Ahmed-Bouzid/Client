@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useTranslation } from "../hooks/useTranslation";
 import { API_CONFIG } from "shared-api/config/apiConfig.js";
 import useSocketClient from "../hooks/useSocketClient.js"; // ⚡ WebSocket pour orders
 import {
@@ -43,6 +44,7 @@ export default function JoinOrCreateTable({
 	tableNumber = null,
 	onJoin = () => {},
 }) {
+	const { t } = useTranslation();
 	const [name, setName] = useState("");
 	const [phone, setPhone] = useState("");
 	const [error, setError] = useState("");
@@ -354,21 +356,21 @@ export default function JoinOrCreateTable({
 	const handleClearStorage = async () => {
 		try {
 			await AsyncStorage.clear();
-			Alert.alert("✅ Succès", "AsyncStorage vidé ! Redémarrez l'app.", [
+			Alert.alert(t("✅ Succès"), t("AsyncStorage vidé ! Redémarrez l'app."), [
 				{ text: "OK" },
 			]);
 		} catch (e) {
-			Alert.alert("❌ Erreur", "Impossible de vider le storage");
+			Alert.alert(t("❌ Erreur"), t("Impossible de vider le storage"));
 		}
 	};
 
 	const handleJoin = async () => {
-		if (!name.trim()) return setError("Veuillez entrer votre nom.");
+		if (!name.trim()) return setError(t("Veuillez entrer votre nom."));
 		if (isFoodtruck && !phone.trim())
-			return setError("Veuillez entrer votre numéro de téléphone.");
+			return setError(t("Veuillez entrer votre numéro de téléphone."));
 		if (!tableId) {
 			console.error("❌ [JOIN] tableId manquant !");
-			return setError("Table non identifiée.");
+			return setError(t("Table non identifiée."));
 		}
 
 		setLoading(true);
@@ -425,7 +427,7 @@ export default function JoinOrCreateTable({
 				data = JSON.parse(text);
 			} catch {
 				console.error("❌ [JOIN] Réponse non-JSON:", text);
-				Alert.alert("Erreur", "Réponse serveur inattendue.");
+				Alert.alert(t("Erreur"), t("Réponse serveur inattendue."));
 				setLoading(false);
 				return;
 			}
@@ -437,8 +439,8 @@ export default function JoinOrCreateTable({
 					data.message,
 				);
 				Alert.alert(
-					"Erreur",
-					data.message || "Erreur lors de la création de la réservation.",
+					t("Erreur"),
+					data.message || t("Erreur lors de la création de la réservation."),
 				);
 				setLoading(false);
 				return;
@@ -474,7 +476,7 @@ export default function JoinOrCreateTable({
 			}
 
 			if (!reservationId) {
-				Alert.alert("Erreur", "Aucun ID de réservation retourné.");
+				Alert.alert(t("Erreur"), t("Aucun ID de réservation retourné."));
 				setLoading(false);
 				return;
 			}
@@ -507,10 +509,10 @@ export default function JoinOrCreateTable({
 			Alert.alert("✅ Succès", welcomeMsg, [{ text: "OK" }]);
 		} catch (err) {
 			console.error("❌ [JOIN] Exception attrapée:", err?.message, err);
-			setError(err.message || "Erreur réseau");
+			setError(err.message || t("Erreur réseau"));
 			Alert.alert(
-				"Erreur",
-				"Impossible de rejoindre la table. Veuillez réessayer.",
+				t("Erreur"),
+				t("Impossible de rejoindre la table. Veuillez réessayer."),
 			);
 		} finally {
 			setLoading(false);
@@ -671,9 +673,9 @@ export default function JoinOrCreateTable({
 
 							{/* Titre de bienvenue stylisé */}
 							<View style={styles.grillzTitleContainer}>
-								<Text style={styles.grillzPreTitle}>Bonjour</Text>
+								<Text style={styles.grillzPreTitle}>{t("Bonjour")}</Text>
 								<View style={styles.grillzMainTitleContainer}>
-									<Text style={styles.grillzMainTitle}>Bienvenue chez</Text>
+									<Text style={styles.grillzMainTitle}>{t("Bienvenue chez")}</Text>
 									<LinearGradient
 										colors={
 											config?.styleKey === "italia"
@@ -702,7 +704,7 @@ export default function JoinOrCreateTable({
 								participants[0] && (
 									<Text style={styles.grillzSubtitle}>
 										Rejoignez{" "}
-										<Text style={styles.grillzTableHighlight}>nos clients</Text>
+										<Text style={styles.grillzTableHighlight}>{t("nos clients")}</Text>
 									</Text>
 								)}
 						</>
@@ -827,7 +829,7 @@ export default function JoinOrCreateTable({
 								<View style={styles.resumeSessionContent}>
 									<MaterialIcons name="replay" size={28} color={theme.primary?.[0] || "#667eea"} />
 									<View style={styles.resumeSessionText}>
-										<Text style={styles.resumeSessionTitle}>Session en cours</Text>
+										<Text style={styles.resumeSessionTitle}>{t("Session en cours")}</Text>
 										<Text style={styles.resumeSessionSubtitle}>
 											Reprendre la commande de{" "}
 											<Text style={{ fontWeight: "700" }}>{existingSession.clientName}</Text>
@@ -841,14 +843,14 @@ export default function JoinOrCreateTable({
 										onPress={handleResumeSession}
 										activeOpacity={0.8}
 									>
-										<Text style={styles.resumeBtnText}>Reprendre</Text>
+										<Text style={styles.resumeBtnText}>{t("Reprendre")}</Text>
 									</TouchableOpacity>
 									<TouchableOpacity
 										style={styles.resumeBtnSecondary}
 										onPress={() => setExistingSession(null)}
 										activeOpacity={0.8}
 									>
-										<Text style={styles.resumeBtnSecondaryText}>Nouvelle session</Text>
+										<Text style={styles.resumeBtnSecondaryText}>{t("Nouvelle session")}</Text>
 									</TouchableOpacity>
 								</View>
 							</BlurView>
@@ -914,7 +916,7 @@ export default function JoinOrCreateTable({
 										style={
 											useCustomBackground ? styles.grillzInput : styles.input
 										}
-										placeholder="Votre nom ou prénom"
+										placeholder={t("Votre nom ou prénom")}
 										value={name}
 										onChangeText={setName}
 										autoCapitalize="words"
@@ -973,7 +975,7 @@ export default function JoinOrCreateTable({
 											style={
 												useCustomBackground ? styles.grillzInput : styles.input
 											}
-											placeholder="Votre numéro de téléphone"
+											placeholder={t("Votre numéro de téléphone")}
 											value={phone}
 											onChangeText={setPhone}
 											keyboardType="phone-pad"
@@ -1053,7 +1055,7 @@ export default function JoinOrCreateTable({
 										<Animated.View style={styles.loadingSpinner}>
 											<MaterialIcons name="refresh" size={24} color="#fff" />
 										</Animated.View>
-										<Text style={styles.joinButtonText}>Connexion...</Text>
+										<Text style={styles.joinButtonText}>{t("Connexion...")}</Text>
 									</View>
 								) : (
 									<>
@@ -1111,7 +1113,7 @@ export default function JoinOrCreateTable({
 									/>
 									<Text style={styles.modalGuestText}>{item}</Text>
 									{index === 0 && (
-										<Text style={styles.creatorBadge}>(créateur)</Text>
+										<Text style={styles.creatorBadge}>{t("(créateur)")}</Text>
 									)}
 								</View>
 							))}
