@@ -51,8 +51,10 @@ import OrderSummary from "./OrderSummary";
 import DietaryPreferences from "./DietaryPreferences";
 import AddOnFlow from "../components/menu/AddOnFlow";
 import { useStyleUpdates } from "../hooks/useSocketClient";
+import socketService from "../services/socketService";
 import useTheme from "../hooks/useThemeNew"; // 🎨 NOUVEAU: Hook thème
 import useThemeKey from "../hooks/useThemeKey";
+import { useTranslation } from "../hooks/useTranslation";
 import { BAGHERA_PALETTE, BAGHERA_FONTS, getMenuBagheraTokens } from "../theme/bagheraTheme";
 
 // Image placeholder
@@ -412,6 +414,7 @@ export default function MenuScreen({
   }, [selectedCategory, isBaghera]);
   
   // Stores - EXACTEMENT comme Menu.jsx
+  const { t } = useTranslation();
   const products = useProductStore((state) => state.products);
   const fetchProducts = useProductStore((state) => state.fetchProducts);
   const { currentOrder, allOrders, addToOrder, updateOrderQuantity, submitOrder, initCart, getTotalItems, getTotalPrice } = useOrderStore();
@@ -478,6 +481,40 @@ export default function MenuScreen({
       useOrderStore.getState().fetchOrdersByReservation(reservationId, clientId);
     }
   }, [reservationId, clientId]);
+
+  // ⭐ SYNC TEMPS RÉEL — écouter les events socket pour rafraîchir les orders
+  useEffect(() => {
+    if (!reservationId && !tableId) return;
+
+    // Rafraîchir allOrders si une order de cette table/réservation change
+    const handleOrderEvent = (payload) => {
+      const data = payload?.data || payload;
+      const orderResaId = data?.reservationId?._id?.toString() || data?.reservationId?.toString();
+      const orderTableId = data?.tableId?._id?.toString() || data?.tableId?.toString();
+      const matchesResa = reservationId && orderResaId === reservationId.toString();
+      const matchesTable = tableId && orderTableId === tableId.toString();
+      if (matchesResa || matchesTable) {
+        useOrderStore.getState().fetchOrdersByReservation(reservationId, clientId);
+      }
+    };
+
+    // Rafraîchir si la session est fermée (table libérée côté frontend)
+    const handleTableSession = (payload) => {
+      const data = payload?.data || payload;
+      const eventTableId = data?.tableId?._id?.toString() || data?.tableId?.toString();
+      if (tableId && eventTableId === tableId.toString() && payload?.type === "closed") {
+        useOrderStore.getState().fetchOrdersByReservation(reservationId, clientId);
+      }
+    };
+
+    socketService.on("order", handleOrderEvent);
+    socketService.on("table-session", handleTableSession);
+
+    return () => {
+      socketService.off("order", handleOrderEvent);
+      socketService.off("table-session", handleTableSession);
+    };
+  }, [reservationId, clientId, tableId]);
   
   // Charger les produits - EXACTEMENT comme Menu.jsx
   // ── PARCOURS : charge le menu complet depuis l'API ──
@@ -606,7 +643,7 @@ export default function MenuScreen({
   const handlePayPress = async () => {
     // Vérifier qu'il y a des articles dans la commande
     if (currentOrder.length === 0) {
-      Alert.alert("Panier vide", "Veuillez ajouter des articles avant de commander.");
+      Alert.alert(t("Panier vide"), t("Veuillez ajouter des articles avant de commander."));
       return;
     }
 
@@ -643,7 +680,7 @@ export default function MenuScreen({
       onNavigateToOrders?.();
     } catch (error) {
       console.error("❌ Erreur soumission commande:", error);
-      Alert.alert("Erreur", "Impossible d'envoyer la commande: " + error.message);
+      Alert.alert(t("Erreur"), t("Impossible d'envoyer la commande: ") + error.message);
     }
   };
 
@@ -779,17 +816,16 @@ export default function MenuScreen({
           }}
           style={{
             alignItems: 'center',
-            justifyContent: 'flex-start',
+            justifyContent: 'center',
             marginHorizontal: 16,
-            paddingTop: 6,
-            height: 38,
+            paddingVertical: 8,
           }}
         >
           <Text style={{
-            fontFamily: BAGHERA_FONTS.serifItalic,
-            fontSize: 18,
-            lineHeight: 22,
-            color: isSelected ? BAGHERA_PALETTE.ink : BAGHERA_PALETTE.smoke,
+            fontFamily: BAGHERA_FONTS.sans,
+            fontSize: 15,
+            lineHeight: 20,
+            color: isSelected ? BAGHERA_PALETTE.espresso : BAGHERA_PALETTE.sage,
             letterSpacing: 0.3,
           }}>
             {category.name}
@@ -1008,7 +1044,7 @@ export default function MenuScreen({
     } : null;
     const bagheraNameOverride = isBaghera && bagheraTokens ? {
       color: bagheraTokens.productNameColor,
-      fontFamily: BAGHERA_FONTS.serif,
+      fontFamily: BAGHERA_FONTS.black,
       fontSize: 19,
       fontWeight: '400',
       letterSpacing: -0.2,
@@ -1016,13 +1052,13 @@ export default function MenuScreen({
     } : null;
     const bagheraDescOverride = isBaghera && bagheraTokens ? {
       color: bagheraTokens.productDescriptionColor,
-      fontFamily: BAGHERA_FONTS.sansItalic,
+      fontFamily: BAGHERA_FONTS.sans,
       fontSize: 13,
       lineHeight: 19,
     } : null;
     const bagheraPriceOverride = isBaghera && bagheraTokens ? {
       color: bagheraTokens.productPriceColor,
-      fontFamily: BAGHERA_FONTS.serifItalic,
+      fontFamily: BAGHERA_FONTS.mono,
       fontSize: 20,
       fontWeight: '400',
     } : null;
@@ -1060,7 +1096,7 @@ export default function MenuScreen({
             <Text style={[styles.price, bagheraPriceOverride]}>{item.price?.toFixed(2) || '0.00'}€</Text>
             {qty === 0 ? (
               <TouchableOpacity style={[styles.addButton, bagheraAddOverride]} onPress={() => handleAddProduct(item)}>
-                <Text style={styles.addButtonText}>Ajouter</Text>
+                <Text style={styles.addButtonText}>{t("Ajouter")}</Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.quantityControls}>
@@ -1109,7 +1145,7 @@ export default function MenuScreen({
     if (isBaghera) {
       return (
         <View style={{
-          backgroundColor: BAGHERA_PALETTE.cream,
+          backgroundColor: BAGHERA_PALETTE.linen,
           paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 24) + 20,
           paddingHorizontal: 22,
           paddingBottom: 22,
@@ -1122,7 +1158,7 @@ export default function MenuScreen({
             style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
             activeOpacity={0.7}
           >
-            <Ionicons name="chevron-back" size={24} color={BAGHERA_PALETTE.ink} />
+            <Ionicons name="chevron-back" size={24} color={BAGHERA_PALETTE.espresso} />
           </TouchableOpacity>
 
           <View style={{ alignItems: 'center', flex: 1 }}>
@@ -1135,22 +1171,22 @@ export default function MenuScreen({
               style={{ alignItems: 'center' }}
             >
               <Animated.Image
-                source={require("../../assets/baghera/logo.png")}
-                style={{ width: 140, height: 56, transform: [{ scale: storyLogoPulse }] }}
+                source={require("../../assets/baghera/baghera-logo.png")}
+                style={{ width: 120, height: 120, transform: [{ scale: storyLogoPulse }] }}
                 resizeMode="contain"
               />
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                 <Text style={{
-                  fontFamily: BAGHERA_FONTS.serifItalic,
-                  fontSize: 12,
-                  color: BAGHERA_PALETTE.smoke,
+                  fontFamily: BAGHERA_FONTS.day,
+                  fontSize: 36,
+                  color: BAGHERA_PALETTE.sage,
                   letterSpacing: 0.5,
                 }}>
-                  la carte
+                  {t("la carte")}
                 </Text>
                 <View style={{
                   width: 3, height: 3, borderRadius: 1.5,
-                  backgroundColor: BAGHERA_PALETTE.ember,
+                  backgroundColor: BAGHERA_PALETTE.terracotta,
                   marginLeft: 6, opacity: 0.8,
                 }} />
               </View>
@@ -1162,7 +1198,7 @@ export default function MenuScreen({
             style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="no-food" size={20} color={BAGHERA_PALETTE.smoke} />
+            <MaterialIcons name="no-food" size={20} color={BAGHERA_PALETTE.sage} />
           </TouchableOpacity>
         </View>
       );
@@ -1245,10 +1281,10 @@ export default function MenuScreen({
             <View style={styles.restaurantBanner}>
               <View style={styles.bannerContent}>
                 <Text style={[styles.restaurantName, fontLoaded && { fontFamily: 'DXNacky' }]}>
-                  {restaurantName || "Restaurant"}
+                  {restaurantName || t("Restaurant")}
                 </Text>
                 <View style={styles.bannerDivider} />
-                <Text style={styles.menuSubtitle}>Menu</Text>
+                <Text style={styles.menuSubtitle}>{t("Menu")}</Text>
               </View>
             </View>
             
@@ -1285,10 +1321,10 @@ export default function MenuScreen({
             <View style={styles.restaurantBanner}>
               <View style={styles.bannerContent}>
                 <Text style={[styles.restaurantName, fontLoaded && { fontFamily: 'DXNacky' }]}>
-                  {restaurantName || "Restaurant"}
+                  {restaurantName || t("Restaurant")}
                 </Text>
                 <View style={styles.bannerDivider} />
-                <Text style={styles.menuSubtitle}>Menu</Text>
+                <Text style={styles.menuSubtitle}>{t("Menu")}</Text>
               </View>
             </View>
             
@@ -1331,7 +1367,7 @@ export default function MenuScreen({
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: bagheraTokens?.background || BAGHERA_PALETTE.cream,
+      backgroundColor: bagheraTokens?.background || BAGHERA_PALETTE.linen,
     };
   }
 
@@ -1396,7 +1432,7 @@ export default function MenuScreen({
         styles.navContainer, 
         isGrillz && { backgroundColor: 'transparent' },
         isCucina && { backgroundColor: '#146845' },
-        isBaghera && { backgroundColor: BAGHERA_PALETTE.cream }
+        isBaghera && { backgroundColor: BAGHERA_PALETTE.linen }
       ]}>
         {/* Fond dégradé principal - caché pour Grillz, Cucina et Baghera */}
         {!isGrillz && !isCucina && !isBaghera && (
@@ -1494,7 +1530,7 @@ export default function MenuScreen({
                   left: 0,
                   height: 2,
                   borderRadius: 1,
-                  backgroundColor: BAGHERA_PALETTE.ember,
+                  backgroundColor: BAGHERA_PALETTE.terracotta,
                   width: underlineW,
                   opacity: underlineOpacity,
                   transform: [{ translateX: underlineX }],
@@ -1578,7 +1614,7 @@ export default function MenuScreen({
                       textAlign: 'center',
                       marginBottom: 10,
                     }}>
-                      Prêt à vous régaler ?
+                      {t("Prêt à vous régaler ?")}
                     </Text>
                     <Text style={{ 
                       color: '#AAAAAA', 
@@ -1586,7 +1622,7 @@ export default function MenuScreen({
                       textAlign: 'center',
                       lineHeight: 24,
                     }}>
-                      Sélectionnez une catégorie pour découvrir nos délicieux chickens et accompagnements
+                      {t("Sélectionnez une catégorie pour découvrir nos délicieux chickens et accompagnements")}
                     </Text>
                   </View>
                 ) : null
@@ -1607,63 +1643,65 @@ export default function MenuScreen({
                   justifyContent: 'center',
                   alignItems: 'center',
                   paddingHorizontal: 36,
-                  paddingTop: 80,
+                  paddingTop: 20,
                 }}>
                   {/* Filet décoratif supérieur */}
                   <View style={{
                     width: 40,
                     height: 1,
-                    backgroundColor: BAGHERA_PALETTE.sand,
+                    backgroundColor: BAGHERA_PALETTE.linen,
                     marginBottom: 28,
                   }} />
 
                   <Text style={{
-                    fontFamily: BAGHERA_FONTS.serifItalic,
-                    fontSize: 14,
-                    color: BAGHERA_PALETTE.smoke,
-                    letterSpacing: 1.2,
-                    textTransform: 'uppercase',
-                    marginBottom: 18,
+                    fontFamily: BAGHERA_FONTS.black,
+                    fontSize: 28,
+                    lineHeight: 48,
+                    color: BAGHERA_PALETTE.terracotta,
+                    letterSpacing: 0.5,
+                    paddingTop: 8,
+                    marginBottom: 32,
                   }}>
-                    — Bienvenue {userName || ''}
+                    {t('— Bienvenue')} {userName ? userName.charAt(0).toUpperCase() + userName.slice(1).toLowerCase() : ''}
                   </Text>
 
                   <Text style={{
-                    fontFamily: BAGHERA_FONTS.serif,
+                    fontFamily: BAGHERA_FONTS.day,
                     fontSize: 30,
-                    color: BAGHERA_PALETTE.ink,
+                    color: BAGHERA_PALETTE.espresso,
                     textAlign: 'center',
-                    lineHeight: 38,
-                    letterSpacing: -0.4,
+                    lineHeight: 44,
+                    paddingTop: 6,
+                    includeFontPadding: false,
                     marginBottom: 18,
                   }}>
-                    Une carte pensée{'\n'}comme un{' '}
+                    {t("Une carte pensée")}{'\n'}{t("comme un")}{' '}
                     <Text style={{
-                      fontFamily: BAGHERA_FONTS.serifItalic,
-                      color: BAGHERA_PALETTE.ember,
+                      fontFamily: BAGHERA_FONTS.day,
+                      color: BAGHERA_PALETTE.terracotta,
                     }}>
-                      art de vivre
+                      {t("art de vivre")}
                     </Text>
                     .
                   </Text>
 
                   <Text style={{
-                    fontFamily: BAGHERA_FONTS.sansItalic,
+                    fontFamily: BAGHERA_FONTS.sans,
                     fontSize: 15,
-                    color: BAGHERA_PALETTE.smoke,
+                    color: BAGHERA_PALETTE.sage,
                     textAlign: 'center',
                     lineHeight: 23,
                     marginBottom: 32,
                     maxWidth: 320,
                   }}>
-                    Choisissez une catégorie ci-dessus pour commencer votre voyage gourmand.
+                    {t("Choisissez une catégorie ci-dessus pour commencer votre voyage gourmand.")}
                   </Text>
 
                   {/* Filet décoratif inférieur */}
                   <View style={{
                     width: 40,
                     height: 1,
-                    backgroundColor: BAGHERA_PALETTE.sand,
+                    backgroundColor: BAGHERA_PALETTE.linen,
                   }} />
                 </View>
               ) : isCucina && selectedCategory === null ? (
@@ -1699,7 +1737,7 @@ export default function MenuScreen({
                     textAlign: 'center',
                     lineHeight: 24,
                   }}>
-                    Sélectionnez une catégorie pour découvrir nos délicieuses spécialités italiennes
+                    {t("Sélectionnez une catégorie pour découvrir nos délicieuses spécialités italiennes")}
                   </Text>
                 </View>
               ) : null
@@ -1741,16 +1779,16 @@ export default function MenuScreen({
               }}
             >
               <Ionicons name="card" size={18} color="#FFFFFF" />
-              <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>Payer ma commande</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>{t("Payer ma commande")}</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={[
             styles.bottomBar,
             isBaghera && {
-              backgroundColor: BAGHERA_PALETTE.cream,
+              backgroundColor: BAGHERA_PALETTE.linen,
               borderTopWidth: 1,
-              borderTopColor: BAGHERA_PALETTE.sand,
+              borderTopColor: BAGHERA_PALETTE.linen,
               shadowOpacity: 0,
               elevation: 0,
               justifyContent: 'center',
@@ -1760,7 +1798,7 @@ export default function MenuScreen({
               style={[
                 styles.placeOrderBtn,
                 isBaghera && {
-                  backgroundColor: BAGHERA_PALETTE.ember,
+                  backgroundColor: BAGHERA_PALETTE.terracotta,
                   borderWidth: 0,
                   borderRadius: 28,
                   paddingHorizontal: 32,
@@ -1773,7 +1811,7 @@ export default function MenuScreen({
               <Text style={[
                 styles.placeOrderText,
                 isBaghera && { fontFamily: BAGHERA_FONTS.sans, fontSize: 15 },
-              ]}>Payer ma commande</Text>
+              ]}>{t("Payer ma commande")}</Text>
             </TouchableOpacity>
           </View>
         )
@@ -1786,15 +1824,15 @@ export default function MenuScreen({
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: BAGHERA_PALETTE.creamSoft,
+            backgroundColor: BAGHERA_PALETTE.white,
             marginHorizontal: 16,
             marginBottom: 20,
             paddingHorizontal: 18,
             paddingVertical: 14,
             borderRadius: 22,
             borderWidth: 1,
-            borderColor: BAGHERA_PALETTE.sand,
-            shadowColor: BAGHERA_PALETTE.ink,
+            borderColor: BAGHERA_PALETTE.linen,
+            shadowColor: BAGHERA_PALETTE.espresso,
             shadowOffset: { width: 0, height: 6 },
             shadowOpacity: 0.06,
             shadowRadius: 14,
@@ -1806,7 +1844,7 @@ export default function MenuScreen({
                 width: 46,
                 height: 46,
                 borderRadius: 23,
-                backgroundColor: BAGHERA_PALETTE.ember,
+                backgroundColor: BAGHERA_PALETTE.terracotta,
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 14,
@@ -1816,28 +1854,28 @@ export default function MenuScreen({
                   position: 'absolute',
                   top: -4,
                   right: -4,
-                  backgroundColor: BAGHERA_PALETTE.cream,
+                  backgroundColor: BAGHERA_PALETTE.linen,
                   width: 20,
                   height: 20,
                   borderRadius: 10,
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderWidth: 1,
-                  borderColor: BAGHERA_PALETTE.ember,
+                  borderColor: BAGHERA_PALETTE.terracotta,
                 }}>
-                  <Text style={{ color: BAGHERA_PALETTE.ember, fontSize: 11, fontFamily: BAGHERA_FONTS.sans, fontWeight: '700' }}>{totalItems}</Text>
+                  <Text style={{ color: BAGHERA_PALETTE.terracotta, fontSize: 11, fontFamily: BAGHERA_FONTS.sans, fontWeight: '700' }}>{totalItems}</Text>
                 </View>
               </View>
 
               <View>
                 <Text style={{
-                  fontFamily: BAGHERA_FONTS.sansItalic,
-                  color: BAGHERA_PALETTE.smoke,
+                  fontFamily: BAGHERA_FONTS.sans,
+                  color: BAGHERA_PALETTE.sage,
                   fontSize: 12,
-                }}>— total</Text>
+                }}>{t("— total")}</Text>
                 <Text style={{
-                  fontFamily: BAGHERA_FONTS.serifItalic,
-                  color: BAGHERA_PALETTE.ember,
+                  fontFamily: BAGHERA_FONTS.mono,
+                  color: BAGHERA_PALETTE.terracotta,
                   fontSize: 22,
                   marginTop: 2,
                 }}>{totalAmount.toFixed(2)}€</Text>
@@ -1849,7 +1887,7 @@ export default function MenuScreen({
               onPress={handlePayPress}
               activeOpacity={0.9}
               style={{
-                backgroundColor: BAGHERA_PALETTE.ember,
+                backgroundColor: BAGHERA_PALETTE.terracotta,
                 paddingHorizontal: 22,
                 paddingVertical: 13,
                 borderRadius: 26,
@@ -1862,7 +1900,7 @@ export default function MenuScreen({
                 fontWeight: '600',
                 letterSpacing: 0.3,
               }}>
-                Commander
+                {t("Commander")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1915,7 +1953,7 @@ export default function MenuScreen({
               
               {/* Textes */}
               <View>
-                <Text style={{ color: '#777', fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase' }}>Total Amount</Text>
+                <Text style={{ color: '#777', fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase' }}>{t("Total Amount")}</Text>
                 <Text style={{ color: '#FF8A50', fontSize: 20, fontWeight: '700' }}>{totalAmount.toFixed(2)}€</Text>
               </View>
             </View>
@@ -1950,12 +1988,12 @@ export default function MenuScreen({
                 </View>
               </View>
               <View>
-                <Text style={styles.totalLabel}>TOTAL</Text>
+                <Text style={styles.totalLabel}>{t("TOTAL")}</Text>
                 <Text style={styles.totalValue}>{totalAmount.toFixed(2)}€</Text>
               </View>
             </View>
             <TouchableOpacity style={styles.placeOrderBtn} onPress={handlePayPress}>
-              <Text style={styles.placeOrderText}>Commander</Text>
+              <Text style={styles.placeOrderText}>{t("Commander")}</Text>
             </TouchableOpacity>
           </View>
         )
@@ -2254,7 +2292,7 @@ export default function MenuScreen({
             <Animated.View
               style={{
                 ...StyleSheet.absoluteFillObject,
-                backgroundColor: BAGHERA_PALETTE.ink,
+                backgroundColor: BAGHERA_PALETTE.espresso,
                 opacity: storyBackdrop.interpolate({
                   inputRange: [0, 1],
                   outputRange: [0, 0.42],
@@ -2282,15 +2320,15 @@ export default function MenuScreen({
               style={{
                 width: '100%',
                 maxWidth: 420,
-                backgroundColor: BAGHERA_PALETTE.creamSoft,
+                backgroundColor: BAGHERA_PALETTE.white,
                 borderRadius: 22,
-                paddingTop: 38,
-                paddingBottom: 32,
+                paddingTop: 28,
+                paddingBottom: 36,
                 paddingHorizontal: 30,
                 borderWidth: 1,
-                borderColor: BAGHERA_PALETTE.sand,
+                borderColor: BAGHERA_PALETTE.linen,
                 // Ombre douce, presque tirage papier
-                shadowColor: BAGHERA_PALETTE.ink,
+                shadowColor: BAGHERA_PALETTE.espresso,
                 shadowOffset: { width: 0, height: 18 },
                 shadowOpacity: 0.28,
                 shadowRadius: 32,
@@ -2314,7 +2352,7 @@ export default function MenuScreen({
             >
               {/* Filigrane logo panthère, très discret */}
               <Image
-                source={require("../../assets/baghera/logo.png")}
+                source={require("../../assets/baghera/baghera-logo.png")}
                 resizeMode="contain"
                 pointerEvents="none"
                 style={{
@@ -2324,27 +2362,27 @@ export default function MenuScreen({
                   width: 200,
                   height: 200,
                   opacity: 0.05,
-                  tintColor: BAGHERA_PALETTE.ink,
+                  tintColor: BAGHERA_PALETTE.espresso,
                 }}
               />
 
               {/* Point ember signature */}
-              <View style={{ alignItems: 'center', marginBottom: 14 }}>
+              <View style={{ alignItems: 'center', marginBottom: 8 }}>
                 <View style={{
                   width: 7, height: 7, borderRadius: 3.5,
-                  backgroundColor: BAGHERA_PALETTE.ember,
+                  backgroundColor: BAGHERA_PALETTE.terracotta,
                 }} />
               </View>
 
               {/* Eyebrow */}
               <Text style={{
                 textAlign: 'center',
-                fontFamily: BAGHERA_FONTS.sans,
+                fontFamily: BAGHERA_FONTS.mono,
                 fontSize: 10.5,
                 letterSpacing: 3,
-                color: BAGHERA_PALETTE.smoke,
+                color: BAGHERA_PALETTE.sage,
                 textTransform: 'uppercase',
-                marginBottom: 12,
+                marginBottom: 16,
               }}>
                 Le mot du chef
               </Text>
@@ -2352,69 +2390,68 @@ export default function MenuScreen({
               {/* Titre serif — poétique */}
               <Text style={{
                 textAlign: 'center',
-                fontFamily: BAGHERA_FONTS.serifItalic,
-                fontSize: 34,
-                lineHeight: 38,
-                color: BAGHERA_PALETTE.ink,
+                fontFamily: BAGHERA_FONTS.day,
+                fontSize: 38,
+                lineHeight: 52,
+                color: BAGHERA_PALETTE.espresso,
                 letterSpacing: -0.5,
-                marginBottom: 22,
+                includeFontPadding: false,
+                marginBottom: 28,
               }}>
-                Une carte qui{"\n"}raconte.
+                {t("Une carte qui")}{"\n"}{t("raconte.")}
               </Text>
 
               {/* Filet ember + sand, centré */}
               <View style={{ alignItems: 'center', marginBottom: 22 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={{ width: 28, height: 1, backgroundColor: BAGHERA_PALETTE.sand }} />
+                  <View style={{ width: 28, height: 1, backgroundColor: BAGHERA_PALETTE.linen }} />
                   <View style={{
                     width: 5, height: 5, borderRadius: 2.5,
-                    backgroundColor: BAGHERA_PALETTE.ember,
+                    backgroundColor: BAGHERA_PALETTE.terracotta,
                     marginHorizontal: 8,
                   }} />
-                  <View style={{ width: 28, height: 1, backgroundColor: BAGHERA_PALETTE.sand }} />
+                  <View style={{ width: 28, height: 1, backgroundColor: BAGHERA_PALETTE.linen }} />
                 </View>
               </View>
 
               {/* Corps — prose */}
               <Text style={{
                 fontFamily: BAGHERA_FONTS.sans,
-                fontSize: 14.5,
-                lineHeight: 24,
-                color: BAGHERA_PALETTE.coal,
+                fontSize: 19,
+                lineHeight: 31,
+                color: '#3E3236',
                 textAlign: 'center',
-                marginBottom: 14,
+                marginBottom: 16,
               }}>
-                Notre carte n’est pas une liste.{"\n"}
-                C’est un{" "}
-                <Text style={{ fontFamily: BAGHERA_FONTS.serifItalic, color: BAGHERA_PALETTE.ink }}>
+                Notre carte n’est pas une liste.{"\n"}C’est un{" "}
+                <Text style={{ fontFamily: BAGHERA_FONTS.sansBold, color: '#E0AB60' }}>
                   carnet de saisons
                 </Text>
-                , écrit à quatre mains avec nos producteurs, et redessiné chaque
-                semaine au gré du marché.
+                , écrit à quatre mains avec nos producteurs, et redessiné chaque semaine au gré du marché.
               </Text>
 
               <Text style={{
                 fontFamily: BAGHERA_FONTS.sans,
-                fontSize: 14.5,
-                lineHeight: 24,
-                color: BAGHERA_PALETTE.smoke,
+                fontSize: 19,
+                lineHeight: 31,
+                color: '#3E3236',
                 textAlign: 'center',
-                marginBottom: 26,
+                marginBottom: 28,
               }}>
                 Chaque plat est pensé comme une{" "}
-                <Text style={{ fontFamily: BAGHERA_FONTS.serifItalic, color: BAGHERA_PALETTE.ink }}>
+                <Text style={{ fontFamily: BAGHERA_FONTS.sansBold, color: '#E0AB60' }}>
                   petite histoire
                 </Text>
-                {" "}— un produit juste, un geste précis, et juste assez de
-                silence autour pour qu’il puisse parler.
+                {" "}— un produit juste, un geste précis, et juste assez de silence autour pour qu’il puisse parler.
               </Text>
 
-              {/* Signature */}
               <Text style={{
-                textAlign: 'center',
-                fontFamily: BAGHERA_FONTS.serifItalic,
-                fontSize: 16,
-                color: BAGHERA_PALETTE.ink,
+                textAlign: 'right',
+                fontFamily: BAGHERA_FONTS.dayBold,
+                fontSize: 18,
+                lineHeight: 28,
+                includeFontPadding: false,
+                color: BAGHERA_PALETTE.espresso,
                 marginBottom: 24,
               }}>
                 — Baghera.
@@ -2433,13 +2470,13 @@ export default function MenuScreen({
                   height: 40,
                   borderRadius: 20,
                   borderWidth: 1,
-                  borderColor: BAGHERA_PALETTE.sand,
+                  borderColor: BAGHERA_PALETTE.linen,
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: 'transparent',
                 }}
               >
-                <Ionicons name="close" size={18} color={BAGHERA_PALETTE.ink} />
+                <Ionicons name="close" size={18} color={BAGHERA_PALETTE.espresso} />
               </TouchableOpacity>
             </Animated.View>
           </View>
