@@ -955,11 +955,14 @@ export default function Payment({
 		// 5. Si paiement complet → Fermer la réservation ou la session comptoir
 		let reservationClosed = false;
 		if (isFullPayment) {
+			console.log("[Payment] isFullPayment=true | reservationId:", reservationId, "| tableId:", tableId, "| restaurantId:", restaurantId);
 			if (reservationId) {
+				console.log("[Payment] → closeReservationOnServer (reservationId:", reservationId, ")");
 				const closureResult = await closeReservationOnServer().catch((error) => {
 					console.error("❌ Erreur fermeture réservation:", error);
 					return { success: false, message: error.message };
 				});
+				console.log("[Payment] closeReservationOnServer result:", JSON.stringify(closureResult));
 
 				if (closureResult && closureResult.success) {
 					reservationClosed = true;
@@ -972,8 +975,10 @@ export default function Payment({
 				}
 			} else if (tableId && restaurantId) {
 				// Pas de reservationId → fermer la session comptoir directement par tableId
+				console.log("[Payment] → close-by-table (tableId:", tableId, "restaurantId:", restaurantId, ")");
 				try {
 					const token = await clientAuthService.getClientToken();
+					console.log("[Payment] token disponible:", !!token);
 					const res = await fetch(
 						`${API_BASE_URL}/counter/sessions/close-by-table`,
 						{
@@ -985,6 +990,8 @@ export default function Payment({
 							body: JSON.stringify({ tableId, restaurantId }),
 						},
 					);
+					const resBody = await res.text();
+					console.log("[Payment] close-by-table HTTP", res.status, ":", resBody);
 					if (res.ok) {
 						reservationClosed = true;
 					} else {
