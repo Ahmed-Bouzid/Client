@@ -383,6 +383,8 @@ const nl = {
   "Copier le texte": "Tekst kopiëren",
   "✅ Copié !": "✅ Gekopieerd!",
   "Avis Google": "Google recensie",
+  "Œufs": "Eieren",
+  "100% végétal": "100% plantaardig",
 };
 
 export default nl;

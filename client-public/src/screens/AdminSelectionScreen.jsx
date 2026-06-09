@@ -118,6 +118,16 @@ export default function AdminSelectionScreen({
 
 	const handleSelectTable = (tableId) => {
 		if (selectedRestaurant && tableId) {
+			// 🔍 CONSOLE LOG : Table sélectionnée par le client
+			const selectedTableData = tables.find(t => t._id === tableId);
+			console.log("\n🎯 [CLIENT] Table sélectionnée:", JSON.stringify(selectedTableData, null, 2));
+			console.log("📍 [CLIENT] Info:", {
+				restaurantId: selectedRestaurant,
+				tableId,
+				numero: selectedTableData?.number,
+				statut: selectedTableData?.status
+			});
+			
 			// Rediriger vers l'URL avec les IDs
 			if (Platform.OS === "web") {
 				window.location.href = `/r/${selectedRestaurant}/${tableId}`;

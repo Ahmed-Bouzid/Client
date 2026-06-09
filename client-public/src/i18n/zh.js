@@ -384,6 +384,8 @@ const zh = {
   "Copier le texte": "复制文本",
   "✅ Copié !": "✅ 已复制！",
   "Avis Google": "Google 评价",
+  "Œufs": "鸡蛋",
+  "100% végétal": "100% 植物性",
 };
 
 export default zh;

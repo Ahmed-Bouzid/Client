@@ -27,6 +27,7 @@ import { clientAuthService } from "shared-api/services/clientAuthService.js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useClientTableStore } from "../stores/useClientTableStore.js";
 import { useRestaurantStore } from "../stores/useRestaurantStore.js";
+import { useLanguageStore } from "../stores/useLanguageStore.js";
 import useRestaurantConfig from "../hooks/useRestaurantConfig.js";
 import { buildSafeTheme, DEFAULT_THEME } from "../theme/defaultTheme";
 import RNUUID from "react-native-uuid";
@@ -84,6 +85,7 @@ export default function JoinOrCreateTable({
 	const { restaurantId } = useClientTableStore();
 	const restaurantName = useRestaurantStore((state) => state.name);
 	const category = useRestaurantStore((state) => state.category);
+	const lang = useLanguageStore((state) => state.lang);
 	const fetchRestaurantInfo = useRestaurantStore(
 		(state) => state.fetchRestaurantInfo,
 	);
@@ -399,6 +401,7 @@ export default function JoinOrCreateTable({
 			const body = {
 				clientName: name.trim(),
 				clientId: clientId,
+				lang: lang || "fr",
 				...(isFoodtruck && { clientPhone: phone.trim() }),
 				tableId: tableId,
 				restaurantId: finalRestaurantId,

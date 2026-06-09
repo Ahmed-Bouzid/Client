@@ -320,7 +320,7 @@ export default function DietaryPreferences({ visible, onClose, isBaghera = false
 							marginBottom: 2,
 						}}
 					>
-						{item.icon} {item.name}
+						{item.icon} {t(item.name)}
 					</Text>
 					{item.description && (
 						<Text
@@ -331,7 +331,7 @@ export default function DietaryPreferences({ visible, onClose, isBaghera = false
 							}}
 							numberOfLines={2}
 						>
-							{item.description}
+							{t(item.description)}
 						</Text>
 					)}
 				</View>
@@ -411,7 +411,7 @@ export default function DietaryPreferences({ visible, onClose, isBaghera = false
 							marginBottom: 2,
 						}}
 					>
-						{item.icon} {item.name}
+						{item.icon} {t(item.name)}
 					</Text>
 					{item.description && (
 						<Text
@@ -422,7 +422,7 @@ export default function DietaryPreferences({ visible, onClose, isBaghera = false
 							}}
 							numberOfLines={2}
 						>
-							{item.description}
+							{t(item.description)}
 						</Text>
 					)}
 				</View>

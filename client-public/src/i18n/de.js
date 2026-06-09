@@ -384,6 +384,8 @@ const de = {
   "Copier le texte": "Text kopieren",
   "✅ Copié !": "✅ Kopiert!",
   "Avis Google": "Google-Bewertung",
+  "Œufs": "Eier",
+  "100% végétal": "100% pflanzlich",
 };
 
 export default de;

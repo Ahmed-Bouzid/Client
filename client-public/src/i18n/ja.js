@@ -384,6 +384,8 @@ const ja = {
   "Copier le texte": "テキストをコピー",
   "✅ Copié !": "✅ コピー済み！",
   "Avis Google": "Google レビュー",
+  "Œufs": "卵",
+  "100% végétal": "100%植物性",
 };
 
 export default ja;

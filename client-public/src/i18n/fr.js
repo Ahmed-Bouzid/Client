@@ -411,6 +411,8 @@ const fr = {
   "Copier le texte": "Copier le texte",
   "✅ Copié !": "✅ Copié !",
   "Avis Google": "Avis Google",
+  "Œufs": "Œufs",
+  "100% végétal": "100% végétal",
 };
 
 export default fr;
